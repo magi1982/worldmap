@@ -35,6 +35,7 @@ TRIPS = [
     ("2025-08-02", 14, 57.70, 11.95, "both", "fly"),
 ]
 OUTINGS = [(46.9480, 7.4474), (46.6863, 7.8632), (47.5596, 7.5886), (46.8508, 9.5320), (47.4245, 9.3767), (46.1670, 8.7943)]
+SHOPS = [(HOME[0] + .012, HOME[1] - .018), (HOME[0] - .009, HOME[1] + .015), (HOME[0] + .02, HOME[1] + .011)]
 AIRPORTS = {(42.65, 18.09): (42.5614, 18.2682), (57.70, 11.95): (57.6628, 12.2798)}
 
 
@@ -42,21 +43,25 @@ def path(a, b, t0, minutes, step, rnd, wiggle=0.15, hint=None):
     """Points from a to b along a gently curved line."""
     n = max(2, int(minutes / step))
     dx, dy = b[0] - a[0], b[1] - a[1]
-    bend = rnd.uniform(-wiggle, wiggle)
+    # the same way every time (like a real road), only a few metres of GPS noise
+    ka, kb = (round(a[0], 3), round(a[1], 3)), (round(b[0], 3), round(b[1], 3))
+    bend = wiggle * (((hash(tuple(sorted((ka, kb)))) % 1000) / 500) - 1) * 0.6 * (1 if ka <= kb else -1)
     out = []
     for i in range(n + 1):
         f = i / n
-        off = math.sin(f * math.pi) * bend + math.sin(f * math.pi * 3) * bend * 0.25
+        off = math.sin(f * math.pi) * bend
         lat = a[0] + dx * f - dy * off
         lon = a[1] + dy * f + dx * off
-        out.append((int((t0 + timedelta(minutes=f * minutes)).timestamp()), lat, lon, hint))
+        out.append((int((t0 + timedelta(minutes=f * minutes)).timestamp()), lat + rnd.uniform(-2e-4, 2e-4),
+                    lon + rnd.uniform(-2e-4, 2e-4), hint))
     return out
 
 
 def main(out: str) -> None:
     Path(out).mkdir(parents=True, exist_ok=True)
     opts = {"persons": [{"entity": "person.alex", "label": "Alex"}, {"entity": "person.sam", "label": "Sam"}],
-            "who_options": ["Paar", "Familie"], "home_lat": HOME[0], "home_lon": HOME[1], "routing": "off",
+            "groups": [{"name": "Paar", "members": "Alex, Sam"}, {"name": "Familie", "members": "Alex, Sam", "extra": 2}],
+            "home_lat": HOME[0], "home_lon": HOME[1], "routing": "off",
             "school_holidays": ["2023-07-08..2023-08-13", "2024-07-06..2024-08-11", "2025-07-05..2025-08-10"]}
     Path(out, "options.json").write_text(json.dumps(opts))
     db = Database(str(Path(out) / "worldmap.db"))
@@ -85,7 +90,7 @@ def main(out: str) -> None:
                     add(person, path(HOME, dest, day.replace(hour=10), 70, 5, rnd, .2, "IN_PASSENGER_VEHICLE"))
                     add(person, path(dest, HOME, day.replace(hour=16), 70, 5, rnd, .2, "IN_PASSENGER_VEHICLE"))
                 elif rnd.random() < .5:
-                    shop = (HOME[0] + rnd.uniform(-.03, .03), HOME[1] + rnd.uniform(-.04, .04))
+                    shop = rnd.choice(SHOPS)
                     add(person, path(HOME, shop, day.replace(hour=15), 20, 2, rnd, .3, "WALKING"))
                 add(person, [(int(day.replace(hour=22).timestamp()), HOME[0], HOME[1], None)])
         day += timedelta(days=1)

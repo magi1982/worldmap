@@ -7,7 +7,7 @@ import time
 from collections import defaultdict
 from datetime import UTC, datetime, timedelta
 
-from . import photos, places, questions, routing, trips
+from . import asking, places, questions, routing, trips
 from .db import Database
 from .geo import haversine_km, simplify
 from .ha import HomeAssistant, position_from_state
@@ -27,6 +27,8 @@ class Engine:
         self.version = 0
         self.home: tuple[float, float] | None = None
         self.ingress_url = "/hassio/ingress/worldmap"
+        self.matcher = None
+        self.tile_dir = "/data/tiles"
         if settings.home_lat is not None and settings.home_lon is not None:
             self.home = (float(settings.home_lat), float(settings.home_lon))
 
@@ -39,7 +41,12 @@ class Engine:
             if st and st.get("attributes", {}).get("latitude") is not None:
                 a = st["attributes"]
                 self.home = (float(a["latitude"]), float(a["longitude"]))
+                self.zone_radius_m = float(a.get("radius") or 0)
         return self.home
+
+    def home_radius_km(self) -> float:
+        r = self.s.home_radius_m or getattr(self, "zone_radius_m", 0) or 300
+        return max(0.05, min(5.0, r / 1000))
 
     # --------------------------------------------------------------- import
     def import_points(self, rows) -> int:
@@ -66,8 +73,9 @@ class Engine:
             cands = trips.group_trips(days)
             presence = self._presence(pts, home, tz)
             holidays = questions.parse_ranges(self.s.school_holidays)
-            existing = self.db.trips()
-            created = updated = asked = 0
+            existing = self.db.trips(include_ignored=True)
+            rules = self.db.rules()
+            created = updated = 0
             labels = set(self.s.labels)
             for c in cands:
                 present = {p for p in c.persons if p in labels}
@@ -89,21 +97,23 @@ class Engine:
                     "start_date": c.start, "end_date": c.end, "destination": name, "country": country,
                     "who": sug.who, "confidence": sug.confidence, "nights": c.nights,
                     "max_km": round(c.max_km, 1), "lat": c.lat, "lon": c.lon,
-                    "reason": sug.reason, "source": "auto",
+                    "reason": sug.reason, "source": "auto", "status": "trip",
                 }
+                rule = asking.rule_for(rules, c.lat, c.lon, c.start, c.end)
+                if rule:  # learned from an earlier answer
+                    data["reason"] = f"Regel: {rule['label']}"
+                    if rule["action"] == "ignore":
+                        data.update(status="ignored", confidence="bestätigt")
+                    else:
+                        data.update(who=rule["value"], confidence="hoch")
+                    self.db.query("UPDATE rules SET hits = hits + 1 WHERE id = ?", (rule["id"],))
                 if match:
-                    tid = self.db.upsert_trip(data, match["id"])
+                    self.db.upsert_trip(data, match["id"])
                     updated += 1
                 else:
-                    tid = self.db.upsert_trip(data)
+                    self.db.upsert_trip(data)
                     created += 1
-                if questions.needs_question(sug, self.s.ask_below):
-                    trip = self.db.trip(tid)
-                    opts = questions.options(self.s.labels, self.s.who_options)
-                    if sug.who and sug.who not in opts:
-                        opts.append(sug.who)
-                    self.db.add_question(tid, "who", questions.question_text(trip, sug, hol, present), opts, sug.who or None)
-                    asked += 1
+            asked = asking.build(self.db, self.s)
             self.touch()
         self.publish_sensors()
         return {"trips_created": created, "trips_updated": updated, "questions": asked, "candidates": len(cands)}
@@ -235,13 +245,6 @@ class Engine:
                     rows.append((ts, lat, lon, p["label"], "ha", acc, None))
         return self.import_points(rows)
 
-    def scan_photos(self) -> int:
-        since = float(self.db.get_meta("photo_scan_mtime", "0") or 0)
-        started = time.time()
-        n = self.import_points(photos.scan(self.s.photo_folders, since, self.s.persons, self.s.timezone))
-        self.db.set_meta("photo_scan_mtime", str(started))
-        return n
-
     def notify_open(self, ingress_url: str | None = None) -> int:
         ingress_url = ingress_url or self.ingress_url
         if self.s.notify_mode == "off" or not self.ha.available:
@@ -266,9 +269,16 @@ class Engine:
         self.db.set_meta("last_notify", str(time.time()))
         return len(qs)
 
-    def fill_routes(self) -> int:
-        router = routing.OsrmRouter(self.s.osrm_url) if self.s.routing == "osrm" else None
-        n = routing.fill_gaps(self.db, router)
+    def fill_routes(self, budget_s: float = 1200) -> int:
+        """Lay gaps onto the real network (tiles) and/or OSRM, within a time budget."""
+        if self.s.routing == "off":
+            return 0
+        if self.matcher is None:
+            from .netmatch import Matcher, OpenFreeMapTiles
+
+            self.matcher = Matcher(OpenFreeMapTiles(self.tile_dir))
+        n = routing.fill_gaps(self.db, self.matcher, budget_s=budget_s)
+        log.info("routing: %d new segments %s", n, dict(self.matcher.stats))
         if n:
             self.touch()
         return n

@@ -19,7 +19,11 @@ COUNTRY_DE = {
     "HU": "Ungarn", "SI": "Slowenien", "HR": "Kroatien", "BA": "Bosnien", "RS": "Serbien",
     "ME": "Montenegro", "AL": "Albanien", "GR": "Griechenland", "TR": "Türkei", "CY": "Zypern",
     "MT": "Malta", "EG": "Ägypten", "MA": "Marokko", "TN": "Tunesien", "KE": "Kenia",
-    "MV": "Malediven", "AE": "Vereinigte Arabische Emirate", "US": "USA", "CA": "Kanada",
+    "MV": "Malediven", "AE": "Vereinigte Arabische Emirate", "US": "USA", "CA": "Kanada", "AU": "Australien",
+    "NZ": "Neuseeland", "JP": "Japan", "CN": "China", "IN": "Indien", "ID": "Indonesien", "VN": "Vietnam",
+    "BR": "Brasilien", "AR": "Argentinien", "MX": "Mexiko", "ZA": "Südafrika", "TZ": "Tansania", "MU": "Mauritius",
+    "LK": "Sri Lanka", "SG": "Singapur", "MY": "Malaysia", "PH": "Philippinen", "KR": "Südkorea", "CU": "Kuba",
+    "DO": "Dominikanische Republik", "CR": "Costa Rica", "PE": "Peru", "CL": "Chile", "JO": "Jordanien", "IL": "Israel",
     "TH": "Thailand", "IS": "Island", "MC": "Monaco", "SM": "San Marino", "VA": "Vatikan",
 }
 
@@ -82,6 +86,14 @@ def nearest(lat: float, lon: float, radius_km: float = 60.0):
                 d2 = dx * dx + dy * dy
                 if d2 < best_d2:
                     best, best_d2 = p, d2
+    if not best:  # outside the detailed (European) gazetteer: use world cities
+        for n, la, lo, cc, _sr, _pop in _world():
+            if abs(la - lat) > 3 or abs(lo - lon) > 4:
+                continue
+            dy, dx = la - lat, (lo - lon) * kx
+            d2 = dx * dx + dy * dy
+            if d2 < best_d2:
+                best, best_d2 = (n, la, lo, cc), d2
     if not best:
         return None, None
     return best, haversine_km(lat, lon, best[1], best[2])
@@ -92,8 +104,9 @@ def describe(lat: float | None, lon: float | None) -> tuple[str, str]:
     if lat is None or lon is None:
         return "", ""
     p, d = nearest(lat, lon)
-    if not p:
-        return f"{lat:.2f}, {lon:.2f}", ""
+    if not p:  # outside the detailed gazetteer (Europe): fall back to world cities
+        city = major(lat, lon, radius_km=250)
+        return (f"bei {city}" if city else f"{lat:.2f}, {lon:.2f}"), ""
     name = p[0] if d <= 8 else f"bei {p[0]}"
     return name, COUNTRY_DE.get(p[3], p[3])
 
@@ -130,14 +143,20 @@ def search(query: str, limit: int = 10) -> list[dict]:
     return out[:limit]
 
 
+WORLD = Path(__file__).with_name("data") / "world_cities.json.gz"
+
+
 @lru_cache(maxsize=1)
-def _major():
-    """Natural Earth populated places (bundled in static/base.json): [name, scalerank, lat, lon]."""
-    base = Path(__file__).with_name("static") / "base.json"
+def _world():
+    """Natural Earth populated places, worldwide (public domain): (name, lat, lon, cc, scalerank, population)."""
     try:
-        return [(n, sr, la, lo) for n, sr, la, lo, *_ in json.loads(base.read_text(encoding="utf-8"))["labels"]]
-    except (OSError, ValueError, KeyError):
+        return [tuple(r) for r in json.loads(gzip.decompress(WORLD.read_bytes()))]
+    except (OSError, ValueError):
         return []
+
+
+def _major():
+    return [(n, sr, la, lo) for n, la, lo, _cc, sr, _pop in _world()]
 
 
 def major(lat: float, lon: float, radius_km: float = 45.0) -> str | None:
@@ -150,3 +169,31 @@ def major(lat: float, lon: float, radius_km: float = 45.0) -> str | None:
         if d <= radius_km and d + sr * 6 < score:
             best, score = n, d + sr * 6
     return best
+
+
+@lru_cache(maxsize=64)
+def country_box(cc: str) -> tuple[float, float, float, float] | None:
+    """Rough extent of a country from its towns (2nd–98th percentile, ignores far-away territories)."""
+    lats, lons = [], []
+    for rows in _index().values():
+        for _n, la, lo, c in rows:
+            if c == cc:
+                lats.append(la)
+                lons.append(lo)
+    if len(lats) < 3:
+        lats = [la for _n, la, _lo, c, _s, _p in _world() if c == cc]
+        lons = [lo for _n, _la, lo, c, _s, _p in _world() if c == cc]
+    if len(lats) < 3:
+        return None
+    lats.sort()
+    lons.sort()
+    q = lambda a, f: a[min(len(a) - 1, int(len(a) * f))]  # noqa: E731
+    return q(lats, .02), q(lons, .02), q(lats, .98), q(lons, .98)
+
+
+def home_region(lat: float, lon: float) -> dict:
+    p, _d = nearest(lat, lon, radius_km=150)
+    if not p:
+        return {"cc": "", "name": "", "box": [lat - 1, lon - 1.5, lat + 1, lon + 1.5]}
+    box = country_box(p[3]) or (lat - 1, lon - 1.5, lat + 1, lon + 1.5)
+    return {"cc": p[3], "name": COUNTRY_DE.get(p[3], p[3]), "box": [round(v, 3) for v in box]}

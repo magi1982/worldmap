@@ -6,7 +6,6 @@ import pytest
 
 from worldmap import routing
 from worldmap.ha import HomeAssistant, Supervisor, list_trackers, position_from_state
-from worldmap.photos import owner_for, scan
 
 
 def test_classify_gap():
@@ -23,50 +22,11 @@ def test_great_circle_endpoints():
     assert max(p[0] for p in line) > 50  # arcs north
 
 
-def test_osrm_url_must_be_http():
-    with pytest.raises(ValueError):
-        routing.OsrmRouter("file:///etc/passwd")
-
-
-def test_fill_gaps_with_fake_router(db):
-    class Fake:
-        def route(self, a, b):
-            return [list(a), [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2 + 0.01], list(b)]
-
-    db.add_points([(0, 47.0, 8.0, "Alex", "t", None, None), (3600, 46.5, 7.6, "Alex", "t", None, None),
-                   (7200, 41.9, 12.5, "Alex", "t", None, None)])
-    assert routing.fill_gaps(db, Fake()) == 2
-    modes = sorted(s["mode"] for s in db.segments())
-    assert modes == ["flight", "road"]
-    assert routing.fill_gaps(db, Fake()) == 0  # cached
-
-
-def _jpeg_with_gps(path, model="Phone A"):
-    from PIL import Image
-
-    im = Image.new("RGB", (8, 8), "red")
-    exif = Image.Exif()
-    exif[0x0110] = model
-    exif[0x8769] = {0x9003: "2019:08:01 10:00:00"}
-    exif[0x8825] = {1: "N", 2: (46.0, 6.0, 0.0), 3: "E", 4: (7.0, 12.0, 0.0)}
-    im.save(path, exif=exif)
-
-
-def test_photo_scan(tmp_path):
-    folder = tmp_path / "2019_Sample Trip"
-    folder.mkdir()
-    _jpeg_with_gps(folder / "a.jpg")
-    (folder / "b.jpg").write_bytes(b"not an image")
-    (tmp_path / "@eaDir").mkdir()
-    _jpeg_with_gps(tmp_path / "@eaDir" / "thumb.jpg")
-    persons = [{"label": "Alex", "camera_models": "phone a"}]
-    pts = list(scan([str(tmp_path)], 0, persons, "Europe/Zurich"))
-    assert len(pts) == 1
-    ts, lat, lon, person, src, acc, hint = pts[0]
-    assert (round(lat, 3), round(lon, 3), person, src) == (46.1, 7.2, "Alex", "exif")
-    assert "2019_Sample Trip" in hint
-    assert list(scan([str(tmp_path)], 9e12, persons, "Europe/Zurich")) == []
-    assert owner_for("Other", persons) == ""
+def test_fill_gaps_flights_without_matcher(db):
+    db.add_points([(0, 47.0, 8.0, "Alex", "t", None, None), (7200, 41.9, 12.5, "Alex", "t", None, None)])
+    assert routing.fill_gaps(db, None) == 1
+    assert [s["mode"] for s in db.segments()] == ["flight"]
+    assert routing.fill_gaps(db, None) == 0
 
 
 def test_position_from_state():

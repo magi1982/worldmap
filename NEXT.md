@@ -27,11 +27,33 @@ Ideen werden zuerst hier gesammelt. Code entsteht erst nach einem ausdrückliche
 - Five-view map (trips, tracks, places & days, municipalities, time-lapse) with the full design of the standalone map.
 - Transport mode per segment, curved flight arcs, estimated areas, routine places, background map cache.
 
-## Next: 0.3
+## Done in 0.3.0
 
-- [ ] Rail lines: map-match train journeys onto the real rail network (OpenFreeMap vector tiles, cached in `/data`) – today gaps follow roads.
+- Map matching onto the real rail and road network (OpenFreeMap tiles), activity types for Google path points.
+
+## Done in 0.4.0
+
+- Maps as start page with icon header, Excel-style trip list, trip-list import, duplicate detection, rule-learning questions,
+  OwnTracks endpoint, notification picker, new time-lapse, worldwide place names; OSRM and NAS scanning removed.
+- "Show for" bar (person / group) in all maps, people & groups configurator, home/work settings, worldwide regions view,
+  info buttons.
+
+## Next update – waiting for "mach es" / Nächstes Update – wartet auf „mach es“
+
+- [ ] **Map style editor** in the settings / **Kartenstil-Editor** in den Einstellungen:
+  - line type per transport (car, train, plane, ship, on foot): solid, dashed, dotted, width;
+  - colours per transport and per person/group;
+  - "many short ways" areas: on/off, transparency, size of the area, outline;
+  - live preview on a small map while changing; nothing is redrawn more than once per change (styles are applied when
+    the cached map tiles are drawn, so there is no cost while panning or zooming).
+- [ ] **Versions of the style** / **Versionen des Stils**: every save creates a version (date, short note), one click goes back;
+  last 20 versions kept in `/data`, export/import as a small JSON file.
+
+## Next
+
 - [ ] Actionable notifications ("who was there?" answered directly on the phone).
-- [ ] Settings for colours per person/group.
+- [ ] Offline network package: pre-load the rail/road tiles for a whole country with one click.
+- [ ] Finer worldwide gazetteer (towns outside Europe).
 - [ ] Dashboard card (Lovelace) with a small live map.
 
 ## Ideas for later

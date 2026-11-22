@@ -5,6 +5,9 @@ configuration:
       person.*- oder device_tracker.*-Entitäten mit GPS (z. B. aus der Home-Assistant-App).
       «label» ist der Name in der App, «camera_models» (mit Komma) ordnet Fotos dieser Kameras
       der Person zu, z. B. «iPhone 15».
+  groups:
+    name: Gruppen
+    description: Gruppen für «Wer war dabei?», z. B. Paar oder Familie. «members» = Namen der Personen mit Komma, «extra» = Personen ohne erfasstes Handy (z. B. Kinder). Einfacher in der App unter Einstellungen › Personen & Gruppen.
   who_options:
     name: Gruppen-Antworten
     description: Weitere Antworten für «Wer war dabei?», z. B. Paar, Familie.
@@ -20,6 +23,21 @@ configuration:
   home_lon:
     name: Längengrad zu Hause (optional)
     description: Ersetzt die Zone.
+  home_radius_m:
+    name: Umkreis Zuhause (m)
+    description: Alles in diesem Abstand gilt als Zuhause. 0 = Radius der Zuhause-Zone.
+  work_lat:
+    name: Breitengrad Arbeit (optional)
+    description: Leer = die Arbeit wird automatisch erkannt (der Ort mit den meisten Stunden an Werktagen).
+  work_lon:
+    name: Längengrad Arbeit (optional)
+    description: Siehe Breitengrad Arbeit.
+  work_radius_m:
+    name: Umkreis Arbeit (m)
+    description: Orte in diesem Abstand gelten als Arbeit.
+  show_work:
+    name: Arbeit auf der Karte zeigen
+    description: Aus = die Arbeit erscheint nie auf der Karte (sie zählt trotzdem nie als Reise).
   timezone:
     name: Zeitzone
     description: Für die Umrechnung in lokale Tage, z. B. Europe/Zurich.
@@ -38,19 +56,17 @@ configuration:
     name: Verlauf beim Start (Tage)
     description: Positionen aus dem Home-Assistant-Recorder beim Start.
   routing:
-    name: Routen
+    name: Bahn- und Strassennetz
     description: >-
-      osrm = echte Strassen zwischen GPS-Punkten zeichnen (Start und Ende jeder Lücke gehen an den
-      Routing-Server); off = nichts verlässt dein Netzwerk.
-  osrm_url:
-    name: OSRM-Server
-    description: Öffentlicher Demo-Server oder eigener OSRM.
-  photo_folders:
-    name: Fotoordner
-    description: Ordner unter /media oder /share, deren Foto-GPS gelesen wird (nur lesend).
-  photo_scan_hours:
-    name: Foto-Scan (Std.)
-    description: Wie oft nach neuen Fotos gesucht wird.
+      tiles = Lücken auf das echte Bahn- und Strassennetz legen. Das Netz stammt aus OpenStreetMap-Kartenkacheln, die
+      einmalig per Kachelnummer geladen und im Add-on gespeichert werden – es werden nie Positionen gesendet, danach
+      läuft alles offline. off = kein Routing.
+  owntracks:
+    name: OwnTracks (lokal, ohne Cloud)
+    description: >-
+      Benutzer für die OwnTracks-App (HTTP-Modus). Das Handy sammelt die Positionen unterwegs und schickt sie, sobald
+      es wieder im Heimnetz ist – ohne Nabu Casa und ohne offenen Port ins Internet. Unten Port 8098 aktivieren.
+      Passwort mindestens 8 Zeichen, Label = Name der Person in der App.
   notify_service:
     name: Benachrichtigungsdienst
     description: z. B. notify.mobile_app_handy. Leer = Hinweis in Home Assistant.

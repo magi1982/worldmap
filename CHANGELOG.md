@@ -1,5 +1,52 @@
 # Changelog
 
+## 0.4.0 – 2026-11-23
+
+### Added
+- The maps are the start page. Header icons on the right: open questions (only when there are any), "+" for a trip by hand, settings.
+- Settings with an Excel-style trip list: filter per column, sort, edit cells in place, delete rows, paste rows from Excel/Google Sheets.
+- Trip lists (CSV/Excel with From/To/Destination …) can be imported; destinations are placed on the map from the bundled gazetteer.
+- Duplicate detection for imported and pasted trips (same dates and same name or less than 30 km apart); empty cells never overwrite data.
+- Smart questions without AI: similar trips are asked once, answers can be remembered as rules (place + kind of day), new answers
+  "no trip (everyday life)", "merge with the trip before" and "ask one by one". Learned rules can be reviewed and deleted.
+- OwnTracks endpoint (port 8098, Basic auth): live positions from phones without Nabu Casa – the app buffers while away and
+  sends when back in the home network.
+- Notification settings with a list of the phones found in Home Assistant and a test button.
+- Time-lapse rebuilt: days play hour by hour, glowing head, animated flights, smooth camera, timeline with trips, keyboard control.
+- Worldwide place names (Natural Earth) for trips outside Europe; home country button instead of a fixed "CH".
+- Failed or old import entries can be removed.
+- "Show for" bar on top of every map: everyone, one person or one group – all five maps, numbers, calendar and time-lapse follow.
+- Settings › People & groups: single persons (colour, live location, camera) and groups such as couple or family (members,
+  people without a tracked phone, colour), with templates.
+- Home and work settings: home radius, workplace position and radius (or automatic), and whether the workplace is shown on the map
+  (off by default).
+- Regions view (states, provinces, cantons worldwide, Natural Earth) replaces the Swiss municipalities view.
+- Descriptions moved behind small (i) buttons in the maps and settings; the map side panel is split into clear sections.
+- Empty map explains what to do next (import, people & groups).
+
+### Changed
+- Routing works fully locally on the OpenStreetMap network; the OSRM option was removed.
+- Swiss borders, cantons and municipalities are no longer drawn stronger.
+- Database migrations for installations of 0.1–0.3.
+
+### Removed
+- Swiss municipalities view and its data file (replaced by worldwide regions).
+- Photo folder scanning (NAS) and the `media`/`share` mounts – photo positions can still be imported as CSV.
+
+## 0.3.0 – 2026-11-22
+
+### Added
+- Map matching onto the real rail and road network: gaps between GPS points follow the actual railway lines and roads
+  from OpenStreetMap (OpenFreeMap vector tiles, decoded in the add-on and cached in `/data/tiles`). Loose line ends at
+  tile borders are stitched, paths with large detours are rejected and stay open instead of becoming straight lines.
+- Trams, buses and city tunnels fall back to the street network.
+- Google Timeline path points inherit the transport type of the activity they belong to (train, car, walking …).
+- New routing mode `tiles` (default): only tile numbers are downloaded, no positions are sent.
+
+### Fixed
+- iCloud location exports with "Aufnahme UTC" / "Breite" / "Länge" columns are imported (the "Datei" column was taken for a date).
+- Short GPS jumps are no longer shown as flights.
+
 ## 0.2.0 – 2026-11-22
 
 ### Added

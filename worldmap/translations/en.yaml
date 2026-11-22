@@ -5,6 +5,9 @@ configuration:
       person.* or device_tracker.* entities with GPS (e.g. from the Home Assistant Companion App).
       "label" is the name shown in the app, "camera_models" (comma-separated) assigns photos of these
       cameras to the person, e.g. "iPhone 15".
+  groups:
+    name: Groups
+    description: Groups for "who was there?", e.g. Couple or Family. "members" = person names separated by commas, "extra" = people without a tracked phone (e.g. children). Easier in the app under Settings › People & groups.
   who_options:
     name: Group answers
     description: Extra answers for "who was there?", e.g. Couple, Family.
@@ -20,6 +23,21 @@ configuration:
   home_lon:
     name: Home longitude (optional)
     description: Overrides the home zone.
+  home_radius_m:
+    name: Home radius (m)
+    description: Everything within this distance of home counts as home. 0 = radius of the home zone.
+  work_lat:
+    name: Workplace latitude (optional)
+    description: Empty = the workplace is detected automatically (the place with the most weekday hours).
+  work_lon:
+    name: Workplace longitude (optional)
+    description: See workplace latitude.
+  work_radius_m:
+    name: Workplace radius (m)
+    description: Places within this distance of the workplace count as work.
+  show_work:
+    name: Show the workplace on the map
+    description: Off = the workplace is never shown on the map (it still never counts as a trip).
   timezone:
     name: Time zone
     description: Used to turn timestamps into local days, e.g. Europe/Zurich.
@@ -38,19 +56,17 @@ configuration:
     name: History on start (days)
     description: Positions read from the Home Assistant recorder when the add-on starts.
   routing:
-    name: Routing
+    name: Rail and road network
     description: >-
-      osrm = draw real roads between GPS points (start and end point of each gap are sent to the
-      routing server); off = nothing leaves your network.
-  osrm_url:
-    name: OSRM server
-    description: Public demo server or your own OSRM instance.
-  photo_folders:
-    name: Photo folders
-    description: Folders below /media or /share whose photo GPS data is read (read-only).
-  photo_scan_hours:
-    name: Photo scan interval (h)
-    description: How often new photos are looked for.
+      tiles = lay gaps onto the real rail and road network. The network comes from OpenStreetMap map tiles that are
+      downloaded once by tile number and kept in the add-on – no positions are ever sent, afterwards it works offline.
+      off = no routing.
+  owntracks:
+    name: OwnTracks (local, no cloud)
+    description: >-
+      Users for the OwnTracks app (HTTP mode). The phone keeps positions while you are away and sends them when it
+      is back in your home network – no Nabu Casa or open port to the internet needed. Enable port 8098 below.
+      Password at least 8 characters, label = person name in the app.
   notify_service:
     name: Notification service
     description: e.g. notify.mobile_app_phone. Empty = persistent notification in Home Assistant.

@@ -41,6 +41,8 @@ def js(raw):
 def test_static_and_headers(server):
     url, _ = server
     st, raw, h = call(url + "/")
+    assert st == 200 and b"atlas.js" in raw  # the maps are the start page
+    st, raw, h = call(url + "/app.html")
     assert st == 200 and b"Worldmap" in raw
     assert "default-src 'self'" in h["Content-Security-Policy"]
     assert h["X-Content-Type-Options"] == "nosniff"
@@ -144,13 +146,15 @@ def test_places_config_tracks_stats(server):
 
 
 def test_validators():
-    ok = validate_connectors({"persons": [{"entity": "person.alex", "label": "Alex"}], "photo_folders": ["/media/Fotos"],
+    ok = validate_connectors({"persons": [{"entity": "person.alex", "label": "Alex"}, {"entity": "", "label": "Sam"}],
+                              "owntracks": [{"user": "alex", "password": "secret-123", "label": "Alex"}],
                               "notify_service": "notify.mobile_app_x", "school_holidays": ["2025-07-05..2025-08-10"],
                               "unknown_key": "ignored"})
-    assert "unknown_key" not in ok and ok["photo_folders"] == ["/media/Fotos"]
+    assert "unknown_key" not in ok and ok["owntracks"][0]["user"] == "alex" and "entity" not in ok["persons"][1]
     for bad in ({"persons": [{"entity": "light.x", "label": "A"}]},
                 {"persons": [{"entity": "person.a", "label": "<b>"}]},
-                {"photo_folders": ["/etc"]}, {"photo_folders": ["/media/../etc"]},
+                {"owntracks": [{"user": "Alex Smith", "password": "secret-123", "label": "Alex"}]},
+                {"owntracks": [{"user": "alex", "password": "short", "label": "Alex"}]},
                 {"notify_service": "shell_command.x"}, {"routing": "maybe"},
                 {"school_holidays": ["July"]}):
         with pytest.raises(ValueError):
@@ -158,3 +162,45 @@ def test_validators():
     with pytest.raises(ValueError):
         validate_trip([], partial=True)
     assert validate_trip({"start_date": "2020-01-01", "end_date": "2020-01-03"}, partial=False)["nights"] == 2
+
+
+def test_settings_endpoints(server):
+    url, eng = server
+    # trip list pasted from Excel: duplicates are recognised
+    rows = [["Von", "Bis", "Ziel", "Land", "Wer"], ["01.08.2019", "10.08.2019", "Korsika", "Frankreich", "Paar"],
+            ["01.08.2019", "10.08.2019", "Korsika", "Frankreich", "Paar"]]
+    st, raw, _ = call(url + "/api/trips/bulk", "POST", {"rows": rows})
+    r = js(raw)
+    assert st == 200 and r["trips_created"] == 1 and r["duplicates_in_file"] == 1
+    assert js(call(url + "/api/trips/bulk", "POST", {"rows": rows})[1])["trips_updated"] == 1
+    assert call(url + "/api/trips/bulk", "POST", {"rows": "nope"})[0] == 400
+    assert call(url + "/api/trips/bulk", "POST", {"rows": [["a", "b"]]})[0] == 400
+    # import of a trip list file
+    csvb = b"Von;Bis;Hauptziel;Land;Wer\n2017-06-03;2017-06-12;Mallorca;Spanien;Familie\n"
+    st, raw, _ = call(url + "/api/import?dry_run=1", "POST", csvb, "application/octet-stream")
+    assert js(raw)["kind"] == "trips" and js(raw)["located"] == 1
+    st, raw, _ = call(url + "/api/import", "POST", csvb, "application/octet-stream", {"X-Filename": "list.csv"})
+    assert js(raw)["trips_created"] == 1
+    imports = js(call(url + "/api/connectors")[1])["imports"]
+    assert imports and call(url + f"/api/imports/{imports[0]['id']}", "DELETE")[0] == 200
+    assert call(url + "/api/imports/99999", "DELETE")[0] == 404
+    assert js(call(url + "/api/rules")[1]) == []
+    assert js(call(url + "/api/notify_services")[1]) == []  # no Home Assistant in tests
+    assert call(url + "/api/notify_test", "POST", {})[0] == 503
+    assert call(url + "/api/sync/photos", "POST", {})[0] == 404
+
+
+def test_validate_groups_home_work():
+    ok = validate_connectors({"persons": [{"label": "Alex", "color": "#112233"}, {"label": "Sam"}],
+                              "groups": [{"name": "Paar", "members": ["Alex", "Sam"], "extra": 30, "color": "#00FF00"}],
+                              "home_lat": "47.1", "home_lon": 8.2, "home_radius_m": 99999, "work_lat": None,
+                              "work_radius_m": 10, "show_work": True})
+    assert ok["groups"] == [{"name": "Paar", "members": "Alex, Sam", "extra": 20, "color": "#00FF00"}]
+    assert ok["who_options"] == ["Paar"] and ok["persons"][0]["color"] == "#112233"
+    assert ok["home_lat"] == 47.1 and ok["home_radius_m"] == 5000 and ok["work_lat"] is None and ok["work_radius_m"] == 50
+    assert ok["show_work"] is True
+    for bad in ({"groups": [{"name": "<x>"}]}, {"groups": [{"name": "A", "members": ["<b>"]}]},
+                {"groups": [{"name": "A", "color": "red"}]}, {"home_lat": 91}, {"work_lon": "x"},
+                {"persons": [{"label": "Alex"}], "groups": [{"name": "Alex"}]}):
+        with pytest.raises(ValueError):
+            validate_connectors(bad)

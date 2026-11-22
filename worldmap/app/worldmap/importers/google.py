@@ -69,7 +69,29 @@ def _semantic(obj, tz):
                 yield parse_ts(dur.get("endTimestamp") or dur.get("endTimestampMs"), tz), e[0], e[1], SRC, None, act
 
 
-def _segment(seg, tz):
+def _activity_index(segs, tz):
+    """Sorted (start, end, type) of all activities – used to give path points their transport type."""
+    out = []
+    for seg in segs:
+        if isinstance(seg, dict) and seg.get("activity"):
+            kind = ((seg["activity"].get("topCandidate") or {}).get("type"))
+            t0, t1 = parse_ts(seg.get("startTime"), tz), parse_ts(seg.get("endTime"), tz)
+            if kind and t0 is not None and t1 is not None:
+                out.append((t0, t1, kind))
+    out.sort()
+    return out
+
+
+def _kind_at(index, starts, ts):
+    import bisect
+
+    i = bisect.bisect_right(starts, ts) - 1
+    if i >= 0 and index[i][0] <= ts <= index[i][1]:
+        return index[i][2]
+    return None
+
+
+def _segment(seg, tz, index=None, starts=None):
     start = seg.get("startTime")
     t0 = parse_ts(start, tz)
     t1 = parse_ts(seg.get("endTime"), tz)
@@ -100,14 +122,17 @@ def _segment(seg, tz):
                 ts = None
         else:
             ts = t0
-        yield ts, ll[0], ll[1], SRC, None, None
+        kind = _kind_at(index, starts, ts) if index and ts is not None else None
+        yield ts, ll[0], ll[1], SRC, None, kind
 
 
 def _device(obj, tz):
     segs = obj["semanticSegments"] if isinstance(obj, dict) else obj
+    index = _activity_index(segs, tz)
+    starts = [a[0] for a in index]
     for seg in segs:
         if isinstance(seg, dict):
-            yield from _segment(seg, tz)
+            yield from _segment(seg, tz, index, starts)
     if isinstance(obj, dict):
         for sig in obj.get("rawSignals", []):
             pos = sig.get("position")

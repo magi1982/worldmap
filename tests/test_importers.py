@@ -128,3 +128,12 @@ def test_xlsx():
 def test_unusable_input_gives_user_error(data):
     with pytest.raises(UserImportError):
         detect_and_parse(data, "x")
+
+
+def test_icloud_style_export_with_utc_column():
+    csv = ("Quelle;Datei;Typ;Aufnahme lokal;Zeitzone;Aufnahme UTC;Breite;Länge;Ordner\n"
+           "iCloud;IMG_1.HEIC;Bild;2025-07-01 13:00:00;GMT+0200;2025-07-01 11:00:00;46.100000;7.200000;Sample\n").encode()
+    r = detect_and_parse(csv, "export.csv")
+    assert len(r.points) == 1
+    assert r.columns["time"] == "Aufnahme UTC"
+    assert r.points[0][0] == 1751367600  # 11:00 UTC

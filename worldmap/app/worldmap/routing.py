@@ -1,20 +1,18 @@
-"""Fill gaps between GPS points with real routes (OSRM) or flight arcs."""
+"""Fill gaps between GPS points with paths on the rail/road network or flight arcs."""
 from __future__ import annotations
 
-import json
 import logging
 import math
 import time
-import urllib.parse
-import urllib.request
 
 from .geo import haversine_km
+from .modes import FLIGHT_KMH, mode_of_pair
 
 log = logging.getLogger(__name__)
 
-MIN_GAP_KM = 3.0
+MIN_GAP_KM = 3.0      # gaps shorter than this may be drawn straight
+MIN_MATCH_KM = 0.4    # map matching on the tile network starts at this length
 MAX_GAP_H = 12.0
-FLIGHT_KMH = 220.0
 
 
 def classify_gap(a: dict, b: dict) -> str | None:
@@ -49,60 +47,46 @@ def great_circle(a: tuple, b: tuple, n: int = 32) -> list[list[float]]:
     return out
 
 
-class OsrmRouter:
-    def __init__(self, base_url: str, min_interval_s: float = 1.1, timeout_s: float = 15.0):
-        parsed = urllib.parse.urlparse(base_url)
-        if parsed.scheme not in ("http", "https") or not parsed.netloc:
-            raise ValueError("osrm_url must be an http(s) URL")
-        self.base = base_url.rstrip("/")
-        self.min_interval = min_interval_s
-        self.timeout = timeout_s
-        self._last = 0.0
+def fill_gaps(db, matcher=None, limit: int = 200_000, budget_s: float | None = None) -> int:
+    """Create missing segments: flight arcs and rail/road paths on the network (``matcher``).
 
-    def route(self, a: tuple, b: tuple) -> list[list[float]] | None:
-        wait = self.min_interval - (time.monotonic() - self._last)
-        if wait > 0:
-            time.sleep(wait)
-        self._last = time.monotonic()
-        coords = f"{a[1]:.5f},{a[0]:.5f};{b[1]:.5f},{b[0]:.5f}"
-        url = f"{self.base}/route/v1/driving/{coords}?overview=full&geometries=geojson"
-        try:
-            with urllib.request.urlopen(url, timeout=self.timeout) as r:  # nosec B310 - scheme checked in __init__
-                if r.status != 200:
-                    return None
-                data = json.loads(r.read(5_000_000))
-        except (OSError, ValueError) as exc:
-            log.debug("OSRM request failed: %s", exc)
-            return None
-        routes = data.get("routes") or []
-        if data.get("code") != "Ok" or not routes:
-            return None
-        coords = routes[0].get("geometry", {}).get("coordinates", [])
-        line = [[round(c[1], 5), round(c[0], 5)] for c in coords]
-        dist = routes[0].get("distance", 0) / 1000
-        direct = haversine_km(a[0], a[1], b[0], b[1])
-        if direct > 0 and dist > direct * 2.5 + 5:  # implausible detour (ferry, wrong snap)
-            return None
-        return line
-
-
-def fill_gaps(db, router: OsrmRouter | None, limit: int = 500) -> int:
-    """Create missing segments. Returns the number of new segments."""
+    Everything is computed locally. Gaps without a plausible path are stored as mode ``none``
+    so the map leaves them open instead of drawing a straight line.
+    """
+    t_end = time.monotonic() + budget_s if budget_s else None
     done = {(s["person"], s["t0"], s["t1"]) for s in db.query("SELECT person, t0, t1 FROM segments")}
-    new = 0
-    prev = None
-    for p in db.query("SELECT ts, lat, lon, person FROM points ORDER BY person, ts"):
-        if prev and prev["person"] == p["person"] and (p["person"], prev["ts"], p["ts"]) not in done:
-            kind = classify_gap(prev, p)
-            geom = None
-            if kind == "flight":
-                geom = great_circle((prev["lat"], prev["lon"]), (p["lat"], p["lon"]))
-            elif kind == "road" and router is not None:
-                geom = router.route((prev["lat"], prev["lon"]), (p["lat"], p["lon"]))
-            if geom:
-                db.add_segment(p["person"], prev["ts"], p["ts"], kind, geom)
-                new += 1
-                if new >= limit:
-                    return new
+    gaps, prev = [], None
+    for p in db.query("SELECT ts, lat, lon, person, hint FROM points ORDER BY person, ts"):
+        if prev and p["person"] and prev["person"] == p["person"] and (p["person"], prev["ts"], p["ts"]) not in done:
+            d = haversine_km(prev["lat"], prev["lon"], p["lat"], p["lon"])
+            dt_h = (p["ts"] - prev["ts"]) / 3600
+            if d >= MIN_MATCH_KM and dt_h <= MAX_GAP_H:
+                mode = mode_of_pair(prev, p, d)
+                if mode == "fly" and d >= MIN_GAP_KM:
+                    gaps.append(("flight", prev, p, d))
+                elif mode in ("rail", "road"):
+                    gaps.append((mode, prev, p, d))
         prev = p
+    if matcher is not None:  # neighbouring gaps share cached region graphs
+        gaps.sort(key=lambda g: (g[0], matcher.region_bbox((g[1]["lat"], g[1]["lon"]), (g[2]["lat"], g[2]["lon"]))))
+    new = 0
+    for mode, a, b, d in gaps:
+        if new >= limit or (t_end and time.monotonic() > t_end):
+            break
+        pa, pb = (a["lat"], a["lon"]), (b["lat"], b["lon"])
+        geom = None
+        if mode == "flight":
+            geom = great_circle(pa, pb)
+        elif matcher is not None:
+            geom = matcher.match(mode, pa, pb)
+            if geom == "none" and mode == "rail" and d < 10:
+                # trams, buses and city tunnels: follow the streets instead
+                geom = matcher.match("road", pa, pb)
+        if geom is None:
+            continue  # no data yet (network) – try again later
+        if geom == "none":
+            db.add_segment(b["person"], a["ts"], b["ts"], "none", [])
+        else:
+            db.add_segment(b["person"], a["ts"], b["ts"], mode, geom)
+        new += 1
     return new

@@ -1,7 +1,7 @@
 name: Worldmap
-version: "0.2.0"
+version: "0.4.0"
 slug: worldmap
-description: Your trips on a map – from Home Assistant, photos and Google/Apple exports, with smart questions.
+description: Your trips on a map – from Home Assistant, OwnTracks and Google exports, with smart questions. Works offline.
 url: https://github.com/magi1982/worldmap
 arch:
   - aarch64
@@ -12,25 +12,28 @@ panel_icon: mdi:earth
 panel_title: Worldmap
 homeassistant_api: true
 hassio_api: true
-map:
-  - media:ro
-  - share:ro
+ports:
+  8098/tcp: null
+ports_description:
+  8098/tcp: OwnTracks (optional, local network only)
 options:
   persons: []
+  groups: []
   who_options:
     - Paar
     - Familie
   hint_keywords: []
   home_zone: zone.home
+  home_radius_m: 0
+  work_radius_m: 300
+  show_work: false
   timezone: Europe/Zurich
   min_trip_km: 30
   routine_days: 20
   poll_interval_min: 5
   history_days_on_start: 10
-  routing: osrm
-  osrm_url: https://router.project-osrm.org
-  photo_folders: []
-  photo_scan_hours: 24
+  routing: tiles
+  owntracks: []
   notify_service: ""
   notify_mode: weekly
   ask_below: hoch
@@ -39,9 +42,15 @@ options:
   log_level: info
 schema:
   persons:
-    - entity: match(^(person|device_tracker)\.[a-z0-9_]+$)
+    - entity: match(^(person|device_tracker)\.[a-z0-9_]+$)?
       label: str
       camera_models: str?
+      color: match(^#[0-9a-fA-F]{6}$)?
+  groups:
+    - name: str
+      members: str?
+      extra: int(0,20)?
+      color: match(^#[0-9a-fA-F]{6}$)?
   who_options:
     - str
   hint_keywords:
@@ -49,16 +58,21 @@ schema:
   home_zone: match(^zone\.[a-z0-9_]+$)
   home_lat: float(-90,90)?
   home_lon: float(-180,180)?
+  home_radius_m: int(0,5000)
+  work_lat: float(-90,90)?
+  work_lon: float(-180,180)?
+  work_radius_m: int(50,5000)
+  show_work: bool
   timezone: str
   min_trip_km: float(1,1000)
   routine_days: int(0,3650)
   poll_interval_min: int(1,60)
   history_days_on_start: int(0,30)
-  routing: list(osrm|off)
-  osrm_url: url
-  photo_folders:
-    - str
-  photo_scan_hours: int(1,168)
+  routing: list(tiles|off)
+  owntracks:
+    - user: match(^[a-z0-9_.-]{2,32}$)
+      password: password
+      label: str
   notify_service: str?
   notify_mode: list(off|instant|daily|weekly)
   ask_below: list(mittel|hoch|bestätigt)

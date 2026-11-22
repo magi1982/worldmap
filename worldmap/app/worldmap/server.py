@@ -19,20 +19,21 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from . import places
+from . import asking, places
 from .atlas import Atlas
 from .db import CONFIDENCE
 from .engine import Engine
 from .ha import Supervisor, list_trackers
-from .importers import UserImportError, detect_and_parse
-from .settings import ENTITY_RE, LABEL_RE, SERVICE_RE, from_dict
+from .importers import UserImportError, detect_and_parse, triplist
+from .settings import COLOR_RE, ENTITY_RE, LABEL_RE, SERVICE_RE, USER_RE, from_dict
 
 log = logging.getLogger(__name__)
 
 STATIC = Path(__file__).with_name("static")
 STATIC_FILES = {
-    "/": ("index.html", "text/html; charset=utf-8"),
-    "/index.html": ("index.html", "text/html; charset=utf-8"),
+    "/": ("atlas.html", "text/html; charset=utf-8"),
+    "/index.html": ("atlas.html", "text/html; charset=utf-8"),
+    "/app.html": ("app.html", "text/html; charset=utf-8"),
     "/app.js": ("app.js", "text/javascript; charset=utf-8"),
     "/style.css": ("style.css", "text/css; charset=utf-8"),
     "/base.json": ("base.json", "application/json"),
@@ -40,7 +41,7 @@ STATIC_FILES = {
     "/atlas.html": ("atlas.html", "text/html; charset=utf-8"),
     "/atlas.js": ("atlas.js", "text/javascript; charset=utf-8"),
     "/atlas.css": ("atlas.css", "text/css; charset=utf-8"),
-    "/ch.json": ("ch.json", "application/json"),
+    "/regions.json": ("regions.json", "application/json"),
 }
 SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",
@@ -52,8 +53,9 @@ SECURITY_HEADERS = {
 _STATIC_CACHE: dict = {}
 FILENAME_RE = re.compile(r"[^\w.\-]+")
 MAX_JSON = 256 * 1024
-CONNECTOR_KEYS = ("persons", "photo_folders", "notify_service", "notify_mode", "who_options",
-                  "school_holidays", "routing", "min_trip_km", "ask_below", "hint_keywords", "routine_days")
+CONNECTOR_KEYS = ("persons", "groups", "owntracks", "notify_service", "notify_mode", "who_options", "school_holidays",
+                  "routing", "min_trip_km", "ask_below", "hint_keywords", "routine_days", "home_lat", "home_lon",
+                  "home_radius_m", "work_lat", "work_lon", "work_radius_m", "show_work")
 TEXT_LIMITS = {"destination": 120, "country": 60, "who": 60, "transport": 80, "reason": 300, "note": 1000, "source": 80}
 
 
@@ -103,6 +105,58 @@ def validate_trip(data: dict, partial: bool) -> dict:
     return out
 
 
+def notify_services(ha) -> list[str]:
+    """notify.* services of Home Assistant (mobile apps, groups …)."""
+    if not ha.available:
+        return []
+    try:
+        domains = ha._req("GET", "/services") or []
+    except OSError:
+        return []
+    out = []
+    for d in domains:
+        if d.get("domain") == "notify":
+            out += [f"notify.{name}" for name in (d.get("services") or {}) if SERVICE_RE.match(f"notify.{name}")]
+    return sorted(out)
+
+
+def _same_trip(a: dict, b: dict) -> bool:
+    """Duplicate = same dates and the same place (same name or less than 30 km apart)."""
+    if a["start_date"] != b["start_date"] or a["end_date"] != b["end_date"]:
+        return False
+    if (a.get("destination") or "").strip().lower() == (b.get("destination") or "").strip().lower():
+        return True
+    if None not in (a.get("lat"), a.get("lon"), b.get("lat"), b.get("lon")):
+        from .geo import haversine_km
+
+        return haversine_km(a["lat"], a["lon"], b["lat"], b["lon"]) < 30
+    return False
+
+
+def upsert_trips(db, trips: list[dict]) -> dict:
+    """Insert imported/pasted trips. Duplicates (also within the file) update the existing row."""
+    created = updated = dup_in_file = 0
+    existing = db.trips(include_ignored=True)
+    seen: list[dict] = []
+    for t in trips:
+        clean = validate_trip(t, partial=False)
+        clean["source"] = clean.get("source") or "Import"
+        if any(_same_trip(clean, s) for s in seen):
+            dup_in_file += 1
+            continue
+        seen.append(clean)
+        match = next((e for e in existing if _same_trip(clean, e)), None)
+        if match:
+            keep = {k: v for k, v in clean.items() if v not in ("", None)}  # never blank out fields
+            db.upsert_trip(keep, match["id"])
+            updated += 1
+        else:
+            clean["id"] = db.upsert_trip(clean)
+            existing.append(clean)
+            created += 1
+    return {"trips_created": created, "trips_updated": updated, "duplicates_in_file": dup_in_file}
+
+
 def validate_connectors(data: dict) -> dict:
     """Whitelist + validate the connector settings that the UI may change."""
     if not isinstance(data, dict):
@@ -115,19 +169,45 @@ def validate_connectors(data: dict) -> dict:
         if k == "persons":
             persons = []
             for p in v or []:
-                ent, label = str(p.get("entity", "")), str(p.get("label", "")).strip()
-                if not ENTITY_RE.match(ent) or not LABEL_RE.match(label):
+                ent, label = str(p.get("entity", "") or ""), str(p.get("label", "")).strip()
+                if (ent and not ENTITY_RE.match(ent)) or not LABEL_RE.match(label):
                     raise ValueError(f"invalid person entry: {ent!r} / {label!r}")
-                persons.append({"entity": ent, "label": label, "camera_models": str(p.get("camera_models") or "")[:200]})
+                color = str(p.get("color") or "")
+                if color and not COLOR_RE.match(color):
+                    raise ValueError("invalid colour")
+                row = {"entity": ent, "label": label, "camera_models": str(p.get("camera_models") or "")[:200], "color": color}
+                persons.append({k2: v2 for k2, v2 in row.items() if v2 or k2 == "label"})  # Supervisor rejects "" for match()
             if len(persons) > 10:
                 raise ValueError("at most 10 persons")
             out[k] = persons
-        elif k == "photo_folders":
-            folders = [str(f).strip() for f in v or [] if str(f).strip()]
-            for f in folders:
-                if not re.fullmatch(r"/(media|share)(/[\w .\-äöüÄÖÜ]+)*", f) or "/.." in f:
-                    raise ValueError(f"photo folder must be below /media or /share: {f!r}")
-            out[k] = folders
+        elif k == "groups":
+            groups = []
+            for g in v or []:
+                name = str(g.get("name", "")).strip()
+                members = g.get("members") or []
+                color = str(g.get("color") or "")
+                if not LABEL_RE.match(name) or not isinstance(members, list) or (color and not COLOR_RE.match(color)):
+                    raise ValueError(f"invalid group {name!r}")
+                if not all(isinstance(m, str) and LABEL_RE.match(m) for m in members):
+                    raise ValueError("invalid group member")
+                row = {"name": name, "members": ", ".join(members), "extra": max(0, min(20, int(g.get("extra") or 0))),
+                       "color": color}
+                groups.append({k2: v2 for k2, v2 in row.items() if v2 or k2 == "name"})
+            if len({g["name"] for g in groups}) != len(groups) or {g["name"] for g in groups} & {
+                    str(p.get("label", "")).strip() for p in (data.get("persons") or [])}:
+                raise ValueError("names of people and groups must be unique")
+            out[k] = groups[:20]
+            out["who_options"] = [g["name"] for g in groups]
+        elif k == "owntracks":
+            users = []
+            for o in v or []:
+                user, pw, label = str(o.get("user", "")), str(o.get("password", "")), str(o.get("label", "")).strip()
+                if not USER_RE.match(user) or len(pw) < 8 or len(pw) > 128 or not LABEL_RE.match(label):
+                    raise ValueError("OwnTracks: user 2–32 characters (a-z 0-9 . _ -), password at least 8 characters, label = person")
+                users.append({"user": user, "password": pw, "label": label})
+            if len({u["user"] for u in users}) != len(users):
+                raise ValueError("OwnTracks users must be unique")
+            out[k] = users[:10]
         elif k == "notify_service":
             if v and not SERVICE_RE.match(str(v)):
                 raise ValueError("notify_service must look like notify.mobile_app_phone")
@@ -137,13 +217,26 @@ def validate_connectors(data: dict) -> dict:
                 raise ValueError("invalid notify_mode")
             out[k] = v
         elif k == "routing":
-            if v not in ("osrm", "off"):
+            if v not in ("tiles", "off"):
                 raise ValueError("invalid routing")
             out[k] = v
         elif k == "ask_below":
             if v not in ("mittel", "hoch", "bestätigt"):
                 raise ValueError("invalid ask_below")
             out[k] = v
+        elif k in ("home_lat", "home_lon", "work_lat", "work_lon"):
+            if v in (None, ""):
+                out[k] = None
+                continue
+            f = float(v)
+            limit = 90 if k.endswith("lat") else 180
+            if not -limit <= f <= limit:
+                raise ValueError(f"{k} out of range")
+            out[k] = round(f, 6)
+        elif k in ("home_radius_m", "work_radius_m"):
+            out[k] = max(0 if k == "home_radius_m" else 50, min(5000, int(v)))
+        elif k == "show_work":
+            out[k] = bool(v)
         elif k == "min_trip_km":
             out[k] = max(1.0, min(1000.0, float(v)))
         elif k == "routine_days":
@@ -194,16 +287,22 @@ def make_handler(app: App):
     def connectors_status() -> dict:
         last = {r["person"]: r["t"] for r in eng.db.query("SELECT person, MAX(ts) AS t FROM points GROUP BY person")}
         by_src = {r["source"]: r["n"] for r in eng.db.query("SELECT source, COUNT(*) AS n FROM points GROUP BY source")}
-        imports = eng.db.query("SELECT filename, format, points, created_at FROM imports ORDER BY id DESC LIMIT 10")
+        imports = eng.db.query("SELECT id, filename, format, points, created_at FROM imports ORDER BY id DESC LIMIT 20")
         return {
             "persons": [{**p, "last_point": last.get(p["label"])} for p in eng.s.persons],
             "trackers": list_trackers(eng.ha),
-            "photo_folders": eng.s.photo_folders,
-            "photo_scan_mtime": eng.db.get_meta("photo_scan_mtime"),
+            "owntracks": [{"user": o["user"], "label": o["label"], "password_set": bool(o["password"]),
+                           "last_point": eng.db.scalar("SELECT MAX(ts) FROM points WHERE source = 'owntracks' AND person = ?",
+                                                       (o["label"],))} for o in eng.s.owntracks],
+            "tiles": len(list(Path(eng.tile_dir).glob("*.json.gz"))) if Path(eng.tile_dir).is_dir() else 0,
+            "segments": {r["mode"]: r["n"] for r in eng.db.query("SELECT mode, COUNT(*) AS n FROM segments GROUP BY mode")},
             "notify_service": eng.s.notify_service, "notify_mode": eng.s.notify_mode,
-            "who_options": eng.s.who_options, "school_holidays": eng.s.school_holidays,
+            "who_options": eng.s.who_options, "groups": eng.s.groups, "school_holidays": eng.s.school_holidays,
             "routing": eng.s.routing, "min_trip_km": eng.s.min_trip_km, "ask_below": eng.s.ask_below,
             "routine_days": eng.s.routine_days,
+            "home": {"zone": eng.s.home_zone, "lat": eng.s.home_lat, "lon": eng.s.home_lon, "radius_m": eng.s.home_radius_m,
+                     "resolved": eng.resolve_home(), "radius_used_m": round(eng.home_radius_km() * 1000)},
+            "work": {"lat": eng.s.work_lat, "lon": eng.s.work_lon, "radius_m": eng.s.work_radius_m, "show": eng.s.show_work},
             "hint_keywords": [f"{k}={v}" for k, v in eng.s.hint_keywords.items()],
             "points_by_source": by_src, "imports": imports,
             "editable": app.supervisor.available, "sync": app.sync_state,
@@ -254,7 +353,7 @@ def make_handler(app: App):
                 if k != "Cache-Control":
                     self.send_header(k, v)
             # data file changes only with a new add-on version; HTML must revalidate
-            self.send_header("Cache-Control", "max-age=86400" if name in ("base.json", "ch.json") else "no-cache")
+            self.send_header("Cache-Control", "max-age=86400" if name in ("base.json", "regions.json") else "no-cache")
             if use_gz:
                 self.send_header("Content-Encoding", "gzip")
             self.send_header("Vary", "Accept-Encoding")
@@ -304,19 +403,23 @@ def make_handler(app: App):
             if path in STATIC_FILES:
                 return self._static(path)
             if path == "/api/trips":
-                return self._send(HTTPStatus.OK, eng.db.trips())
+                return self._send(HTTPStatus.OK, eng.db.trips(include_ignored=q.get("all", ["0"])[0] == "1"))
             if path == "/api/questions":
                 return self._send(HTTPStatus.OK, eng.db.open_questions())
             if path == "/api/stats":
                 return self._send(HTTPStatus.OK, eng.stats())
             if path == "/api/config":
                 return self._send(HTTPStatus.OK, {
-                    "persons": eng.s.labels, "who_options": eng.s.who_options,
+                    "persons": eng.s.labels, "who_options": eng.s.who_options, "colors": eng.s.colors(),
                     "home": eng.home, "routing": eng.s.routing, "max_upload_mb": eng.s.max_upload_mb,
                 })
-            m = re.fullmatch(r"/api/atlas/(core|tracks|labels|gem)", path)
+            m = re.fullmatch(r"/api/atlas/(core|tracks|labels|reg)", path)
             if m:
                 return self._gz_json(app.atlas.get(m.group(1)))
+            if path == "/api/rules":
+                return self._send(HTTPStatus.OK, eng.db.rules())
+            if path == "/api/notify_services":
+                return self._send(HTTPStatus.OK, notify_services(eng.ha))
             if path == "/api/places":
                 return self._send(HTTPStatus.OK, places.search(q.get("q", [""])[0]))
             if path == "/api/connectors":
@@ -356,14 +459,43 @@ def make_handler(app: App):
                 m = re.fullmatch(r"/api/questions/(\d+)/answer", path)
                 if m:
                     body = self._json()
-                    res = eng.db.answer_question(int(m.group(1)), str(body.get("answer", "")))
-                    if res is None:
+                    try:
+                        res = asking.answer(eng.db, int(m.group(1)), str(body.get("answer", "")), bool(body.get("remember", False)))
+                    except LookupError:
                         return self._send(HTTPStatus.NOT_FOUND, {"error": "not found"})
                     app.changed()
                     eng.publish_sensors()
-                    return self._send(HTTPStatus.OK, {"ok": True})
+                    return self._send(HTTPStatus.OK, {"ok": True, **res})
+                if path == "/api/trips/bulk":
+                    body = self._json()
+                    rows = body.get("rows")
+                    if not isinstance(rows, list) or len(rows) > 5000:
+                        raise ValueError("rows must be a list (max 5000)")
+                    _names, trips, skipped = triplist.parse_rows([[None if c is None else str(c)[:1000] for c in r][:30]
+                                                                 for r in rows if isinstance(r, list)])
+                    if not trips:
+                        raise ValueError("no row with a start date and a destination (first row = column names)")
+                    res = upsert_trips(eng.db, trips)
+                    app.changed()
+                    return self._send(HTTPStatus.OK, {**res, "skipped": skipped})
+                if path == "/api/notify_test":
+                    self._json()
+                    if not eng.ha.available:
+                        return self._send(HTTPStatus.SERVICE_UNAVAILABLE, {"error": "Home Assistant not reachable"})
+                    title, msg = "Worldmap", "Test: so sehen die Fragen zu deinen Reisen aus."
+                    ok = (eng.ha.notify(eng.s.notify_service, title, msg, url=eng.ingress_url) if eng.s.notify_service
+                          else (eng.ha.persistent(title, msg) or True))
+                    return self._send(HTTPStatus.OK if ok else HTTPStatus.BAD_GATEWAY, {"ok": bool(ok)})
                 if path == "/api/connectors":
-                    new = validate_connectors(self._json())
+                    body = self._json()
+                    if isinstance(body, dict) and isinstance(body.get("owntracks"), list):
+                        known = {o["user"]: o["password"] for o in eng.s.owntracks}
+                        for o in body["owntracks"]:  # an empty password field keeps the stored one
+                            if isinstance(o, dict) and not o.get("password") and o.get("user") in known:
+                                o["password"] = known[o["user"]]
+                            if isinstance(o, dict):
+                                o.pop("keep_password", None)
+                    new = validate_connectors(body)
                     if not app.supervisor.available:
                         return self._send(HTTPStatus.SERVICE_UNAVAILABLE, {"error": "Supervisor API not available"})
                     opts = app.supervisor.options()
@@ -372,12 +504,11 @@ def make_handler(app: App):
                     eng.s = from_dict(opts)
                     app.changed()
                     return self._send(HTTPStatus.OK, connectors_status())
-                m = re.fullmatch(r"/api/sync/(ha|photos|routes|rebuild)", path)
+                m = re.fullmatch(r"/api/sync/(ha|routes|rebuild)", path)
                 if m:
                     self._json()
                     what = m.group(1)
-                    fn = {"ha": eng.backfill_history, "photos": eng.scan_photos,
-                          "routes": eng.fill_routes, "rebuild": eng.rebuild}[what]
+                    fn = {"ha": eng.backfill_history, "routes": eng.fill_routes, "rebuild": eng.rebuild}[what]
                     started = app.run_bg(what, fn)
                     return self._send(HTTPStatus.ACCEPTED if started else HTTPStatus.CONFLICT,
                                       {"started": started, "state": app.sync_state})
@@ -427,9 +558,32 @@ def make_handler(app: App):
             if m and eng.db.delete_trip(int(m.group(1))):
                 app.changed()
                 return self._send(HTTPStatus.OK, {"ok": True})
+            m = re.fullmatch(r"/api/rules/(\d+)", path)
+            if m and eng.db.delete_rule(int(m.group(1))):
+                return self._send(HTTPStatus.OK, {"ok": True})
+            m = re.fullmatch(r"/api/imports/(\d+)", path)
+            if m:
+                with eng.db.tx() as c:
+                    gone = c.execute("DELETE FROM imports WHERE id = ?", (int(m.group(1)),)).rowcount
+                if gone:
+                    return self._send(HTTPStatus.OK, {"ok": True})
             return self._send(HTTPStatus.NOT_FOUND, {"error": "not found"})
 
         # ---------------------------------------------------- import
+        def _import_trips(self, res, filename, dry):
+            found = sum(1 for t in res.trips if t.get("lat") is not None)
+            summary = {"format": res.format, "kind": "trips", "trips": len(res.trips), "located": found,
+                       "skipped": res.skipped, "columns": res.columns, "warnings": res.warnings,
+                       "first": min(t["start_date"] for t in res.trips), "last": max(t["end_date"] for t in res.trips),
+                       "sample": [t["destination"] for t in res.trips[:5]]}
+            if dry:
+                return self._send(HTTPStatus.OK, summary)
+            summary.update(upsert_trips(eng.db, res.trips))
+            with eng.db.tx() as c:
+                c.execute("INSERT INTO imports (filename, format, points) VALUES (?, ?, ?)", (filename, res.format, len(res.trips)))
+            app.changed()
+            return self._send(HTTPStatus.OK, summary)
+
         def _import(self, q):
             if "application/octet-stream" not in (self.headers.get("Content-Type") or ""):
                 raise ValueError("Content-Type must be application/octet-stream")
@@ -443,6 +597,15 @@ def make_handler(app: App):
                 res = detect_and_parse(data, filename, person, eng.s.timezone)
             except UserImportError as exc:
                 return self._send(HTTPStatus.UNPROCESSABLE_ENTITY, {"error": str(exc)})
+            if res.trips:
+                return self._import_trips(res, filename, dry)
+            if not person:  # photos: the camera tells whose they are
+                cams = [(tok.strip().lower(), p["label"]) for p in eng.s.persons
+                        for tok in str(p.get("camera_models") or "").split(",") if tok.strip()]
+                if cams:
+                    res.points = [pt if pt[3] or not pt[6] else
+                                  (*pt[:3], next((lab for tok, lab in cams if tok in pt[6].lower()), ""), *pt[4:])
+                                  for pt in res.points]
             summary = {
                 "format": res.format, "points": len(res.points), "skipped": res.skipped,
                 "columns": res.columns, "warnings": res.warnings,

@@ -11,6 +11,7 @@ from .atlas import Atlas
 from .db import Database
 from .engine import Engine
 from .ha import Supervisor
+from .owntracks import serve as serve_owntracks
 from .server import serve
 from .settings import load
 
@@ -33,19 +34,16 @@ def scheduler(engine: Engine, stop: threading.Event) -> None:
             log.info("history backfill: %d new points", engine.backfill_history())
         log.info("rebuild: %s", engine.rebuild())
         warm(engine)
+        if engine.fill_routes():  # lay new gaps onto the rail/road network, then refresh the map
+            warm(engine)
     except Exception:  # noqa: BLE001 - keep the add-on alive
         log.exception("startup sync failed")
-    last_rebuild = last_photos = time.time()
-    if s.photo_folders:
-        last_photos = 0
+    last_rebuild = time.time()
     while not stop.wait(max(60, engine.s.poll_interval_min * 60)):
         s = engine.s  # settings may change through the UI
         try:
             if engine.ha.available and s.persons:
                 engine.poll_once()
-            if s.photo_folders and time.time() - last_photos > s.photo_scan_hours * 3600:
-                log.info("photo scan: %d new points", engine.scan_photos())
-                last_photos = time.time()
             if time.time() - last_rebuild > 3600:
                 engine.rebuild()
                 engine.fill_routes()
@@ -64,12 +62,18 @@ def main() -> None:
     db = Database(os.path.join(data_dir, "worldmap.db"))
     engine = Engine(db, settings)
     engine.atlas = Atlas(engine, data_dir)
+    engine.tile_dir = os.path.join(data_dir, "tiles")
     sup = Supervisor()
     if sup.available:
         engine.ingress_url = sup.ingress_path()
     stop = threading.Event()
     threading.Thread(target=scheduler, args=(engine, stop), daemon=True, name="scheduler").start()
     httpd = serve(engine, port=int(os.environ.get("WORLDMAP_PORT", "8099")))
+    try:  # local live source for phones; reachable only if port 8098 is enabled in the add-on network settings
+        ot = serve_owntracks(engine, port=int(os.environ.get("WORLDMAP_OWNTRACKS_PORT", "8098")))
+        threading.Thread(target=ot.serve_forever, daemon=True, name="owntracks").start()
+    except OSError as exc:
+        log.warning("OwnTracks endpoint not started: %s", exc)
 
     def shutdown(*_):
         stop.set()

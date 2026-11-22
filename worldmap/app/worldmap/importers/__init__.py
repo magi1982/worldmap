@@ -9,7 +9,7 @@ import json
 from dataclasses import dataclass, field
 
 from ..geo import valid_coord
-from . import google, gpx, tabular
+from . import google, gpx, tabular, triplist
 
 # (ts, lat, lon, person, source, accuracy, hint)
 Point = tuple
@@ -24,6 +24,7 @@ class ImportResult:
     skipped: int = 0
     columns: dict | None = None  # column mapping for tabular data (shown in the preview)
     warnings: list = field(default_factory=list)
+    trips: list = field(default_factory=list)  # trip lists: one dict per trip
 
 
 class UserImportError(ValueError):
@@ -48,6 +49,9 @@ def detect_and_parse(data: bytes, filename: str = "", person: str = "", tz: str 
     head = data[:4096].lstrip()
     if data[:2] == b"PK" or name.endswith((".xlsx", ".xlsm")):
         rows, sheet = tabular.read_xlsx(data)
+        trip_res = _trips(rows, "xlsx")
+        if trip_res:
+            return trip_res
         res = ImportResult(format="xlsx")
         mapping, pts = tabular.parse_rows(rows, tz)
         res.columns = mapping
@@ -75,10 +79,26 @@ def detect_and_parse(data: bytes, filename: str = "", person: str = "", tz: str 
         return res
     text = tabular.decode_text(data)
     rows = tabular.read_csv(text)
+    trip_res = _trips(rows, "trips-csv")
+    if trip_res:
+        return trip_res
     mapping, pts = tabular.parse_rows(rows, tz)
     res = ImportResult(format="csv", columns=mapping)
     _clean(pts, person, res)
     _require(res)
+    return res
+
+
+def _trips(rows, fmt):
+    names, trips, skipped = triplist.parse_rows(rows)
+    if not names:
+        return None
+    if not trips:
+        raise UserImportError("trip list recognised, but no row has a start date and a destination")
+    res = ImportResult(format=fmt, columns=names, skipped=skipped, trips=trips)
+    missing = sum(1 for t in trips if t.get("lat") is None)
+    if missing:
+        res.warnings.append(f"{missing} destinations not found on the map – edit them in the list")
     return res
 
 

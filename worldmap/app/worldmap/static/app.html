@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Worldmap · Einstellungen</title>
+<link rel="icon" href="logo.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
+<script src="app.js" defer></script>
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="./"><img src="logo.svg" alt="" width="28" height="28"><b>Worldmap</b></a>
+  <nav id="tabs" role="tablist">
+    <a class="back" href="./">← Karten</a>
+    <button data-tab="trips" class="on" role="tab">Reiseliste</button>
+    <button data-tab="people" role="tab">Personen &amp; Gruppen</button>
+    <button data-tab="import" role="tab">Import</button>
+    <button data-tab="connectors" role="tab">Verbindungen</button>
+    <button data-tab="notify" role="tab">Benachrichtigungen</button>
+    <button data-tab="rules" role="tab">Fragen &amp; Regeln</button>
+  </nav>
+</header>
+
+<main>
+  <section id="tab-trips" class="tab on">
+    <div class="toolbar">
+      <button id="gridAdd" class="btn">+ Zeile</button>
+      <button id="gridDel" class="btn" disabled>Ausgewählte löschen</button>
+      <button id="gridPaste" class="btn">Aus Excel einfügen</button>
+      <label class="check small"><input type="checkbox" id="gridIgnored"> auch „keine Reise“</label>
+      <span class="small" id="gridCount"></span>
+      <span class="grow"></span>
+      <button id="gridClear" class="btn">Filter löschen</button>
+      <a class="btn" href="api/export.csv">CSV / Excel</a>
+    </div>
+    <p class="small hint">Zelle anklicken und tippen – gespeichert wird beim Verlassen der Zelle. Mit <kbd>Strg</kbd>+<kbd>V</kbd> fügst du Zeilen direkt aus Excel ein (Spalten Von, Bis, Ziel, …). Doppelte Reisen werden erkannt.</p>
+    <div class="tablewrap grid"><table id="grid"><thead></thead><tbody></tbody></table></div>
+  </section>
+
+  <section id="tab-questions" class="tab">
+    <div id="qlist" class="cards"></div>
+  </section>
+
+  <section id="tab-import" class="tab">
+    <div id="drop" class="drop" tabindex="0">
+      <b>Dateien hierher ziehen</b> oder <label class="link">auswählen<input id="file" type="file" multiple hidden></label>
+      <p class="small">Reiselisten (CSV/Excel mit Von, Bis, Ziel …), Google-Zeitachse (JSON), iCloud-/exiftool-CSV, GPX, KML – das Format wird automatisch erkannt. Doppelte Daten werden nicht doppelt gespeichert.</p>
+    </div>
+    <div id="imports" class="cards"></div>
+    <h3 class="sub">Bisherige Importe</h3>
+    <div id="pastImports" class="cards"></div>
+  </section>
+
+  <section id="tab-people" class="tab"><div id="people" class="cards"></div></section>
+  <section id="tab-connectors" class="tab"><div id="conn" class="cards"></div></section>
+  <section id="tab-notify" class="tab"><div id="notify" class="cards"></div></section>
+  <section id="tab-rules" class="tab"><div id="rules" class="cards"></div></section>
+</main>
+
+<dialog id="edit"></dialog>
+<dialog id="wizard"></dialog>
+<dialog id="pasteDlg"></dialog>
+<div id="toast" class="toast" hidden></div>
+</body>
+</html>

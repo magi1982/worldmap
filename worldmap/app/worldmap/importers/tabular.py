@@ -21,7 +21,7 @@ LATREF = ("gpslatituderef",)
 LONREF = ("gpslongituderef",)
 PAIR = ("gpsposition", "coordinates", "coordinate", "coords", "koordinaten", "location", "position", "latlng", "geo")
 TIME = (
-    "datetimeoriginal", "gpsdatetime", "createdate", "creationdate", "timestamp", "datetime", "datumzeit",
+    "aufnahmeutc", "datetimeoriginal", "gpsdatetime", "gpszeitutc", "aufnahmelokal", "aufnahme", "createdate", "creationdate", "timestamp", "datetime", "datumzeit",
     "date", "datum", "starttime", "start", "begin", "time", "zeit", "recorded", "createdat",
 )
 TIME_ONLY = ("time", "zeit", "uhrzeit")
@@ -69,12 +69,14 @@ def read_xlsx(data: bytes):
     return best, best_name
 
 
-def _find(header: list[str], names) -> int | None:
+def _find(header: list[str], names, exact: bool = False) -> int | None:
     normed = [_norm(h) for h in header]
     for n in names:  # priority order
         for i, h in enumerate(normed):
             if h == n:
                 return i
+    if exact:
+        return None
     for n in names:
         if len(n) < 4:
             continue
@@ -112,7 +114,7 @@ def detect_columns(header: list) -> dict:
         m["lon_ref"] = None
     if m["lat"] is None or m["lon"] is None:
         m["pair"] = _find(header, PAIR)
-    d, c = _find(header, DATE_ONLY), _find(header, TIME_ONLY)
+    d, c = _find(header, DATE_ONLY, exact=True), _find(header, TIME_ONLY, exact=True)
     if d is not None and c is not None and d != c:
         m["date"], m["clock"] = d, c
     m["names"] = {k: header[v] for k, v in m.items() if isinstance(v, int)}
@@ -137,6 +139,9 @@ def parse_rows(rows: list, tz: str):
         return m["names"], []
     if m["time"] is None and m["date"] is None:
         return m["names"], []
+
+    time_name = _norm(m["names"].get("time", ""))
+    row_tz = "UTC" if "utc" in time_name or time_name == "gpsdatetime" else tz
 
     def gen():
         for row in rows[hi + 1:]:
@@ -163,7 +168,7 @@ def parse_rows(rows: list, tz: str):
             if m["date"] is not None:
                 ts = parse_ts(f"{_cell(row, m['date'])} {_cell(row, m['clock'])}".strip(), tz)
             else:
-                ts = parse_ts(_cell(row, m["time"]), tz)
+                ts = parse_ts(_cell(row, m["time"]), row_tz)
             hint_parts = [str(_cell(row, m[k])) for k in ("hint", "camera") if _cell(row, m[k])]
             yield ts, lat, lon, "csv", None, " | ".join(hint_parts) or None
 

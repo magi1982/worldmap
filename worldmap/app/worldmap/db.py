@@ -80,11 +80,32 @@ CREATE TABLE IF NOT EXISTS imports (
 );
 
 CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+
+CREATE TABLE IF NOT EXISTS rules (
+    id INTEGER PRIMARY KEY,
+    lat REAL NOT NULL,
+    lon REAL NOT NULL,
+    radius_km REAL NOT NULL,
+    days TEXT NOT NULL DEFAULT 'all',      -- all | weekday | weekend
+    action TEXT NOT NULL,                  -- who | ignore
+    value TEXT NOT NULL DEFAULT '',
+    label TEXT NOT NULL DEFAULT '',
+    hits INTEGER NOT NULL DEFAULT 0,
+    created_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+);
 """
+
+# columns added after 0.1.0 – CREATE TABLE IF NOT EXISTS does not add them to old databases
+MIGRATIONS = (
+    ("trips", "radius_km", "REAL"),
+    ("trips", "approx", "INTEGER NOT NULL DEFAULT 0"),
+    ("trips", "status", "TEXT NOT NULL DEFAULT 'trip'"),
+    ("questions", "trip_ids", "TEXT"),
+)
 
 TRIP_FIELDS = (
     "start_date", "end_date", "destination", "country", "who", "confidence", "nights",
-    "max_km", "lat", "lon", "transport", "reason", "note", "source", "locked", "radius_km", "approx",
+    "max_km", "lat", "lon", "transport", "reason", "note", "source", "locked", "radius_km", "approx", "status",
 )
 CONFIDENCE = ("tief", "mittel", "hoch", "bestätigt")
 
@@ -97,6 +118,10 @@ class Database:
         self._conn.row_factory = sqlite3.Row
         self._conn.execute("PRAGMA foreign_keys=ON")
         self._conn.executescript(SCHEMA)
+        for table, col, decl in MIGRATIONS:
+            cols = {r[1] for r in self._conn.execute(f"PRAGMA table_info({table})")}  # nosec B608 - constant names
+            if col not in cols:
+                self._conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {decl}")  # nosec B608 - constant names
 
     def close(self) -> None:
         with self._lock:
@@ -149,8 +174,10 @@ class Database:
         return self.query(sql + " ORDER BY person, ts", args)
 
     # ---- trips --------------------------------------------------------
-    def trips(self) -> list[dict]:
-        return self.query("SELECT * FROM trips ORDER BY start_date, id")
+    def trips(self, include_ignored: bool = False) -> list[dict]:
+        if include_ignored:
+            return self.query("SELECT * FROM trips ORDER BY start_date, id")
+        return self.query("SELECT * FROM trips WHERE status != 'ignored' ORDER BY start_date, id")
 
     def trip(self, trip_id: int) -> dict | None:
         r = self.query("SELECT * FROM trips WHERE id = ?", (trip_id,))
@@ -181,21 +208,47 @@ class Database:
     # ---- questions ----------------------------------------------------
     def open_questions(self) -> list[dict]:
         rows = self.query(
-            "SELECT q.*, t.start_date, t.end_date, t.destination FROM questions q"
-            " JOIN trips t ON t.id = q.trip_id WHERE q.answer IS NULL ORDER BY t.start_date DESC"
+            "SELECT q.*, t.start_date, t.end_date, t.destination, t.max_km FROM questions q"
+            " JOIN trips t ON t.id = q.trip_id WHERE q.answer IS NULL"
+            " ORDER BY (q.trip_ids IS NOT NULL) DESC, t.max_km DESC, t.start_date DESC"
         )
         for r in rows:
             r["options"] = json.loads(r["options"])
+            r["trip_ids"] = json.loads(r["trip_ids"]) if r.get("trip_ids") else [r["trip_id"]]
         return rows
 
-    def add_question(self, trip_id: int, kind: str, text: str, options: list[str], suggestion: str | None) -> None:
+    def add_question(self, trip_id: int, kind: str, text: str, options: list[str], suggestion: str | None,
+                     trip_ids: list[int] | None = None, notified: int = 0) -> None:
         with self.tx() as c:
             c.execute(
-                "INSERT INTO questions (trip_id, kind, text, options, suggestion) VALUES (?, ?, ?, ?, ?)"
+                "INSERT INTO questions (trip_id, kind, text, options, suggestion, trip_ids, notified)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?)"
                 " ON CONFLICT (trip_id, kind) DO UPDATE SET text = excluded.text, options = excluded.options,"
-                " suggestion = excluded.suggestion WHERE questions.answer IS NULL",
-                (trip_id, kind, text, json.dumps(options, ensure_ascii=False), suggestion),
+                " suggestion = excluded.suggestion, trip_ids = excluded.trip_ids WHERE questions.answer IS NULL",
+                (trip_id, kind, text, json.dumps(options, ensure_ascii=False), suggestion,
+                 json.dumps(trip_ids) if trip_ids else None, notified),
             )
+
+    def clear_open_questions(self) -> set:
+        """Remove unanswered questions (they are rebuilt); returns keys that were already notified."""
+        rows = self.query("SELECT kind, trip_ids, trip_id FROM questions WHERE answer IS NULL AND notified = 1")
+        with self.tx() as c:
+            c.execute("DELETE FROM questions WHERE answer IS NULL")
+        return {(r["kind"], r["trip_ids"] or str(r["trip_id"])) for r in rows}
+
+    # ---- rules ---------------------------------------------------------
+    def rules(self) -> list[dict]:
+        return self.query("SELECT * FROM rules ORDER BY created_at DESC")
+
+    def add_rule(self, lat, lon, radius_km, days, action, value, label) -> int:
+        with self.tx() as c:
+            cur = c.execute("INSERT INTO rules (lat, lon, radius_km, days, action, value, label) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                            (lat, lon, radius_km, days, action, value, label))
+            return int(cur.lastrowid)
+
+    def delete_rule(self, rid: int) -> bool:
+        with self.tx() as c:
+            return c.execute("DELETE FROM rules WHERE id = ?", (rid,)).rowcount > 0
 
     def answer_question(self, qid: int, answer: str) -> dict | None:
         rows = self.query("SELECT * FROM questions WHERE id = ?", (qid,))

@@ -12,8 +12,8 @@ Do not open a public issue. You will get an answer within 7 days.
 - All database access is parameterised; all user input is validated and size-limited.
 - XML imports reject DTDs and entities (XXE); CSV exports neutralise spreadsheet formulas.
 - Strict Content-Security-Policy, no inline scripts, all API text is escaped in the UI.
-- Photo folders are mounted read-only; the scanner never follows symlinks out of the configured folders.
-- Optional routing (OSRM) sends only the start and end point of a gap; it can be switched off.
+- The optional OwnTracks endpoint (port 8098, disabled unless mapped) accepts only `POST` with HTTP Basic auth, compares credentials in constant time and slows down failed attempts.
+- Map matching runs locally; only OpenStreetMap tiles are downloaded by tile number.
 - CI runs tests, Ruff, Bandit, pip-audit, CodeQL and Dependabot.
 
 ## Privacy

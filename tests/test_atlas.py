@@ -60,7 +60,10 @@ def test_core_shape(filled, tmp_path):
     assert "fly" in holiday["m"] and holiday["fl"] and holiday["g"]
     day_trip = next(t for t in core["trips"] if t["a"] == "2025-03-01")
     assert day_trip["m"][0] == "rail"
-    assert core["flights"] and len(core["flights"][0]) == 3
+    assert core["flights"] and len(core["flights"][0]) == 5 and 0 <= core["flights"][0][3] <= 1
+    assert {f[4] for f in core["flights"]} == {0, 1}  # person index per flight
+    assert len(core["trackP"]) == len(core["trackT"]) and set(core["trackP"]) <= {-1, 0, 1}
+    assert len(core["dayP"]) == len(core["days"]) and any(m == 3 for m in core["dayP"])
     assert all(len(r) == 8 for r in core["days"])
     assert core["groups"] and core["groups"][0][1]
 
@@ -68,6 +71,8 @@ def test_core_shape(filled, tmp_path):
 def test_tracks_and_cache(filled, tmp_path):
     at = A.Atlas(filled, str(tmp_path))
     tracks = load(at, "tracks")
+    times = load(at, "core")["trackT"]
+    assert len(times) == len(tracks) and all(0 <= a <= b <= 1 for a, b in times)
     assert tracks and all(len(t) >= 6 and len(t) % 2 == 0 for t in tracks)
     assert {t[1] for t in tracks} >= {1}  # rail
     assert list(tmp_path.glob("atlas-*.json.gz"))
@@ -80,13 +85,28 @@ def test_tracks_and_cache(filled, tmp_path):
         at.get("../etc")
 
 
-def test_swiss_municipalities(engine, tmp_path):
+def test_regions_worldwide(engine, tmp_path):
     at = A.Atlas(engine, str(tmp_path))
-    assert at._mun_at(47.0505, 8.3093)[1] == "Luzern"
-    assert at._mun_at(48.86, 2.35) is None
+    names = {r[0]: (r[1], r[2]) for r in json.loads((A.STATIC / "regions.json").read_text(encoding="utf-8"))["regions"]}
+    assert names[at.region_at(47.0505, 8.3093)] == ("Kanton Luzern", "CHE")
+    assert names[at.region_at(48.137, 11.575)][1] == "DEU"       # Bavaria
+    assert names[at.region_at(34.05, -118.25)][1] == "USA"       # California
+    assert at.region_at(0.0, -30.0) is None                      # Atlantic
     engine.import_points([(ts("2025-01-05T12:00:00"), 47.0505, 8.3093, "Alex", "t", None, None)])
-    gem = load(at, "gem")
-    assert any(g[1] == "2025-01-05" for g in gem)
+    reg = load(at, "reg")
+    assert any(r[2] == "2025-01-05" and r[1] == 0 for r in reg)
+
+
+def test_groups_settings():
+    from worldmap.settings import from_dict
+    s = from_dict({"persons": [{"label": "Alex", "color": "#FF00AA"}, {"label": "Sam"}],
+                   "groups": [{"name": "Paar", "members": "Alex, Sam, Nobody", "extra": 2, "color": "#00FF00"},
+                              {"name": "bad", "color": "red"}]})
+    assert s.groups[0] == {"name": "Paar", "members": ["Alex", "Sam"], "extra": 2, "color": "#00FF00"}
+    assert s.groups[1]["color"] == "" and s.who_options == ["Paar", "bad"]
+    assert s.colors() == {"Alex": "#FF00AA", "Paar": "#00FF00"}
+    old = from_dict({"who_options": ["Familie"]})
+    assert old.groups == [{"name": "Familie", "members": [], "extra": 0, "color": ""}]
 
 
 def test_mode_detection():
@@ -115,3 +135,9 @@ def test_routine_places_are_not_trips(engine):
     assert T.routine_cells(pts, "Europe/Zurich", 20)
     engine.s.routine_days = 0
     assert engine.rebuild()["trips_created"] > 20
+
+
+def test_gps_jumps_are_not_flights():
+    a = {"ts": 0, "lat": 47.0, "lon": 8.0, "hint": None}
+    assert A.mode_of_pair(a, {"ts": 20, "lat": 47.02, "lon": 8.0, "hint": None}, 2.2) == "jump"
+    assert A.mode_of_pair(a, {"ts": 3600, "lat": 48.0, "lon": 8.0, "hint": None}, 111) == "road"
