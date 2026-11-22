@@ -22,6 +22,14 @@ Ideen werden zuerst hier gesammelt. Code entsteht erst nach einem ausdrückliche
 - Notifications (mobile app or persistent notification), sensors `sensor.worldmap_*`.
 - Gap routing via OSRM (optional) and flight arcs.
 
+## Next: 0.2 – full map design / volles Karten-Design
+
+- [ ] Port the design of the standalone interactive map 1:1: sidebar with headline, colour by *who* or *transport*, stats with bars (km per mode), legend, labelled destinations, CH/EU buttons, scale bar.
+- [ ] All five views: Trips, Tracks, Places & days, Municipalities, Time-lapse.
+- [ ] Tile engine (256 px raster cache, LOD tracks, Path2D chunks) for millions of points.
+- [ ] Real rail/motorway lines via map matching on OpenFreeMap vector tiles (cached in `/data`).
+- [ ] Transport mode per segment (road, rail, foot, flight, ferry) from speed and import hints.
+
 ## Ideas for later
 
 - [ ] Actionable notifications: answer "who was there?" directly from the phone (listen to `mobile_app_notification_action` over the WebSocket API).
