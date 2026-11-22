@@ -112,8 +112,12 @@ def test_import_preview_then_import_and_questions(server):
 def test_upload_limit(server):
     url, eng = server
     eng.s.max_upload_mb = 1
-    st, _, _ = call(url + "/api/import", "POST", b"x" * (1024 * 1024 + 10), "application/octet-stream")
+    try:
+        st, _, _ = call(url + "/api/import", "POST", b"x" * (1024 * 1024 + 10), "application/octet-stream")
+    except urllib.error.URLError:  # server may close before the client finished sending
+        st = 413
     assert st == 413
+    assert eng.db.scalar("SELECT COUNT(*) FROM imports") == 0
 
 
 def test_export_csv_neutralises_formulas(server):

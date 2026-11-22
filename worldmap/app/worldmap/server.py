@@ -254,6 +254,7 @@ def make_handler(app: App):
             except ValueError:
                 n = -1
             if n < 0 or n > limit:
+                self.close_connection = True  # do not read the oversized body
                 raise OverflowError
             return self.rfile.read(n) if n else b""
 
