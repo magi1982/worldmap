@@ -20,6 +20,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from . import places
+from .atlas import Atlas
 from .db import CONFIDENCE
 from .engine import Engine
 from .ha import Supervisor, list_trackers
@@ -36,11 +37,15 @@ STATIC_FILES = {
     "/style.css": ("style.css", "text/css; charset=utf-8"),
     "/base.json": ("base.json", "application/json"),
     "/logo.svg": ("logo.svg", "image/svg+xml"),
+    "/atlas.html": ("atlas.html", "text/html; charset=utf-8"),
+    "/atlas.js": ("atlas.js", "text/javascript; charset=utf-8"),
+    "/atlas.css": ("atlas.css", "text/css; charset=utf-8"),
+    "/ch.json": ("ch.json", "application/json"),
 }
 SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "same-origin",
-    "Content-Security-Policy": "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self';"
+    "Content-Security-Policy": "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self';"
                                " connect-src 'self'; frame-ancestors 'self'; base-uri 'none'; form-action 'none'",
     "Cache-Control": "no-store",
 }
@@ -48,7 +53,7 @@ _STATIC_CACHE: dict = {}
 FILENAME_RE = re.compile(r"[^\w.\-]+")
 MAX_JSON = 256 * 1024
 CONNECTOR_KEYS = ("persons", "photo_folders", "notify_service", "notify_mode", "who_options",
-                  "school_holidays", "routing", "min_trip_km", "ask_below", "hint_keywords")
+                  "school_holidays", "routing", "min_trip_km", "ask_below", "hint_keywords", "routine_days")
 TEXT_LIMITS = {"destination": 120, "country": 60, "who": 60, "transport": 80, "reason": 300, "note": 1000, "source": 80}
 
 
@@ -141,6 +146,8 @@ def validate_connectors(data: dict) -> dict:
             out[k] = v
         elif k == "min_trip_km":
             out[k] = max(1.0, min(1000.0, float(v)))
+        elif k == "routine_days":
+            out[k] = max(0, min(3650, int(v)))
         elif k in ("who_options", "school_holidays", "hint_keywords"):
             items = [str(x).strip()[:80] for x in v or [] if str(x).strip()][:50]
             if k == "who_options" and not all(LABEL_RE.match(x) for x in items):
@@ -157,7 +164,13 @@ class App:
         self.allowed_ips = allowed_ips
         self.busy = threading.Lock()
         self.supervisor = Supervisor()
+        self.atlas = getattr(engine, "atlas", None) or Atlas(engine, os.environ.get("WORLDMAP_DATA"))
         self.sync_state: dict = {}
+
+    def changed(self) -> None:
+        """Data changed: invalidate caches and rebuild the map data in the background."""
+        self.engine.touch()
+        self.run_bg("atlas", lambda: len(self.atlas.get("core")))
 
     def run_bg(self, name: str, fn) -> bool:
         if self.sync_state.get(name) == "running":
@@ -190,6 +203,7 @@ def make_handler(app: App):
             "notify_service": eng.s.notify_service, "notify_mode": eng.s.notify_mode,
             "who_options": eng.s.who_options, "school_holidays": eng.s.school_holidays,
             "routing": eng.s.routing, "min_trip_km": eng.s.min_trip_km, "ask_below": eng.s.ask_below,
+            "routine_days": eng.s.routine_days,
             "hint_keywords": [f"{k}={v}" for k, v in eng.s.hint_keywords.items()],
             "points_by_source": by_src, "imports": imports,
             "editable": app.supervisor.available, "sync": app.sync_state,
@@ -240,7 +254,22 @@ def make_handler(app: App):
                 if k != "Cache-Control":
                     self.send_header(k, v)
             # data file changes only with a new add-on version; HTML must revalidate
-            self.send_header("Cache-Control", "max-age=86400" if name == "base.json" else "no-cache")
+            self.send_header("Cache-Control", "max-age=86400" if name in ("base.json", "ch.json") else "no-cache")
+            if use_gz:
+                self.send_header("Content-Encoding", "gzip")
+            self.send_header("Vary", "Accept-Encoding")
+            self.end_headers()
+            if self.command != "HEAD":
+                self.wfile.write(body)
+
+        def _gz_json(self, gz: bytes):
+            use_gz = "gzip" in (self.headers.get("Accept-Encoding") or "")
+            body = gz if use_gz else gzip.decompress(gz)
+            self.send_response(HTTPStatus.OK)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            for k, v in SECURITY_HEADERS.items():
+                self.send_header(k, v)
             if use_gz:
                 self.send_header("Content-Encoding", "gzip")
             self.send_header("Vary", "Accept-Encoding")
@@ -285,6 +314,9 @@ def make_handler(app: App):
                     "persons": eng.s.labels, "who_options": eng.s.who_options,
                     "home": eng.home, "routing": eng.s.routing, "max_upload_mb": eng.s.max_upload_mb,
                 })
+            m = re.fullmatch(r"/api/atlas/(core|tracks|labels|gem)", path)
+            if m:
+                return self._gz_json(app.atlas.get(m.group(1)))
             if path == "/api/places":
                 return self._send(HTTPStatus.OK, places.search(q.get("q", [""])[0]))
             if path == "/api/connectors":
@@ -319,7 +351,7 @@ def make_handler(app: App):
                     return self._import(q)
                 if path == "/api/trips":
                     tid = eng.db.upsert_trip(validate_trip(self._json(), partial=False))
-                    eng.touch()
+                    app.changed()
                     return self._send(HTTPStatus.CREATED, eng.db.trip(tid))
                 m = re.fullmatch(r"/api/questions/(\d+)/answer", path)
                 if m:
@@ -327,7 +359,7 @@ def make_handler(app: App):
                     res = eng.db.answer_question(int(m.group(1)), str(body.get("answer", "")))
                     if res is None:
                         return self._send(HTTPStatus.NOT_FOUND, {"error": "not found"})
-                    eng.touch()
+                    app.changed()
                     eng.publish_sensors()
                     return self._send(HTTPStatus.OK, {"ok": True})
                 if path == "/api/connectors":
@@ -338,7 +370,7 @@ def make_handler(app: App):
                     opts.update(new)
                     app.supervisor.set_options(opts)
                     eng.s = from_dict(opts)
-                    eng.touch()
+                    app.changed()
                     return self._send(HTTPStatus.OK, connectors_status())
                 m = re.fullmatch(r"/api/sync/(ha|photos|routes|rebuild)", path)
                 if m:
@@ -384,7 +416,7 @@ def make_handler(app: App):
             except (ValueError, TypeError, json.JSONDecodeError) as exc:
                 return self._send(HTTPStatus.BAD_REQUEST, {"error": str(exc)[:300]})
             eng.db.upsert_trip(data, tid)
-            eng.touch()
+            app.changed()
             return self._send(HTTPStatus.OK, eng.db.trip(tid))
 
         def do_DELETE(self):  # noqa: N802
@@ -393,7 +425,7 @@ def make_handler(app: App):
             path, _ = self._route()
             m = re.fullmatch(r"/api/trips/(\d+)", path)
             if m and eng.db.delete_trip(int(m.group(1))):
-                eng.touch()
+                app.changed()
                 return self._send(HTTPStatus.OK, {"ok": True})
             return self._send(HTTPStatus.NOT_FOUND, {"error": "not found"})
 
@@ -428,6 +460,7 @@ def make_handler(app: App):
                     summary["rebuild"] = eng.rebuild()
                 finally:
                     app.busy.release()
+            app.changed()
             return self._send(HTTPStatus.OK, summary)
 
     return Handler

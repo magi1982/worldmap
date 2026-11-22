@@ -2,9 +2,9 @@
 'use strict';
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
-const NEON = ['#2D7BFF', '#FF2DAA', '#8B3DFF', '#00C26E', '#00B8C9', '#FF8A00', '#E03131', '#5C7CFA'];
+const NEON = ['#0A7CFF', '#FF3D9A', '#8B3DFF', '#00BFB3', '#FF8A00', '#12A84F', '#E03131', '#5C7CFA'];
 const CONF = ['tief', 'mittel', 'hoch', 'bestätigt'];
-const st = {cfg: null, trips: [], questions: [], tracks: {}, trackLevel: null, off: new Set(), yFrom: null, yTo: null};
+const st = {cfg: null, trips: [], questions: []};
 
 async function api(path, opt = {}) {
   const r = await fetch(path, opt);
@@ -30,191 +30,27 @@ function colorOf(who) {
 function showTab(name) {
   document.querySelectorAll('nav button').forEach((b) => b.classList.toggle('on', b.dataset.tab === name));
   document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('on', t.id === 'tab-' + name));
-  if (name === 'map') resize();
+  if (name === 'map') reloadAtlasIfDirty();
   if (name === 'connectors') loadConnectors();
   history.replaceState(null, '', '#' + name);
 }
 $('tabs').addEventListener('click', (e) => { const b = e.target.closest('button[data-tab]'); if (b) showTab(b.dataset.tab); });
 
-/* ================================================================ MAP */
-const cv = $('map'), ctx = cv.getContext('2d');
-const V = {cx: 0.52, cy: 0.33, S: 1400, W: 0, H: 0, dpr: 1};
-const MX = (lon) => (lon + 180) / 360;
-const MY = (lat) => { const s = Math.sin(Math.max(-85, Math.min(85, lat)) * Math.PI / 180); return 0.5 - Math.log((1 + s) / (1 - s)) / (4 * Math.PI); };
-const IY = (y) => (Math.atan(Math.sinh(Math.PI * (1 - 2 * y))) * 180) / Math.PI;
-let base = null; let cache = null; let cacheV = null; let idle = null; let raf = null;
-
-function resize() {
-  const r = cv.getBoundingClientRect(); if (!r.width) return;
-  V.dpr = Math.min(2, window.devicePixelRatio || 1); V.W = r.width; V.H = r.height;
-  cv.width = Math.round(r.width * V.dpr); cv.height = Math.round(r.height * V.dpr);
-  cache = null; fullRender();
-}
-window.addEventListener('resize', resize);
-
-/* no closePath(): fill() closes sub-paths itself and closePath on thousands of rings is very slow in Skia */
-function decode(rings) {
-  const p = new Path2D();
-  for (const r of rings) { let x = 0, y = 0; for (let i = 0; i < r.length; i += 2) { x += r[i]; y += r[i + 1]; const X = MX(x / 1e4), Y = MY(y / 1e4); i ? p.lineTo(X, Y) : p.moveTo(X, Y); } }
-  return p;
-}
-async function loadBase() {
-  const j = await api('base.json');
-  const rivers = []; for (const r of j.rivers) rivers.push(...r.slice(1));
-  base = {land: decode(j.land), lakes: decode(j.lakes), borders: decode(j.borders), rivers: decode(rivers), cant: decode(j.ch_cant), chb: decode(j.ch_border), labels: j.labels};
-  $('loading').hidden = true; cache = null; fullRender();
-}
-
-function worldTransform(c, v) { c.setTransform(v.dpr, 0, 0, v.dpr, 0, 0); c.translate(v.W / 2, v.H / 2); c.scale(v.S, v.S); c.translate(-v.cx, -v.cy); }
-const toScreen = (x, y) => [(x - V.cx) * V.S + V.W / 2, (y - V.cy) * V.S + V.H / 2];
-const toWorld = (sx, sy) => [V.cx + (sx - V.W / 2) / V.S, V.cy + (sy - V.H / 2) / V.S];
-
-function trackLevel() { const t = (360 / V.S) * 1.2; return [0.05, 0.01, 0.002, 0.0005, 0.0001].find((l) => l <= t) ?? 0.0001; }
-function yearOk(y) { y = +y; return (!st.yFrom || y >= st.yFrom) && (!st.yTo || y <= st.yTo); }
-function tripVisible(t) { return !st.off.has(t.who || '') && yearOk(t.start_date.slice(0, 4)); }
-
-function renderScene(c, v) {
-  c.setTransform(v.dpr, 0, 0, v.dpr, 0, 0); c.fillStyle = '#DCE4F6'; c.fillRect(0, 0, v.W, v.H);
-  worldTransform(c, v); const S = v.S;
-  if (base) {
-    c.fillStyle = '#FCFBFF'; c.fill(base.land);
-    if (S > 30000) { c.strokeStyle = '#C4D4F2'; c.lineWidth = 1 / S; c.stroke(base.rivers); }
-    c.fillStyle = '#C9D8F3'; c.fill(base.lakes);
-    if (S > 35000) { c.strokeStyle = '#DCD6EE'; c.lineWidth = 1 / S; c.stroke(base.cant); }
-    c.strokeStyle = '#C2B8E0'; c.lineWidth = 1.2 / S; c.stroke(base.borders); c.stroke(base.chb);
-  }
-  const tr = st.tracks[st.trackLevel];
-  if (tr && $('showTracks').checked) {
-    c.lineJoin = c.lineCap = 'round';
-    for (const [key, path] of tr.paths) {
-      const [person, year] = key.split('|');
-      if (st.off.has(person) || !yearOk(year)) continue;
-      c.strokeStyle = colorOf(person); c.lineWidth = (S < 300000 ? 1.2 : 2.2) / S; c.stroke(path);
-    }
-    c.setLineDash([6 / S, 5 / S]); c.lineWidth = 1.4 / S;
-    for (const f of tr.flights) { if (st.off.has(f.person) || !yearOk(f.year)) continue; c.strokeStyle = colorOf(f.person); c.stroke(f.path); }
-    c.setLineDash([]);
-  }
-  /* trips: estimate areas, flight arcs of hand-made trips, markers */
-  const home = st.cfg && st.cfg.home;
-  for (const t of st.trips) {
-    if (t.lat == null || !tripVisible(t)) continue;
-    const col = colorOf(t.who), x = MX(t.lon), y = MY(t.lat);
-    if (t.radius_km && $('showEst').checked) {
-      const r = (t.radius_km / (40075 * Math.cos((t.lat * Math.PI) / 180)));
-      c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2);
-      c.fillStyle = col + '2E'; c.fill(); c.setLineDash([5 / S, 4 / S]); c.strokeStyle = col; c.lineWidth = 1.5 / S; c.stroke(); c.setLineDash([]);
-    }
-    if (home && /flug/i.test(t.transport || '') && t.source === 'manual') {
-      c.beginPath(); const hx = MX(home[1]), hy = MY(home[0]); const mx = (hx + x) / 2, my = (hy + y) / 2 - Math.hypot(x - hx, y - hy) * 0.18;
-      c.moveTo(hx, hy); c.quadraticCurveTo(mx, my, x, y); c.setLineDash([6 / S, 5 / S]); c.strokeStyle = col; c.lineWidth = 1.4 / S; c.stroke(); c.setLineDash([]);
-    }
-  }
-  c.setTransform(v.dpr, 0, 0, v.dpr, 0, 0);
-  if (base && v.S > 9000) {
-    c.font = '11px system-ui'; c.fillStyle = '#7D7FA3'; c.textAlign = 'center';
-    for (const l of base.labels) { if (l[1] > Math.log2(v.S / 400) + 1) continue; const [sx, sy] = [(MX(l[3]) - v.cx) * v.S + v.W / 2, (MY(l[2]) - v.cy) * v.S + v.H / 2]; if (sx > -40 && sx < v.W + 40 && sy > -10 && sy < v.H + 10) c.fillText(l[0], sx, sy); }
-  }
-  for (const t of st.trips) {
-    if (t.lat == null || !tripVisible(t)) continue;
-    const sx = (MX(t.lon) - v.cx) * v.S + v.W / 2, sy = (MY(t.lat) - v.cy) * v.S + v.H / 2;
-    if (sx < -10 || sx > v.W + 10 || sy < -10 || sy > v.H + 10) continue;
-    c.beginPath(); c.arc(sx, sy, t.confidence === 'bestätigt' ? 5 : 4, 0, Math.PI * 2);
-    c.fillStyle = colorOf(t.who); c.fill(); c.lineWidth = 2; c.strokeStyle = '#fff'; c.stroke();
-  }
-}
-
-function fullRender() {
-  if (!V.W) return;
-  if (!cache) cache = document.createElement('canvas');
-  cache.width = cv.width; cache.height = cv.height;
-  renderScene(cache.getContext('2d'), V); cacheV = {...V};
-  blit();
-  const lvl = trackLevel(); if (lvl !== st.trackLevel) loadTracks(lvl);
-}
-function blit() {
-  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = '#DCE4F6'; ctx.fillRect(0, 0, cv.width, cv.height);
-  if (!cache || !cacheV) return;
-  const k = V.S / cacheV.S;
-  const dx = ((cacheV.cx - V.cx) * V.S + V.W / 2 - (V.W / 2) * k) * V.dpr, dy = ((cacheV.cy - V.cy) * V.S + V.H / 2 - (V.H / 2) * k) * V.dpr;
-  ctx.drawImage(cache, dx, dy, cache.width * k, cache.height * k);
-}
-/* while moving only the cached bitmap is transformed; the full scene is redrawn when the map rests */
-function moved() { if (!raf) raf = requestAnimationFrame(() => { raf = null; blit(); }); clearTimeout(idle); idle = setTimeout(fullRender, 140); }
-
-const pending = new Set();
-async function loadTracks(level) {
-  st.trackLevel = level;
-  if (st.tracks[level] || pending.has(level)) return;
-  pending.add(level);
-  try {
-    const j = await api('api/tracks?tol=' + level);
-    const paths = [];
-    for (const [key, lines] of Object.entries(j.lines)) {
-      const p = new Path2D(); for (const ln of lines) ln.forEach(([la, lo], i) => (i ? p.lineTo(MX(lo), MY(la)) : p.moveTo(MX(lo), MY(la)))); paths.push([key, p]);
-    }
-    const flights = j.flights.map((f) => { const p = new Path2D(); f.line.forEach(([la, lo], i) => (i ? p.lineTo(MX(lo), MY(la)) : p.moveTo(MX(lo), MY(la)))); return {person: f.person, year: f.year, path: p}; });
-    st.tracks[level] = {paths, flights};
-    if (st.trackLevel === level) fullRender();
-  } catch (e) { console.warn('tracks', e); } finally { pending.delete(level); }
-}
-
-function zoomAt(f, sx, sy) { const [wx, wy] = toWorld(sx, sy); V.S = Math.min(4e7, Math.max(600, V.S * f)); V.cx = wx - (sx - V.W / 2) / V.S; V.cy = wy - (sy - V.H / 2) / V.S; moved(); }
-function fitTrips() {
-  const pts = st.trips.filter((t) => t.lat != null && tripVisible(t)); if (!pts.length) return;
-  let x0 = 1, x1 = 0, y0 = 1, y1 = 0;
-  for (const t of pts) { const x = MX(t.lon), y = MY(t.lat); x0 = Math.min(x0, x); x1 = Math.max(x1, x); y0 = Math.min(y0, y); y1 = Math.max(y1, y); }
-  V.cx = (x0 + x1) / 2; V.cy = (y0 + y1) / 2; V.S = Math.min(2e5, Math.min((V.W - 80) / Math.max(1e-6, x1 - x0), (V.H - 120) / Math.max(1e-6, y1 - y0)));
-  fullRender();
-}
-(function pointer() {
-  const pts = new Map(); let last = null, pinch = null;
-  cv.addEventListener('pointerdown', (e) => { cv.setPointerCapture(e.pointerId); pts.set(e.pointerId, [e.offsetX, e.offsetY]); cv.classList.add('drag'); last = [e.offsetX, e.offsetY]; if (pts.size === 2) { const [a, b] = [...pts.values()]; pinch = Math.hypot(a[0] - b[0], a[1] - b[1]); } });
-  cv.addEventListener('pointermove', (e) => {
-    if (!pts.has(e.pointerId)) return hover(e);
-    pts.set(e.pointerId, [e.offsetX, e.offsetY]);
-    if (pts.size === 2) { const [a, b] = [...pts.values()]; const d = Math.hypot(a[0] - b[0], a[1] - b[1]); if (pinch) zoomAt(d / pinch, (a[0] + b[0]) / 2, (a[1] + b[1]) / 2); pinch = d; return; }
-    V.cx -= (e.offsetX - last[0]) / V.S; V.cy -= (e.offsetY - last[1]) / V.S; last = [e.offsetX, e.offsetY]; moved();
-  });
-  const up = (e) => { pts.delete(e.pointerId); pinch = null; if (!pts.size) cv.classList.remove('drag'); const p = [...pts.values()][0]; if (p) last = p; };
-  cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
-  cv.addEventListener('wheel', (e) => { e.preventDefault(); zoomAt(Math.exp(-e.deltaY * 0.0015), e.offsetX, e.offsetY); }, {passive: false});
-  cv.addEventListener('dblclick', (e) => zoomAt(2, e.offsetX, e.offsetY));
-  $('zin').onclick = () => zoomAt(1.6, V.W / 2, V.H / 2); $('zout').onclick = () => zoomAt(1 / 1.6, V.W / 2, V.H / 2); $('zhome').onclick = fitTrips;
-})();
-function hover(e) {
-  let best = null, bd = 12;
-  for (const t of st.trips) { if (t.lat == null || !tripVisible(t)) continue; const [sx, sy] = toScreen(MX(t.lon), MY(t.lat)); const d = Math.hypot(sx - e.offsetX, sy - e.offsetY); if (d < bd) { bd = d; best = t; } }
-  const tip = $('tip');
-  if (!best) { tip.hidden = true; return; }
-  tip.innerHTML = `<b>${esc(best.destination || '–')}</b>${best.country ? ', ' + esc(best.country) : ''}<br>${esc(fmtRange(best))} · ${esc(best.who || 'wer?')}${best.approx ? ' · geschätzt' : ''}`;
-  tip.hidden = false; tip.style.left = Math.min(V.W - 290, e.offsetX + 14) + 'px'; tip.style.top = (e.offsetY + 14) + 'px';
-}
-cv.addEventListener('click', (e) => { if (!$('tip').hidden) { const t = nearestTrip(e); if (t) openEdit(t); } });
-function nearestTrip(e) { let best = null, bd = 12; for (const t of st.trips) { if (t.lat == null || !tripVisible(t)) continue; const [sx, sy] = toScreen(MX(t.lon), MY(t.lat)); const d = Math.hypot(sx - e.offsetX, sy - e.offsetY); if (d < bd) { bd = d; best = t; } } return best; }
-
+/* ================================================================ MAP (atlas in a same-origin frame) */
+const atlas = $('atlas');
+let atlasDirty = false;
+function reloadAtlasIfDirty() { if (atlasDirty) { atlasDirty = false; atlas.contentWindow.location.reload(); } }
+window.addEventListener('message', (e) => {
+  if (e.origin !== location.origin || e.source !== atlas.contentWindow) return;
+  const m = e.data || {};
+  if (m.type === 'worldmap-edit' && Number.isInteger(m.id)) { const t = st.trips.find((x) => x.id === m.id); if (t) openEdit(t); }
+});
 function renderFilters() {
-  const who = ['', ...whoList()].filter((w, i, a) => a.indexOf(w) === i);
-  const used = new Set(st.trips.map((t) => t.who || ''));
-  $('whoChips').innerHTML = who.filter((w) => used.has(w) || w).map((w) => `<button class="chip ${st.off.has(w) ? 'off' : ''}" data-who="${esc(w)}" data-c="${colorOf(w)}"><i></i>${esc(w || 'offen')}</button>`).join('');
-  paint($('whoChips'));
-  const years = [...new Set(st.trips.map((t) => +t.start_date.slice(0, 4)))].sort();
-  const opts = years.map((y) => `<option>${y}</option>`).join('');
-  $('yFrom').innerHTML = opts; $('yTo').innerHTML = opts;
-  if (years.length) { $('yFrom').value = st.yFrom || years[0]; $('yTo').value = st.yTo || years[years.length - 1]; }
+  const who = [...new Set(['', ...whoList(), ...st.trips.map((t) => t.who || '')])];
   $('tripWho').innerHTML = '<option value="">Alle</option>' + who.map((w) => `<option value="${esc(w)}">${esc(w || 'offen')}</option>`).join('');
 }
-$('whoChips').addEventListener('click', (e) => { const b = e.target.closest('.chip'); if (!b) return; const w = b.dataset.who; st.off.has(w) ? st.off.delete(w) : st.off.add(w); renderFilters(); fullRender(); });
-$('yFrom').onchange = () => { st.yFrom = +$('yFrom').value; fullRender(); };
-$('yTo').onchange = () => { st.yTo = +$('yTo').value; fullRender(); };
-$('showTracks').onchange = fullRender; $('showEst').onchange = fullRender;
-
 async function loadStats() {
-  try {
-    const s = await api('api/stats');
-    $('stats').innerHTML = `<div><b>${s.trips}</b>Reisen</div><div><b>${s.countries.length}</b>Länder</div><div><b>${Number(s.km_total).toLocaleString('de-CH')}</b>km</div>`;
-    const b = $('qbadge'); b.hidden = !s.open_questions; b.textContent = s.open_questions;
-  } catch (e) { console.warn(e); }
+  try { const s = await api('api/stats'); const b = $('qbadge'); b.hidden = !s.open_questions; b.textContent = s.open_questions; } catch (e) { console.warn(e); }
 }
 
 /* ================================================================ TRIPS */
@@ -260,7 +96,7 @@ function renderQuestions() {
 $('qlist').addEventListener('click', async (e) => {
   const b = e.target.closest('button[data-a]'); if (!b) return;
   const id = b.closest('[data-q]').dataset.q;
-  try { await post(`api/questions/${id}/answer`, {answer: b.dataset.a}); b.closest('.card').remove(); st.questions = st.questions.filter((q) => q.id !== +id); refresh(true); } catch (err) { toast(err.message); }
+  try { await post(`api/questions/${id}/answer`, {answer: b.dataset.a}); b.closest('.card').remove(); st.questions = st.questions.filter((q) => q.id !== +id); refresh(); } catch (err) { toast(err.message); }
 });
 
 /* ================================================================ IMPORT */
@@ -285,7 +121,7 @@ async function preview(file) {
       <div class="opts"><button class="primary go">Importieren</button></div>`;
     card.querySelector('.go').onclick = async () => {
       card.querySelector('.go').disabled = true; card.querySelector('.go').textContent = 'importiere …';
-      try { const x = await upload(file, card.querySelector('.who').value, false); card.querySelector('.opts').innerHTML = `<span class="status ok">${x.new_points.toLocaleString('de-CH')} neue Positionen</span> ${x.rebuild ? `<span class="status">${x.rebuild.trips_created ?? 0} neue Reisen, ${x.rebuild.questions ?? 0} Fragen</span>` : ''}`; st.tracks = {}; refresh(); } catch (e) { card.querySelector('.opts').innerHTML = `<span class="status warn">${esc(e.message)}</span>`; }
+      try { const x = await upload(file, card.querySelector('.who').value, false); card.querySelector('.opts').innerHTML = `<span class="status ok">${x.new_points.toLocaleString('de-CH')} neue Positionen</span> ${x.rebuild ? `<span class="status">${x.rebuild.trips_created ?? 0} neue Reisen, ${x.rebuild.questions ?? 0} Fragen</span>` : ''}`; refresh(); } catch (e) { card.querySelector('.opts').innerHTML = `<span class="status warn">${esc(e.message)}</span>`; }
     };
   } catch (e) { card.innerHTML = `<h3>${esc(file.name)}</h3><p><span class="status warn">${esc(e.message)}</span></p>`; }
 }
@@ -326,7 +162,7 @@ async function loadConnectors() {
     <label class="field">Gruppen (Komma)<input id="whoOpts" value="${esc(c.who_options.join(', '))}"></label>
     <label class="field">Hinweise im Ordnernamen (Wort=Wer, eine pro Zeile)<textarea id="kw" rows="2" placeholder="Papa=Papa + Kinder">${esc(c.hint_keywords.join('\n'))}</textarea></label>
     <label class="field">Schulferien (YYYY-MM-DD..YYYY-MM-DD, eine pro Zeile)<textarea id="hol" rows="2">${esc(c.school_holidays.join('\n'))}</textarea></label>
-    <div class="prow"><label class="field">Reise ab km<input id="minkm" type="number" min="1" max="1000" value="${c.min_trip_km}"></label><label class="field">Fragen wenn unter<select id="askb">${['mittel', 'hoch', 'bestätigt'].map((x) => `<option ${x === c.ask_below ? 'selected' : ''}>${x}</option>`).join('')}</select></label></div>
+    <div class="prow"><label class="field">Reise ab km<input id="minkm" type="number" min="1" max="1000" value="${c.min_trip_km}"></label><label class="field">Alltagsort ab Tagen<input id="routd" type="number" min="0" max="3650" value="${c.routine_days}" title="Orte wie die Arbeit, die man an so vielen Tagen besucht, gelten nicht als Reise"></label><label class="field">Fragen wenn unter<select id="askb">${['mittel', 'hoch', 'bestätigt'].map((x) => `<option ${x === c.ask_below ? 'selected' : ''}>${x}</option>`).join('')}</select></label></div>
     <div class="opts"><button class="primary" id="saveQ">Speichern</button><button class="btn" data-sync="rebuild">Neu erkennen</button></div></div>`;
   const lines = (id) => $(id).value.split('\n').map((s) => s.trim()).filter(Boolean);
   const save = async (data) => { try { await post('api/connectors', data); toast('Gespeichert'); st.cfg = await api('api/config'); loadConnectors(); } catch (e) { toast(e.message, 4000); } };
@@ -336,7 +172,7 @@ async function loadConnectors() {
   $('saveF').onclick = () => save({photo_folders: lines('folders')});
   $('saveR').onclick = () => save({routing: $('routing').value});
   $('saveN').onclick = () => save({notify_service: $('nsvc').value.trim(), notify_mode: $('nmode').value});
-  $('saveQ').onclick = () => save({who_options: $('whoOpts').value.split(',').map((s) => s.trim()).filter(Boolean), hint_keywords: lines('kw'), school_holidays: lines('hol'), min_trip_km: +$('minkm').value, ask_below: $('askb').value});
+  $('saveQ').onclick = () => save({who_options: $('whoOpts').value.split(',').map((s) => s.trim()).filter(Boolean), hint_keywords: lines('kw'), school_holidays: lines('hol'), min_trip_km: +$('minkm').value, routine_days: +$('routd').value, ask_below: $('askb').value});
   box.querySelectorAll('[data-sync]').forEach((b) => (b.onclick = async () => { try { const r = await post('api/sync/' + b.dataset.sync); toast(r.started ? 'Läuft im Hintergrund …' : 'Läuft bereits'); } catch (e) { toast(e.message); } }));
   box.querySelectorAll('[data-goto]').forEach((b) => (b.onclick = () => showTab(b.dataset.goto)));
 }
@@ -404,18 +240,14 @@ function haversine(a, b, c, d) { const r = Math.PI / 180, x = Math.sin(((c - a) 
 $('addTrip').onclick = wizard;
 
 /* ================================================================ boot */
-async function refresh(light) {
+async function refresh(initial) {
   const [trips, qs] = await Promise.all([api('api/trips'), api('api/questions')]);
   st.trips = trips; st.questions = qs;
-  if (!light) { st.tracks = {}; st.trackLevel = null; }
   renderFilters(); renderTrips(); renderQuestions(); loadStats();
-  fullRender();
+  if (initial !== 'boot') { atlasDirty = true; if ($('tab-map').classList.contains('on')) reloadAtlasIfDirty(); }
 }
 (async function boot() {
   try { st.cfg = await api('api/config'); } catch (e) { toast(e.message); }
   const tab = location.hash.slice(1); if (tab && $('tab-' + tab)) showTab(tab);
-  resize();
-  await refresh().catch((e) => toast(e.message));
-  if (!st.fitted) { st.fitted = true; fitTrips(); }
-  loadBase().catch((e) => { $('loading').textContent = 'Karte konnte nicht geladen werden'; console.warn(e); });
+  await refresh('boot').catch((e) => toast(e.message));
 })();

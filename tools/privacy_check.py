@@ -12,7 +12,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 SKIP_SUFFIX = {".png", ".gz", ".jpg", ".ico"}
-PUBLIC_DATASETS = {"worldmap/app/worldmap/static/base.json"}  # Natural Earth / swisstopo, no personal data
+PUBLIC_DATASETS = {"worldmap/app/worldmap/static/base.json", "worldmap/app/worldmap/static/ch.json"}  # Natural Earth / BFS, no personal data
 EMAIL = re.compile(r"[\w.+-]+@[\w-]+\.[\w.]+")
 ALLOWED_EMAIL = re.compile(r"(noreply|example)\.(com|org)|users\.noreply\.github\.com|anthropic\.com")
 MAX_BYTES = 5_000_000

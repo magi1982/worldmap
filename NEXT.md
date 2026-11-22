@@ -22,19 +22,22 @@ Ideen werden zuerst hier gesammelt. Code entsteht erst nach einem ausdrückliche
 - Notifications (mobile app or persistent notification), sensors `sensor.worldmap_*`.
 - Gap routing via OSRM (optional) and flight arcs.
 
-## Next: 0.2 – full map design / volles Karten-Design
+## Done in 0.2.0
 
-- [ ] Port the design of the standalone interactive map 1:1: sidebar with headline, colour by *who* or *transport*, stats with bars (km per mode), legend, labelled destinations, CH/EU buttons, scale bar.
-- [ ] All five views: Trips, Tracks, Places & days, Municipalities, Time-lapse.
-- [ ] Tile engine (256 px raster cache, LOD tracks, Path2D chunks) for millions of points.
-- [ ] Real rail/motorway lines via map matching on OpenFreeMap vector tiles (cached in `/data`).
-- [ ] Transport mode per segment (road, rail, foot, flight, ferry) from speed and import hints.
+- Five-view map (trips, tracks, places & days, municipalities, time-lapse) with the full design of the standalone map.
+- Transport mode per segment, curved flight arcs, estimated areas, routine places, background map cache.
+
+## Next: 0.3
+
+- [ ] Rail lines: map-match train journeys onto the real rail network (OpenFreeMap vector tiles, cached in `/data`) – today gaps follow roads.
+- [ ] Actionable notifications ("who was there?" answered directly on the phone).
+- [ ] Settings for colours per person/group.
+- [ ] Dashboard card (Lovelace) with a small live map.
 
 ## Ideas for later
 
 - [ ] Actionable notifications: answer "who was there?" directly from the phone (listen to `mobile_app_notification_action` over the WebSocket API).
 - [ ] Small HACS integration: services `worldmap.add_trip`, `worldmap.import_file`, calendar entity with all trips.
-- [ ] Map engine of the standalone map: tile cache, map-matched rail/motorway lines, municipalities, time-lapse.
 - [ ] Self-hosted OSRM / Valhalla as optional companion add-on (nothing leaves the network).
 - [ ] School holidays from an iCal URL instead of manual ranges.
 - [ ] HEIC support for photos (pillow-heif).

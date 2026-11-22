@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Worldmap · Karte</title>
+<link rel="icon" href="logo.svg" type="image/svg+xml">
+<link rel="stylesheet" href="atlas.css">
+<script src="atlas.js" defer></script>
+</head>
+<body>
+<header class="top">
+ <div class="brand">Reisen <span id="brandyears"></span></div>
+ <nav class="tabs" id="tabs" aria-label="Karten">
+  <button data-t="reisen" class="on"><i>1</i>Reisen</button><button data-t="spuren"><i>2</i>Spuren</button><button data-t="orte"><i>3</i>Orte &amp; Tage</button><button data-t="gemeinden"><i>4</i>Gemeinden</button><button data-t="zeit"><i>5</i>Zeitraffer</button>
+ </nav>
+</header>
+<div class="app">
+ <div class="mapwrap" id="wrap">
+  <canvas id="cv"></canvas>
+  <div class="ctrl">
+   <button id="zin" aria-label="Hineinzoomen">+</button><button id="zout" aria-label="Herauszoomen">−</button>
+   <button class="txt" id="zhome" aria-label="Zur Heimat">⌂</button><button class="txt" id="zch">CH</button><button class="txt" id="zeu">EU</button>
+  </div>
+  <div class="legend" id="legend"></div>
+  <div class="scale" id="scale"><span></span><i></i></div>
+  <div class="hud" id="hud"><b id="hudd"></b><span id="huds"></span></div>
+  <div class="detail" id="detail"></div>
+  <div class="tip" id="tip"></div>
+  <div class="load" id="load">Karte wird geladen …</div>
+ </div>
+ <aside class="side">
+  <section class="panel on" id="p-reisen">
+   <div><div class="kicker">KARTE 1 · REISEN</div><h1>Wer war wo – und womit</h1><div class="sub" id="r-sub"></div></div>
+   <div class="card">
+    <div class="ct">FARBE NACH <div class="seg" id="r-color"><button data-v="w" class="on">Wer</button><button data-v="m">Verkehrsmittel</button></div></div>
+    <div class="ct" style="margin-top:14px">WER</div><div class="chips" id="r-who"></div>
+    <div class="ct" style="margin-top:16px">WOMIT</div><div class="chips" id="r-mode"></div>
+   </div>
+   <div class="card"><div class="stats" id="r-stats"></div><div id="r-split" style="margin-top:14px"></div></div>
+   <div class="card">
+    <div class="ct">ZEITREISE <small>Jahr antippen · nochmals = alle</small></div>
+    <div class="years" id="r-years"></div>
+    <div class="yrow"><button class="play" id="r-play" aria-label="Jahre abspielen"><svg width="14" height="14" viewBox="0 0 14 14"><path id="r-pico" d="M3 1.5L12 7L3 12.5Z" fill="#fff"/></svg></button><span class="yrlabel" id="r-ylab">Alle Jahre</span><button class="ylink" id="r-yall">Alle zeigen</button></div>
+   </div>
+   <div class="card"><div class="ct">TOP-ZIELE <small>tippen zum Hinfliegen</small></div><div id="r-top"></div></div>
+   <div class="note">Fern-Linien = GPS-Spuren der Reisetage; Lücken folgen echten Strassen. Flächen = viele kurze Wege. Gestrichelte Kreise = geschätzt ohne GPS (von Hand erfasst). Flüge als gestrichelte Bögen, mehrfarbig wenn mehrere dort waren.</div>
+  </section>
+  <section class="panel" id="p-spuren">
+   <div><div class="kicker">KARTE 2 · SPUREN</div><h1>Jeder Weg seit <span id="s-since"></span></h1><div class="sub">Alle GPS-Spuren. Wo eine Linie kräftiger wird, warst du öfter. Zoom bis auf Quartierebene.</div></div>
+   <div class="card">
+    <div class="ct">FARBE NACH <div class="seg" id="s-color"><button data-v="m" class="on">Verkehrsmittel</button><button data-v="y">Jahr</button><button data-v="w">Wer</button></div></div>
+    <div class="ct" style="margin-top:14px">WOMIT</div><div class="chips" id="s-modes"></div>
+    <div class="ct" style="margin-top:16px">WAS</div><div class="chips" id="s-cat"></div>
+    <div class="ct" style="margin-top:16px">WANN <div class="seg" id="s-wd"><button data-v="all" class="on">Alle Tage</button><button data-v="wk">Mo–Fr</button><button data-v="we">Wochenende</button></div></div>
+   </div>
+   <div class="card"><div class="stats" id="s-stats"></div><div id="s-split" style="margin-top:14px"></div></div>
+   <div class="card"><div class="ct">KILOMETER PRO JAHR <small>Jahr antippen · nochmals = alle</small></div><div class="years" id="s-years"></div></div>
+   <div class="note" id="s-note"></div>
+  </section>
+  <section class="panel" id="p-orte">
+   <div><div class="kicker">KARTE 3 · ORTE &amp; TAGE</div><h1>Wo wir Zeit verbracht haben</h1><div class="sub">Jeder Punkt ist ein Ort, je grösser, desto mehr Stunden. Darunter jeder einzelne Tag mit Daten – antippen zeigt die Route.</div></div>
+   <div class="card"><div class="stats" id="o-stats"></div></div>
+   <div class="card">
+    <div class="ct">JEDER TAG <small id="o-hint">Tag antippen</small></div>
+    <div class="cal"><canvas id="calc"></canvas></div>
+    <div class="row" style="margin-top:12px"><button class="btn pri" id="o-rand">Zufälliger Reisetag</button><button class="btn" id="o-clear">Alle Orte</button></div>
+    <div id="o-legend" class="row" style="margin-top:12px;font-size:12px;font-weight:600;gap:12px"></div>
+   </div>
+   <div class="card"><div class="ct">MEISTE ZEIT VERBRACHT <small>ohne Zuhause</small></div><input class="search" id="o-search" placeholder="Ort suchen …" aria-label="Ort suchen"><div id="o-top" style="margin-top:8px"></div></div>
+   <div class="note">Ortsnamen aus den Gemeindegrenzen der Schweiz und dem GeoNames-Ortsverzeichnis. Stunden = Summe aller Aufenthalte.</div>
+  </section>
+  <section class="panel" id="p-gemeinden">
+   <div><div class="kicker">KARTE 4 · GEMEINDEN</div><h1>Wie viel Schweiz habt ihr gesehen?</h1><div class="sub">Jede der 2'134 Gemeinden der Schweiz. Farbig = mindestens einmal durchgefahren oder dort gewesen.</div></div>
+   <div class="card"><div class="stats" id="g-stats"></div></div>
+   <div class="card">
+    <div class="ct">FARBE NACH <div class="seg" id="g-color"><button data-v="y" class="on">Erstes Mal</button><button data-v="d">Wie oft</button><button data-v="v">Aufenthalt</button></div></div>
+    <div id="g-legend" style="margin-top:6px"></div>
+   </div>
+   <div class="card"><div class="ct">NEUE GEMEINDEN PRO JAHR</div><div class="years" id="g-years"></div></div>
+   <div class="card"><div class="ct">KANTONE <small>Anteil besuchter Gemeinden</small></div><div id="g-cant"></div></div>
+   <div class="note">Gemeindegrenzen Stand 2024 (swiss-maps / BFS). Gezählt wird jede Gemeinde, in der ein GPS-Punkt liegt.</div>
+  </section>
+  <section class="panel" id="p-zeit">
+   <div><div class="kicker">KARTE 5 · ZEITRAFFER</div><h1>Jahre in Bewegung</h1><div class="sub">Die Zeitachse als Film: jeder Tag ein Bild. Die frischesten Wege leuchten auf, ältere verblassen langsam.</div></div>
+   <div class="card">
+    <div class="row"><button class="play" id="z-play" aria-label="Abspielen"><svg width="14" height="14" viewBox="0 0 14 14"><path id="z-pico" d="M3 1.5L12 7L3 12.5Z" fill="#fff"/></svg></button><div style="flex:1"><div class="yrlabel" id="z-date">–</div><div class="note" id="z-what">bereit</div></div></div>
+    <input type="range" id="z-slider" min="0" max="100" value="0" aria-label="Datum" style="margin-top:10px">
+    <div class="ct" style="margin-top:12px">TEMPO <div class="seg" id="z-speed"><button data-v="1">1 Tag/s</button><button data-v="7" class="on">1 Woche/s</button><button data-v="30">1 Monat/s</button><button data-v="120">4 Monate/s</button></div></div>
+    <div class="ct" style="margin-top:10px">KAMERA <div class="seg" id="z-cam"><button data-v="follow" class="on">folgt mir</button><button data-v="fixed">fest</button></div></div>
+    <div class="ct" style="margin-top:10px">SPUR <div class="seg" id="z-trail"><button data-v="all" class="on">alles behalten</button><button data-v="month">nur 30 Tage</button></div></div>
+   </div>
+   <div class="card"><div class="stats" id="z-stats"></div></div>
+   <div class="card"><div class="ct">SPRINGE ZU</div><div class="chips" id="z-jump"></div></div>
+  </section>
+ </aside>
+</div>
+</body>
+</html>

@@ -16,7 +16,7 @@ good-looking map.
 
 | | |
 |---|---|
-| 🗺️ **Map** | Tracks, flight arcs and estimated areas for trips without GPS. Filter by person/group and year. Pans and zooms smoothly even with millions of points (bitmap cache, simplified tracks per zoom level, gzip). |
+| 🗺️ **Map – five views** | **Trips** (who went where and how, destinations, flight arcs, estimated areas for trips without GPS), **Tracks** (every route, coloured by transport, year or person), **Places & days** (where you spent time, a calendar of every day), **Municipalities** (how much of Switzerland you have seen) and **Time-lapse** (your history as a film). Colour by *who* or *transport*, statistics with bars, year filter. A tile renderer keeps it fast with millions of points. |
 | 📋 **Trip list** | Searchable list with destination, country, who, confidence, nights and distance. Edit any trip; your edits are never overwritten by automatic detection. Export as CSV for Excel. |
 | ❓ **Smart questions** | For every new trip Worldmap suggests who was there – using who was away at the same time, weekends, school holidays and words in photo folder names – and only asks when it is unsure. |
 | ✍️ **Trip by hand** | A short wizard for old trips without any data (*Where? When? How long? Who? How? How big was the area?*). Regions such as "Corsica" or "Tuscany" come with a sensible area. |
@@ -25,6 +25,10 @@ good-looking map.
 | 🛣️ **Real routes** | Gaps between GPS points are routed along real roads (OSRM, optional) and long fast jumps become flight arcs. |
 | 🔔 **Notifications** | Open questions arrive on your phone (instant, daily or weekly) or as a Home Assistant notification. |
 | 📊 **Sensors** | `sensor.worldmap_km_this_year`, `sensor.worldmap_trips`, `sensor.worldmap_countries`, `sensor.worldmap_open_questions`, `sensor.worldmap_last_trip` for dashboards and automations. |
+
+| Tracks | Places & days | Municipalities | Time-lapse |
+|---|---|---|---|
+| ![Tracks](docs/images/spuren.jpg) | ![Places](docs/images/orte.jpg) | ![Municipalities](docs/images/gemeinden.jpg) | ![Time-lapse](docs/images/zeit.jpg) |
 
 | Questions | Connectors | Trip by hand |
 |---|---|---|
@@ -59,6 +63,7 @@ Everything can be set in the app (**Connectors**) or in the add-on configuration
 | `hint_keywords` | – | `keyword=answer` – suggested when a photo folder contains the keyword |
 | `home_zone` / `home_lat` / `home_lon` | `zone.home` | where home is |
 | `min_trip_km` | 30 | a day counts as a trip from this distance |
+| `routine_days` | 20 | places visited on this many days (work, school) never start a trip; 0 = off |
 | `routing` / `osrm_url` | `osrm`, public demo | route gaps along roads; `off` keeps everything local |
 | `photo_folders` | – | folders below `/media` or `/share` (read-only) |
 | `notify_service` / `notify_mode` | – / `weekly` | e.g. `notify.mobile_app_phone`; `off`, `instant`, `daily`, `weekly` |

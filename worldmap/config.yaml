@@ -1,5 +1,5 @@
 name: Worldmap
-version: "0.1.0"
+version: "0.2.0"
 slug: worldmap
 description: Your trips on a map – from Home Assistant, photos and Google/Apple exports, with smart questions.
 url: https://github.com/magi1982/worldmap
@@ -24,6 +24,7 @@ options:
   home_zone: zone.home
   timezone: Europe/Zurich
   min_trip_km: 30
+  routine_days: 20
   poll_interval_min: 5
   history_days_on_start: 10
   routing: osrm
@@ -50,6 +51,7 @@ schema:
   home_lon: float(-180,180)?
   timezone: str
   min_trip_km: float(1,1000)
+  routine_days: int(0,3650)
   poll_interval_min: int(1,60)
   history_days_on_start: int(0,30)
   routing: list(osrm|off)

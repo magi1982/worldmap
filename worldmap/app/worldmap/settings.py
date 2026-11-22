@@ -21,6 +21,7 @@ class Settings:
     home_lon: float | None = None
     timezone: str = "Europe/Zurich"
     min_trip_km: float = 30.0
+    routine_days: int = 20                                # places visited on this many days are not trips (0 = off)
     poll_interval_min: int = 5
     history_days_on_start: int = 10
     routing: str = "osrm"                                 # osrm | off
@@ -73,6 +74,7 @@ def from_dict(raw: dict) -> Settings:
     s.school_holidays = [str(x) for x in _list(s.school_holidays)]
     s.min_trip_km = max(1.0, float(s.min_trip_km))
     s.poll_interval_min = max(1, int(s.poll_interval_min))
+    s.routine_days = max(0, min(3650, int(s.routine_days)))
     s.max_upload_mb = min(2000, max(1, int(s.max_upload_mb)))
     if s.notify_service and not SERVICE_RE.match(str(s.notify_service)):
         s.notify_service = ""

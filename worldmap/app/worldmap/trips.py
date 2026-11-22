@@ -43,7 +43,22 @@ class TripCandidate:
         return (self.start, self.end)
 
 
-def days_away(points: list[dict], home: tuple[float, float], min_km: float, tz: str) -> list[DayAway]:
+def routine_cell(lat: float, lon: float) -> tuple[int, int]:
+    return round(lat / 0.01), round(lon / 0.015)
+
+
+def routine_cells(points: list[dict], tz: str, min_days: int) -> set:
+    """Cells (~1 km) visited on at least ``min_days`` different days: work, school, family …"""
+    days = defaultdict(set)
+    for p in points:
+        days[routine_cell(p["lat"], p["lon"])].add(local_date(p["ts"], tz))
+    return {c for c, d in days.items() if len(d) >= min_days}
+
+
+def days_away(points: list[dict], home: tuple[float, float], min_km: float, tz: str,
+              routine: set | None = None) -> list[DayAway]:
+    """Days on which someone was far from home. Points in ``routine`` cells (e.g. work) do not count."""
+    routine = routine or set()
     by = defaultdict(list)
     for p in points:
         by[(p["person"], local_date(p["ts"], tz))].append(p)
@@ -54,13 +69,16 @@ def days_away(points: list[dict], home: tuple[float, float], min_km: float, tz: 
         hints = set()
         for p in pts:
             d = haversine_km(home[0], home[1], p["lat"], p["lon"])
+            if routine and routine_cell(p["lat"], p["lon"]) in routine:
+                d = 0.0
             if d > best:
                 best, far = d, p
             if p.get("hint"):
                 hints.add(p["hint"])
         if best >= min_km:
             last = pts[-1]
-            overnight = haversine_km(home[0], home[1], last["lat"], last["lon"]) >= min_km
+            overnight = (haversine_km(home[0], home[1], last["lat"], last["lon"]) >= min_km
+                         and routine_cell(last["lat"], last["lon"]) not in routine)
             out.append(DayAway(day, person, best, far["lat"], far["lon"], overnight, hints))
     return sorted(out, key=lambda d: (d.day, d.person))
 
@@ -77,8 +95,8 @@ def group_trips(days: list[DayAway], gap_days: int = 1) -> list[TripCandidate]:
         for d in ds[1:]:
             prev = cur[-1]
             gap = (date.fromisoformat(d.day) - date.fromisoformat(prev.day)).days
-            # continue if the next day follows, or a short gap while the person never came home
-            if gap == 1 or (gap <= gap_days + 1 and prev.overnight):
+            # continue only if the person did not come home in between (stayed away overnight)
+            if gap <= gap_days + 1 and prev.overnight:
                 cur.append(d)
             else:
                 runs.append((person, cur))

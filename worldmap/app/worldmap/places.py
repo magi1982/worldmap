@@ -54,26 +54,37 @@ REGIONS = [
 ]
 
 
+GRID = 0.2  # degrees
+
+
 @lru_cache(maxsize=1)
 def _index():
     rows = json.loads(gzip.decompress(DATA.read_bytes()))
     grid: dict[tuple[int, int], list] = {}
     for name, lat, lon, cc in rows:
-        grid.setdefault((math.floor(lat), math.floor(lon)), []).append((name, lat, lon, cc))
+        grid.setdefault((math.floor(lat / GRID), math.floor(lon / GRID)), []).append((name, lat, lon, cc))
     return grid
 
 
 def nearest(lat: float, lon: float, radius_km: float = 60.0):
+    """Closest town within ``radius_km`` – fast equirectangular search on a 0.2° grid."""
     grid = _index()
-    best, best_d = None, radius_km
-    ci, cj = math.floor(lat), math.floor(lon)
-    for i in (ci - 1, ci, ci + 1):
-        for j in (cj - 1, cj, cj + 1):
+    kx = math.cos(math.radians(lat))
+    ring_y = math.ceil(radius_km / (GRID * 111.2))
+    ring_x = math.ceil(radius_km / (GRID * 111.2 * max(0.1, kx)))
+    ci, cj = math.floor(lat / GRID), math.floor(lon / GRID)
+    best, best_d2 = None, (radius_km / 111.2) ** 2
+    for i in range(ci - ring_y, ci + ring_y + 1):
+        for j in range(cj - ring_x, cj + ring_x + 1):
             for p in grid.get((i, j), ()):
-                d = haversine_km(lat, lon, p[1], p[2])
-                if d < best_d:
-                    best, best_d = p, d
-    return (best, best_d) if best else (None, None)
+                dy = p[1] - lat
+                dx = (p[2] - lon) * kx
+                d2 = dx * dx + dy * dy
+                if d2 < best_d2:
+                    best, best_d2 = p, d2
+    if not best:
+        return None, None
+    return best, haversine_km(lat, lon, best[1], best[2])
 
 
 def describe(lat: float | None, lon: float | None) -> tuple[str, str]:
@@ -117,3 +128,25 @@ def search(query: str, limit: int = 10) -> list[dict]:
     out = regions + [{"name": n, "lat": la, "lon": lo, "country": COUNTRY_DE.get(cc, cc), "kind": "place"}
            for _, n, la, lo, cc in sorted(starts)[:limit] + sorted(contains)[:limit]][:limit]
     return out[:limit]
+
+
+@lru_cache(maxsize=1)
+def _major():
+    """Natural Earth populated places (bundled in static/base.json): [name, scalerank, lat, lon]."""
+    base = Path(__file__).with_name("static") / "base.json"
+    try:
+        return [(n, sr, la, lo) for n, sr, la, lo, *_ in json.loads(base.read_text(encoding="utf-8"))["labels"]]
+    except (OSError, ValueError, KeyError):
+        return []
+
+
+def major(lat: float, lon: float, radius_km: float = 45.0) -> str | None:
+    """Best-known city near a point (prefers low scale rank = more important)."""
+    best, score = None, 1e9
+    for n, sr, la, lo in _major():
+        if abs(la - lat) > 1 or abs(lo - lon) > 1.5:
+            continue
+        d = haversine_km(lat, lon, la, lo)
+        if d <= radius_km and d + sr * 6 < score:
+            best, score = n, d + sr * 6
+    return best

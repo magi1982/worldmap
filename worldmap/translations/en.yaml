@@ -26,6 +26,11 @@ configuration:
   min_trip_km:
     name: Trip distance (km)
     description: A day counts as a trip when someone was at least this far from home.
+  routine_days:
+    name: Routine places (days)
+    description: >-
+      Places visited on at least this many days (work, school, family) never start a trip,
+      so a daily commute is not counted as travel. 0 = off.
   poll_interval_min:
     name: Live poll interval (min)
     description: How often the positions of the tracked persons are stored.

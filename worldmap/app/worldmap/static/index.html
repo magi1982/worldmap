@@ -23,22 +23,7 @@
 
 <main>
   <section id="tab-map" class="tab on">
-    <canvas id="map" aria-label="Karte"></canvas>
-    <div class="mapui">
-      <div class="panel" id="filters">
-        <div class="row" id="whoChips"></div>
-        <div class="row small">
-          <label>von <select id="yFrom"></select></label>
-          <label>bis <select id="yTo"></select></label>
-          <label class="check"><input type="checkbox" id="showTracks" checked> Spuren</label>
-          <label class="check"><input type="checkbox" id="showEst" checked> Schätzungen</label>
-        </div>
-      </div>
-      <div class="panel stats" id="stats"></div>
-      <div class="zoom"><button id="zin" aria-label="Zoom in">+</button><button id="zout" aria-label="Zoom out">−</button><button id="zhome" aria-label="Alles zeigen">⌂</button></div>
-      <div id="tip" class="tip" hidden></div>
-      <div id="loading" class="loading">Karte lädt …</div>
-    </div>
+    <iframe id="atlas" src="atlas.html" title="Karte"></iframe>
   </section>
 
   <section id="tab-trips" class="tab">

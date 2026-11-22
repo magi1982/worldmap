@@ -26,6 +26,11 @@ configuration:
   min_trip_km:
     name: Reise ab (km)
     description: Ein Tag zählt als Reise, wenn jemand mindestens so weit weg war.
+  routine_days:
+    name: Alltagsorte (Tage)
+    description: >-
+      Orte, an denen man an mindestens so vielen Tagen war (Arbeit, Schule, Familie), starten
+      keine Reise – der tägliche Arbeitsweg zählt so nicht als Reise. 0 = aus.
   poll_interval_min:
     name: Live-Abfrage (Min.)
     description: Wie oft die Positionen der Personen gespeichert werden.

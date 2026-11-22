@@ -61,7 +61,8 @@ class Engine:
         with self._lock:
             pts = self.db.points()
             tz = self.s.timezone
-            days = trips.days_away(pts, home, self.s.min_trip_km, tz)
+            routine = trips.routine_cells(pts, tz, self.s.routine_days) if self.s.routine_days else set()
+            days = trips.days_away(pts, home, self.s.min_trip_km, tz, routine)
             cands = trips.group_trips(days)
             presence = self._presence(pts, home, tz)
             holidays = questions.parse_ranges(self.s.school_holidays)
@@ -74,6 +75,9 @@ class Engine:
                 if match and match["locked"]:
                     continue
                 name, country = places.describe(c.lat, c.lon)
+                city = places.major(c.lat, c.lon, radius_km=15)  # a known city reads better than a suburb
+                if city and c.max_km >= 150 and not name.startswith("bei "):
+                    name = city
                 at_home = {p for p in labels - present
                            if all(presence.get((p, d)) == "home" for d in self._days(c.start, c.end))}
                 overlap = trips.overlap_share(c, *sorted(present)[:2]) if len(present) >= 2 else 0.0

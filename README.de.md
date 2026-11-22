@@ -16,7 +16,7 @@ schönen Karte.
 
 | | |
 |---|---|
-| 🗺️ **Karte** | Spuren, Flugbögen und geschätzte Flächen für Reisen ohne GPS. Filter nach Person/Gruppe und Jahr. Verschieben und Zoomen bleibt flüssig, auch mit Millionen Punkten (Bild-Cache, vereinfachte Spuren je Zoomstufe, gzip). |
+| 🗺️ **Karte – fünf Ansichten** | **Reisen** (wer war wo und womit, Ziele, Flugbögen, geschätzte Flächen für Reisen ohne GPS), **Spuren** (jeder Weg, gefärbt nach Verkehrsmittel, Jahr oder Person), **Orte & Tage** (wo ihr Zeit verbracht habt, Kalender mit jedem Tag), **Gemeinden** (wie viel Schweiz ihr gesehen habt) und **Zeitraffer** (eure Geschichte als Film). Farbe nach *Wer* oder *Verkehrsmittel*, Zahlen mit Balken, Jahresfilter. Ein Kachel-Renderer hält alles schnell, auch mit Millionen Punkten. |
 | 📋 **Reiseliste** | Durchsuchbare Liste mit Ziel, Land, Wer, Sicherheit, Nächten und Entfernung. Jede Reise lässt sich bearbeiten; deine Änderungen überschreibt die automatische Erkennung nie. Export als CSV für Excel. |
 | ❓ **Kluge Fragen** | Für jede neue Reise schlägt Worldmap vor, wer dabei war – anhand davon, wer gleichzeitig weg war, Wochenenden, Schulferien und Wörtern in Fotoordnern – und fragt nur, wenn es unsicher ist. |
 | ✍️ **Reise von Hand** | Ein kurzer Assistent für alte Reisen ohne Daten (*Wohin? Wann? Wie lange? Wer? Womit? Wie gross war die Gegend?*). Regionen wie „Korsika“ oder „Toskana“ bringen gleich eine passende Fläche mit. |
@@ -25,6 +25,10 @@ schönen Karte.
 | 🛣️ **Echte Routen** | Lücken zwischen GPS-Punkten folgen echten Strassen (OSRM, optional); lange, schnelle Sprünge werden zu Flugbögen. |
 | 🔔 **Benachrichtigungen** | Offene Fragen kommen aufs Handy (sofort, täglich oder wöchentlich) oder als Hinweis in Home Assistant. |
 | 📊 **Sensoren** | `sensor.worldmap_km_this_year`, `sensor.worldmap_trips`, `sensor.worldmap_countries`, `sensor.worldmap_open_questions`, `sensor.worldmap_last_trip` für Dashboards und Automationen. |
+
+| Spuren | Orte & Tage | Gemeinden | Zeitraffer |
+|---|---|---|---|
+| ![Spuren](docs/images/spuren.jpg) | ![Orte](docs/images/orte.jpg) | ![Gemeinden](docs/images/gemeinden.jpg) | ![Zeitraffer](docs/images/zeit.jpg) |
 
 | Fragen | Verbindungen | Reise von Hand |
 |---|---|---|
@@ -59,6 +63,7 @@ Alles lässt sich in der App (**Verbindungen**) oder in der Add-on-Konfiguration
 | `hint_keywords` | – | `Wort=Antwort` – wird vorgeschlagen, wenn ein Fotoordner das Wort enthält |
 | `home_zone` / `home_lat` / `home_lon` | `zone.home` | wo zu Hause ist |
 | `min_trip_km` | 30 | ab dieser Entfernung zählt ein Tag als Reise |
+| `routine_days` | 20 | Orte, an denen man an so vielen Tagen war (Arbeit, Schule), starten keine Reise; 0 = aus |
 | `routing` / `osrm_url` | `osrm`, öffentlicher Demo-Server | Lücken auf Strassen legen; `off` = alles bleibt lokal |
 | `photo_folders` | – | Ordner unter `/media` oder `/share` (nur lesend) |
 | `notify_service` / `notify_mode` | – / `weekly` | z. B. `notify.mobile_app_handy`; `off`, `instant`, `daily`, `weekly` |
