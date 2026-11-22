@@ -1,0 +1,19 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+.venv/
+# never commit real data
+*.db
+*.db-*
+/data/
+options.json
+*.csv
+!tests/fixtures/*.csv
+!sample_data/*.csv
+*.xlsx
+!sample_data/*.xlsx
+Records.json
+Timeline.json
+location-history*.json
+.privacy-terms

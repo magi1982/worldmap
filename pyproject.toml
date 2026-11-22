@@ -1,0 +1,23 @@
+[project]
+name = "worldmap"
+version = "0.1.0"
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 165
+target-version = "py312"
+src = ["worldmap/app", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S", "N"]
+ignore = ["S101", "S310", "S104", "S314", "S405", "S608", "S110", "B008"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S", "N802", "E402"]
+"tools/*" = ["S311", "S108", "S603", "S607", "E402"]
+
+[tool.bandit]
+exclude_dirs = ["tests", "tools"]

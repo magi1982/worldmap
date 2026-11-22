@@ -1,0 +1,66 @@
+configuration:
+  persons:
+    name: Personen
+    description: >-
+      person.*- oder device_tracker.*-Entitäten mit GPS (z. B. aus der Home-Assistant-App).
+      «label» ist der Name in der App, «camera_models» (mit Komma) ordnet Fotos dieser Kameras
+      der Person zu, z. B. «iPhone 15».
+  who_options:
+    name: Gruppen-Antworten
+    description: Weitere Antworten für «Wer war dabei?», z. B. Paar, Familie.
+  hint_keywords:
+    name: Stichwörter in Ordnern
+    description: 'Stichwort=Antwort, z. B. «Papa=Papa + Kinder». Kommt das Wort im Fotoordner vor, wird die Antwort vorgeschlagen.'
+  home_zone:
+    name: Zuhause-Zone
+    description: Zone für zu Hause. Entfernungen werden von hier gemessen.
+  home_lat:
+    name: Breitengrad zu Hause (optional)
+    description: Ersetzt die Zone.
+  home_lon:
+    name: Längengrad zu Hause (optional)
+    description: Ersetzt die Zone.
+  timezone:
+    name: Zeitzone
+    description: Für die Umrechnung in lokale Tage, z. B. Europe/Zurich.
+  min_trip_km:
+    name: Reise ab (km)
+    description: Ein Tag zählt als Reise, wenn jemand mindestens so weit weg war.
+  poll_interval_min:
+    name: Live-Abfrage (Min.)
+    description: Wie oft die Positionen der Personen gespeichert werden.
+  history_days_on_start:
+    name: Verlauf beim Start (Tage)
+    description: Positionen aus dem Home-Assistant-Recorder beim Start.
+  routing:
+    name: Routen
+    description: >-
+      osrm = echte Strassen zwischen GPS-Punkten zeichnen (Start und Ende jeder Lücke gehen an den
+      Routing-Server); off = nichts verlässt dein Netzwerk.
+  osrm_url:
+    name: OSRM-Server
+    description: Öffentlicher Demo-Server oder eigener OSRM.
+  photo_folders:
+    name: Fotoordner
+    description: Ordner unter /media oder /share, deren Foto-GPS gelesen wird (nur lesend).
+  photo_scan_hours:
+    name: Foto-Scan (Std.)
+    description: Wie oft nach neuen Fotos gesucht wird.
+  notify_service:
+    name: Benachrichtigungsdienst
+    description: z. B. notify.mobile_app_handy. Leer = Hinweis in Home Assistant.
+  notify_mode:
+    name: Fragen schicken
+    description: Wann offene Fragen kommen – nie, sofort, täglich oder wöchentlich.
+  ask_below:
+    name: Fragen, wenn Sicherheit unter
+    description: Reisen mit tieferer Sicherheit erzeugen eine Frage.
+  school_holidays:
+    name: Schulferien
+    description: Zeiträume wie 2026-07-04..2026-08-09. In den Ferien ist eine Familienreise wahrscheinlicher.
+  max_upload_mb:
+    name: Max. Upload (MB)
+    description: Grösste Datei beim Import.
+  log_level:
+    name: Log-Level
+    description: Menge der Log-Ausgaben.

@@ -1,0 +1,66 @@
+configuration:
+  persons:
+    name: Tracked persons
+    description: >-
+      person.* or device_tracker.* entities with GPS (e.g. from the Home Assistant Companion App).
+      "label" is the name shown in the app, "camera_models" (comma-separated) assigns photos of these
+      cameras to the person, e.g. "iPhone 15".
+  who_options:
+    name: Group answers
+    description: Extra answers for "who was there?", e.g. Couple, Family.
+  hint_keywords:
+    name: Folder keywords
+    description: 'keyword=answer, e.g. "Dad=Dad + kids". If a photo folder contains the keyword, the answer is suggested.'
+  home_zone:
+    name: Home zone
+    description: Zone that marks home. Distances are measured from here.
+  home_lat:
+    name: Home latitude (optional)
+    description: Overrides the home zone.
+  home_lon:
+    name: Home longitude (optional)
+    description: Overrides the home zone.
+  timezone:
+    name: Time zone
+    description: Used to turn timestamps into local days, e.g. Europe/Zurich.
+  min_trip_km:
+    name: Trip distance (km)
+    description: A day counts as a trip when someone was at least this far from home.
+  poll_interval_min:
+    name: Live poll interval (min)
+    description: How often the positions of the tracked persons are stored.
+  history_days_on_start:
+    name: History on start (days)
+    description: Positions read from the Home Assistant recorder when the add-on starts.
+  routing:
+    name: Routing
+    description: >-
+      osrm = draw real roads between GPS points (start and end point of each gap are sent to the
+      routing server); off = nothing leaves your network.
+  osrm_url:
+    name: OSRM server
+    description: Public demo server or your own OSRM instance.
+  photo_folders:
+    name: Photo folders
+    description: Folders below /media or /share whose photo GPS data is read (read-only).
+  photo_scan_hours:
+    name: Photo scan interval (h)
+    description: How often new photos are looked for.
+  notify_service:
+    name: Notification service
+    description: e.g. notify.mobile_app_phone. Empty = persistent notification in Home Assistant.
+  notify_mode:
+    name: Ask me
+    description: When to send open questions – off, instant, daily or weekly.
+  ask_below:
+    name: Ask when confidence is below
+    description: Trips with a lower confidence create a question.
+  school_holidays:
+    name: School holidays
+    description: Ranges like 2026-07-04..2026-08-09. Trips in holidays are more likely family trips.
+  max_upload_mb:
+    name: Max. upload (MB)
+    description: Largest file accepted by the import.
+  log_level:
+    name: Log level
+    description: Amount of log output.

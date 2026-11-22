@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Worldmap</title>
+<link rel="icon" href="logo.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css">
+<script src="app.js" defer></script>
+</head>
+<body>
+<header class="top">
+  <div class="brand"><img src="logo.svg" alt="" width="28" height="28"><b>Worldmap</b></div>
+  <nav id="tabs" role="tablist">
+    <button data-tab="map" class="on" role="tab">Karte</button>
+    <button data-tab="trips" role="tab">Reisen</button>
+    <button data-tab="questions" role="tab">Fragen <span id="qbadge" class="badge" hidden></span></button>
+    <button data-tab="import" role="tab">Import</button>
+    <button data-tab="connectors" role="tab">Verbindungen</button>
+  </nav>
+  <button id="addTrip" class="primary">+ Reise von Hand</button>
+</header>
+
+<main>
+  <section id="tab-map" class="tab on">
+    <canvas id="map" aria-label="Karte"></canvas>
+    <div class="mapui">
+      <div class="panel" id="filters">
+        <div class="row" id="whoChips"></div>
+        <div class="row small">
+          <label>von <select id="yFrom"></select></label>
+          <label>bis <select id="yTo"></select></label>
+          <label class="check"><input type="checkbox" id="showTracks" checked> Spuren</label>
+          <label class="check"><input type="checkbox" id="showEst" checked> Schätzungen</label>
+        </div>
+      </div>
+      <div class="panel stats" id="stats"></div>
+      <div class="zoom"><button id="zin" aria-label="Zoom in">+</button><button id="zout" aria-label="Zoom out">−</button><button id="zhome" aria-label="Alles zeigen">⌂</button></div>
+      <div id="tip" class="tip" hidden></div>
+      <div id="loading" class="loading">Karte lädt …</div>
+    </div>
+  </section>
+
+  <section id="tab-trips" class="tab">
+    <div class="toolbar">
+      <input id="tripSearch" type="search" placeholder="Suchen: Ort, Land, Wer, Jahr …">
+      <select id="tripWho"><option value="">Alle</option></select>
+      <a class="btn" href="api/export.csv">CSV / Excel</a>
+      <button id="rebuild" class="btn">Neu erkennen</button>
+    </div>
+    <div class="tablewrap"><table id="tripTable">
+      <thead><tr><th>Von</th><th>Bis</th><th>Ziel</th><th>Land</th><th>Wer</th><th>Sicherheit</th><th class="num">Nächte</th><th class="num">km</th><th>Quelle</th></tr></thead>
+      <tbody></tbody>
+    </table></div>
+  </section>
+
+  <section id="tab-questions" class="tab">
+    <p class="lead">Kurze Fragen zu erkannten Reisen. Eine Antwort bestätigt die Reise und färbt sie auf der Karte ein.</p>
+    <div id="qlist" class="cards"></div>
+  </section>
+
+  <section id="tab-import" class="tab">
+    <div id="drop" class="drop" tabindex="0">
+      <b>Dateien hierher ziehen</b> oder <label class="link">auswählen<input id="file" type="file" multiple hidden></label>
+      <p class="small">Google Timeline (JSON), iCloud-/exiftool-CSV, Excel, GPX, KML – das Format wird automatisch erkannt.</p>
+    </div>
+    <div id="imports" class="cards"></div>
+  </section>
+
+  <section id="tab-connectors" class="tab">
+    <p class="lead">Woher die Positionen kommen. Änderungen werden in den Add-on-Einstellungen gespeichert.</p>
+    <div id="conn" class="cards"></div>
+  </section>
+</main>
+
+<dialog id="edit"></dialog>
+<dialog id="wizard"></dialog>
+<div id="toast" class="toast" hidden></div>
+</body>
+</html>
