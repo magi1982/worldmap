@@ -16,7 +16,14 @@ let HOME=[47,8];
 const $=id=>document.getElementById(id);
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmt=n=>Math.round(n).toLocaleString('de-CH').replace(/[, \s]/g,'’');
-function tint(c,a){const r=parseInt(c.slice(1,3),16),g=parseInt(c.slice(3,5),16),b=parseInt(c.slice(5,7),16);const m=(x,y)=>Math.round(y+(x-y)*a).toString(16).padStart(2,'0');return '#'+m(r,252)+m(g,251)+m(b,255)}
+/* map colours for light and dark mode; lakes, borders and coasts stay visible in both */
+const THEMES={light:{sea:'#DCE4F6',land:'#FCFBFF',prov:'#ECE8F5',rivS:'#C4D4F2',rivB:'#B6CAEF',lake:'#C9D8F3',lakeLine:'#AFC3EA',border:'#C2B8E0',halo:'rgba(252,251,255,.92)',text:'#3C3560',strong:'#17122E',ring:'#fff',old:'#C9C3DD',oldT:'#BDB6D6',regLine:'rgba(111,104,144,.55)',regBorder:'#17122E',empty:'#F6F4FB',cal0:'#E4E0F0',calHi:'#5B5479',base:[252,251,255]},
+ dark:{sea:'#0B1230',land:'#1A1C33',prov:'#2B2D4A',rivS:'#2C4B85',rivB:'#3B63AA',lake:'#1E3769',lakeLine:'#4670BD',border:'#7C74B8',halo:'rgba(17,18,36,.92)',text:'#CFCAEB',strong:'#F4F2FF',ring:'#1A1C33',old:'#454169',oldT:'#3A3760',regLine:'rgba(190,182,240,.4)',regBorder:'#BDB5F0',empty:'#1A1B30',cal0:'#2A2B48',calHi:'#B9B2E6',base:[26,28,51]}};
+let THEME='light',MC=THEMES.light;
+function themeBtn(){const b=document.getElementById('ztheme');if(b){b.textContent=THEME=='dark'?'☀':'☾';b.title=b.ariaLabel=THEME=='dark'?'Heller Modus':'Dunkler Modus'}}
+function pickTheme(){let t='auto';try{t=localStorage.getItem('wm-theme')||'auto'}catch(e){}const dark=t=='dark'||(t=='auto'&&matchMedia('(prefers-color-scheme: dark)').matches);THEME=dark?'dark':'light';MC=THEMES[THEME];document.documentElement.dataset.theme=THEME}
+pickTheme();
+function tint(c,a){const r=parseInt(c.slice(1,3),16),g=parseInt(c.slice(3,5),16),b=parseInt(c.slice(5,7),16);const m=(x,y)=>Math.round(y+(x-y)*a).toString(16).padStart(2,'0');return '#'+m(r,MC.base[0])+m(g,MC.base[1])+m(b,MC.base[2])}
 const RED=matchMedia('(prefers-reduced-motion: reduce)').matches;
 const last={};
 function count(id,v,suf=''){const e=$(id);if(!e)return;const from=last[id]??0;last[id]=v;const t0=performance.now();function f(t){const p=RED?1:Math.min(1,(t-t0)/450),q=1-Math.pow(1-p,3);e.textContent=fmt(from+(v-from)*q)+suf;if(p<1)requestAnimationFrame(f)}requestAnimationFrame(f)}
@@ -42,9 +49,9 @@ function sizeCV(){const r=$('wrap').getBoundingClientRect();V.W=r.width;V.H=r.he
 const toS=(x,y)=>[(x-V.cx)*V.S+V.W/2,(y-V.cy)*V.S+V.H/2];
 const toW=(sx,sy)=>[(sx-V.W/2)/V.S+V.cx,(sy-V.H/2)/V.S+V.cy];
 const TS=256,TDPR=Math.min(2,window.devicePixelRatio||1),TC=new Map();let TKEY='',tileT=null;
-function renderTile(z,x,y,fn){const n=2**z,St=TS*n,f=TDPR;const c=document.createElement('canvas');c.width=c.height=Math.round(TS*f);const g=c.getContext('2d');const bb=[x/n,y/n,(x+1)/n,(y+1)/n];const oc=ctx,oS=V.S;ctx=g;V.S=St;V.tf=f;g.setTransform(f*St,0,0,f*St,-x*TS*f,-y*TS*f);g.fillStyle='#DCE4F6';g.fillRect(bb[0],bb[1],1/n,1/n);try{fn(bb)}finally{ctx=oc;V.S=oS}return c}
+function renderTile(z,x,y,fn){const n=2**z,St=TS*n,f=TDPR;const c=document.createElement('canvas');c.width=c.height=Math.round(TS*f);const g=c.getContext('2d');const bb=[x/n,y/n,(x+1)/n,(y+1)/n];const oc=ctx,oS=V.S;ctx=g;V.S=St;V.tf=f;g.setTransform(f*St,0,0,f*St,-x*TS*f,-y*TS*f);g.fillStyle=MC.sea;g.fillRect(bb[0],bb[1],1/n,1/n);try{fn(bb)}finally{ctx=oc;V.S=oS}return c}
 function drawTiles(fn){
- ctx.setTransform(V.dpr,0,0,V.dpr,0,0);ctx.fillStyle='#E7E4F2';ctx.fillRect(0,0,V.W,V.H);
+ ctx.setTransform(V.dpr,0,0,V.dpr,0,0);ctx.fillStyle=MC.sea;ctx.fillRect(0,0,V.W,V.H);
  const z=Math.max(1,Math.min(25,Math.round(Math.log2(V.S/TS)))),n=2**z,k=V.S/(TS*n),ts=TS*k;
  const x0=Math.floor((V.cx-V.W/2/V.S)*n),x1=Math.floor((V.cx+V.W/2/V.S)*n),y0=Math.floor((V.cy-V.H/2/V.S)*n),y1=Math.floor((V.cy+V.H/2/V.S)*n);
  const list=[];for(let x=x0;x<=x1;x++)for(let y=y0;y<=y1;y++)list.push([x,y]);const cx=V.cx*n,cy=V.cy*n;list.sort((a,b)=>Math.hypot(a[0]+.5-cx,a[1]+.5-cy)-Math.hypot(b[0]+.5-cx,b[1]+.5-cy));
@@ -58,7 +65,7 @@ function drawTiles(fn){
  window.__miss=miss;if(miss){clearTimeout(tileT);tileT=setTimeout(()=>redraw(),16)}
 }
 function worldT(){ctx.save();ctx.translate(V.W/2,V.H/2);ctx.scale(V.S,V.S);ctx.translate(-V.cx,-V.cy)}
-function begin(){ctx.setTransform(V.dpr,0,0,V.dpr,0,0);ctx.fillStyle='#DCE4F6';ctx.fillRect(0,0,V.W,V.H);ctx.save();ctx.translate(V.W/2,V.H/2);ctx.scale(V.S,V.S);ctx.translate(-V.cx,-V.cy)}
+function begin(){ctx.setTransform(V.dpr,0,0,V.dpr,0,0);ctx.fillStyle=MC.sea;ctx.fillRect(0,0,V.W,V.H);ctx.save();ctx.translate(V.W/2,V.H/2);ctx.scale(V.S,V.S);ctx.translate(-V.cx,-V.cy)}
 function endWorld(){ctx.restore();ctx.setTransform(V.dpr,0,0,V.dpr,0,0)}
 let idleT=null,rq=null;
 function full(){DRAW();scaleBar()}
@@ -82,18 +89,18 @@ function prepBase(j){
 }
 function drawBase(opt={}){
  const S=V.S;
- ctx.fillStyle='#FCFBFF';ctx.fill(B.land,'nonzero');
- if(S>14000){ctx.strokeStyle='#ECE8F5';ctx.lineWidth=.8/S;ctx.stroke(B.prov)}
+ ctx.fillStyle=MC.land;ctx.fill(B.land,'nonzero');
+ if(S>14000){ctx.strokeStyle=MC.prov;ctx.lineWidth=.8/S;ctx.stroke(B.prov)}
 
- if(S>30000){ctx.strokeStyle='#C4D4F2';ctx.lineWidth=Math.min(2,S/60000)/S;ctx.stroke(B.rivS)}
- ctx.strokeStyle='#B6CAEF';ctx.lineWidth=Math.min(2.4,.6+S/50000)/S;ctx.stroke(B.rivB);
- ctx.fillStyle='#C9D8F3';ctx.fill(B.lakes);ctx.strokeStyle='#AFC3EA';ctx.lineWidth=.7/S;ctx.stroke(B.lakes);
+ if(S>30000){ctx.strokeStyle=MC.rivS;ctx.lineWidth=Math.min(2,S/60000)/S;ctx.stroke(B.rivS)}
+ ctx.strokeStyle=MC.rivB;ctx.lineWidth=Math.min(2.4,.6+S/50000)/S;ctx.stroke(B.rivB);
+ ctx.fillStyle=MC.lake;ctx.fill(B.lakes);ctx.strokeStyle=MC.lakeLine;ctx.lineWidth=.7/S;ctx.stroke(B.lakes);
 
- ctx.strokeStyle='#C2B8E0';ctx.lineWidth=1.2/S;ctx.stroke(B.borders);
+ ctx.strokeStyle=MC.border;ctx.lineWidth=1.2/S;ctx.stroke(B.borders);
 
 }
 const placed=[];const usedNames=new Set();
-function lbl(t,x,y,fs,fw,c,anchor='left',halo=4,force=false){if(!force&&usedNames.has(t))return false;ctx.font=`${fw} ${fs}px Inter, sans-serif`;const w=ctx.measureText(t).width;let x0=anchor=='left'?x:anchor=='right'?x-w:x-w/2;const box=[x0-2,y-fs+1,x0+w+2,y+4];if(!force&&placed.some(b=>!(box[2]<b[0]||box[0]>b[2]||box[3]<b[1]||box[1]>b[3])))return false;placed.push(box);usedNames.add(t);ctx.textAlign='left';ctx.lineJoin='round';ctx.lineWidth=halo;ctx.strokeStyle='rgba(252,251,255,.92)';ctx.strokeText(t,x0,y);ctx.fillStyle=c;ctx.fillText(t,x0,y);return true}
+function lbl(t,x,y,fs,fw,c,anchor='left',halo=4,force=false){if(!force&&usedNames.has(t))return false;ctx.font=`${fw} ${fs}px Inter, sans-serif`;const w=ctx.measureText(t).width;let x0=anchor=='left'?x:anchor=='right'?x-w:x-w/2;const box=[x0-2,y-fs+1,x0+w+2,y+4];if(!force&&placed.some(b=>!(box[2]<b[0]||box[0]>b[2]||box[3]<b[1]||box[1]>b[3])))return false;placed.push(box);usedNames.add(t);ctx.textAlign='left';ctx.lineJoin='round';ctx.lineWidth=halo;ctx.strokeStyle=MC.halo;ctx.strokeText(t,x0,y);ctx.fillStyle=c;ctx.fillText(t,x0,y);return true}
 let LALL=null;
 function drawPlaceLabels(){
  const S=V.S;
@@ -102,8 +109,8 @@ function drawPlaceLabels(){
  for(const [r,t,wx,wy,fs,fw,need] of LALL){if(S<need||wx<x0||wx>x1||wy<y0||wy>y1)continue;const x=(wx-V.cx)*S+V.W/2,y=(wy-V.cy)*S+V.H/2;if(x<-50||y<-20||x>V.W+50||y>V.H+20)continue;if(lbl(t,x+4,y+4,fs,fw,'#6F6890',
  'left',3.5)){ctx.fillStyle='#8E86AE';ctx.beginPath();ctx.arc(x,y,1.8,0,7);ctx.fill();if(++n>140)break}}
 }
-function homeMark(){const [x,y]=toS(MX(HOME[1]),MY(HOME[0]));ctx.beginPath();ctx.arc(x,y,6,0,7);ctx.fillStyle='#17122E';ctx.fill();ctx.lineWidth=2;ctx.strokeStyle='#fff';ctx.stroke();ctx.beginPath();ctx.arc(x,y,11,0,7);ctx.strokeStyle='#17122E';ctx.lineWidth=1.8;ctx.stroke();lbl('Zuhause',x+15,y-8,14,800,'#17122E','left',4.5,true)}
-function pieS(x,y,r,cs){if(!cs.length)cs=['#B8B0D6'];if(cs.length==1){ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fillStyle=cs[0];ctx.fill()}else cs.forEach((c,i)=>{ctx.beginPath();ctx.moveTo(x,y);ctx.arc(x,y,r,2*Math.PI*i/cs.length-Math.PI/2,2*Math.PI*(i+1)/cs.length-Math.PI/2);ctx.closePath();ctx.fillStyle=c;ctx.fill()});ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.lineWidth=2;ctx.strokeStyle='#fff';ctx.stroke()}
+function homeMark(){const [x,y]=toS(MX(HOME[1]),MY(HOME[0]));ctx.beginPath();ctx.arc(x,y,6,0,7);ctx.fillStyle=MC.strong;ctx.fill();ctx.lineWidth=2;ctx.strokeStyle=MC.ring;ctx.stroke();ctx.beginPath();ctx.arc(x,y,11,0,7);ctx.strokeStyle=MC.strong;ctx.lineWidth=1.8;ctx.stroke();lbl('Zuhause',x+15,y-8,14,800,MC.strong,'left',4.5,true)}
+function pieS(x,y,r,cs){if(!cs.length)cs=['#B8B0D6'];if(cs.length==1){ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fillStyle=cs[0];ctx.fill()}else cs.forEach((c,i)=>{ctx.beginPath();ctx.moveTo(x,y);ctx.arc(x,y,r,2*Math.PI*i/cs.length-Math.PI/2,2*Math.PI*(i+1)/cs.length-Math.PI/2);ctx.closePath();ctx.fillStyle=c;ctx.fill()});ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.lineWidth=2;ctx.strokeStyle=MC.ring;ctx.stroke()}
 
 /* ---- Daten ---- */
 let D=null,tripById={},dayInfo=[],TR=null,byDay={};
@@ -151,7 +158,7 @@ function flightSel(f){if(!SEL)return true;const pn=f[4]>=0?D.persons[f[4]]:null;
 function placeSel(p){if(!SEL||p[9]=='Zuhause')return true;if(p[8]>=0&&tripById[p[8]]&&tripById[p[8]].w==SEL)return true;return !isGroup(SEL)&&!!(p[10]&selMask())}
 function whoBar(){const ps=D.persons||[],gs=GCFG().map(g=>g.name);const box=$('whobar');
  if(!ps.length&&!gs.length){box.innerHTML='<div class="wb-empty">Noch keine Personen oder Gruppen. <a href="app.html#people">Einrichten</a></div>';return}
- const chip=(n,ico)=>`<button class="chip ${SEL==n?'on':''}" style="--c:${n?WCOL[n]||'#8B3DFF':'#17122E'}" data-n="${esc(n||'')}" aria-pressed="${SEL==n}"><i></i>${ico}${esc(n||'Alle')}</button>`;
+ const chip=(n,ico)=>`<button class="chip ${SEL==n?'on':''}" style="--c:${n?WCOL[n]||'#8B3DFF':MC.strong}" data-n="${esc(n||'')}" aria-pressed="${SEL==n}"><i></i>${ico}${esc(n||'Alle')}</button>`;
  box.innerHTML='<div class="wb-t">ANZEIGEN FÜR <a href="app.html#people" title="Personen und Gruppen bearbeiten">bearbeiten</a></div><div class="chips">'+chip(null,'')+ps.map(n=>chip(n,'<span class="wi" aria-hidden="true">👤</span>')).join('')+gs.map(n=>chip(n,'<span class="wi" aria-hidden="true">👥</span>')).join('')+'</div>';
  box.querySelectorAll('.chip').forEach(b=>b.onclick=()=>setSel(b.dataset.n||null))}
 function setSel(n){SEL=SEL==n?null:n;SELV++;
@@ -210,16 +217,16 @@ function drawR(){
  RC.mbox=null;let off=null;
  for(const G of D.groups){const [g,name,la,lo,an,fs,major,gkm]=G;const ts=RC.on.filter(t=>t.g==g);if(!ts.length)continue;const [x,y]=toS(MX(lo),MY(la));if(x<-80||y<-40||x>V.W+80||y>V.H+40){if(gkm>1500&&(!off||gkm>off[0][7]))off=[G,ts];continue}
   const cs=R.color=='w'?WHO.filter(w=>ts.some(t=>t.w==w)).map(w=>WCOL[w]):[...new Set(ts.flatMap(t=>t.m).filter(m=>R.m.has(m)))].map(m=>MCOL[m]);const r=major?7.5:5.5;pieS(x,y,r,cs);
-  lbl(name,an=='end'?x-r-6:an=='middle'?x:x+r+6,an=='middle'?y-r-6:y+5,fs,major?780:650,major?'#17122E':'#3C3560',an=='end'?'right':an=='middle'?'center':'left',4.5,true)}
+  lbl(name,an=='end'?x-r-6:an=='middle'?x:x+r+6,an=='middle'?y-r-6:y+5,fs,major?780:650,major?MC.strong:MC.text,an=='end'?'right':an=='middle'?'center':'left',4.5,true)}
  // near trips
  const near={};for(const t of RC.on){if(t.g)continue;const k=t.name;(near[k]=near[k]||{name:k,p:t.p,ts:[]}).ts.push(t)}
  const ns=Object.values(near).sort((a,b)=>b.ts.length-a.ts.length);
- for(const q of ns){const [x,y]=toS(MX(q.p[1]),MY(q.p[0]));if(x<-20||y<-20||x>V.W+20||y>V.H+20)continue;const r=Math.min(9,3+Math.sqrt(q.ts.length)*1.3)*(S>40000?1:.75);const cs=R.color=='w'?WHO.filter(w=>q.ts.some(t=>t.w==w)).map(w=>WCOL[w]):[...new Set(q.ts.flatMap(t=>t.m).filter(m=>R.m.has(m)))].map(m=>MCOL[m]);pieS(x,y,r,cs);q.sx=x;q.sy=y;q.r=r;if(S>45000)lbl(q.name,x+r+4,y+4,12,650,'#3C3560')}
+ for(const q of ns){const [x,y]=toS(MX(q.p[1]),MY(q.p[0]));if(x<-20||y<-20||x>V.W+20||y>V.H+20)continue;const r=Math.min(9,3+Math.sqrt(q.ts.length)*1.3)*(S>40000?1:.75);const cs=R.color=='w'?WHO.filter(w=>q.ts.some(t=>t.w==w)).map(w=>WCOL[w]):[...new Set(q.ts.flatMap(t=>t.m).filter(m=>R.m.has(m)))].map(m=>MCOL[m]);pieS(x,y,r,cs);q.sx=x;q.sy=y;q.r=r;if(S>45000)lbl(q.name,x+r+4,y+4,12,650,MC.text)}
  RC.ndots=ns;
  if(off)edgeBadge(off[0],off[1]);
  drawPlaceLabels();
 }
-function edgeBadge(G,ts){if(V.S>40000)return;const x=V.W-70,y=V.H-58;const c=R.color=='w'?WCOL[ts[0].w]:MCOL.fly;ctx.font='800 13px Inter, sans-serif';const [gx,gy]=toS(MX(G[3]),MY(G[2]));const ar=(gy>V.H?'↓':gy<0?'↑':'')+(gx>V.W?'→':gx<0?'←':'');const txt=G[1]+' '+ar+' '+fmt(G[7])+' km';RC.mg=[G[1],ts];const w=ctx.measureText(txt).width+20;ctx.fillStyle='#fff';ctx.strokeStyle=c;ctx.lineWidth=1.5;ctx.beginPath();ctx.roundRect(x-w,y-14,w,28,10);ctx.fill();ctx.stroke();ctx.fillStyle='#17122E';ctx.fillText(txt,x-w+10,y+5);RC.mbox=[x-w,y-14,x,y+14]}
+function edgeBadge(G,ts){if(V.S>40000)return;const x=V.W-70,y=V.H-58;const c=R.color=='w'?WCOL[ts[0].w]:MCOL.fly;ctx.font='800 13px Inter, sans-serif';const [gx,gy]=toS(MX(G[3]),MY(G[2]));const ar=(gy>V.H?'↓':gy<0?'↑':'')+(gx>V.W?'→':gx<0?'←':'');const txt=G[1]+' '+ar+' '+fmt(G[7])+' km';RC.mg=[G[1],ts];const w=ctx.measureText(txt).width+20;ctx.fillStyle=MC.land;ctx.strokeStyle=c;ctx.lineWidth=1.5;ctx.beginPath();ctx.roundRect(x-w,y-14,w,28,10);ctx.fill();ctx.stroke();ctx.fillStyle=MC.strong;ctx.fillText(txt,x-w+10,y+5);RC.mbox=[x-w,y-14,x,y+14]}
 function sideR(){
  const on=RC.on,ak=alltagKm(),tk={};on.forEach(t=>{for(const k in t.k)if(R.m.has(k))tk[k]=(tk[k]||0)+t.k[k]});
  const ts=Object.values(tk).reduce((a,b)=>a+b,0),as=Object.values(ak).reduce((a,b)=>a+b,0);
@@ -297,18 +304,18 @@ segBind('s-color',v=>{SP.color=v;updS()});segBind('s-wd',v=>{SP.wd=v;updS()});
 
 /* ================= KARTE 3: ORTE & TAGE ================= */
 const O={day:null,pl:null,hit:[],q:''};
-let PCOL={Zuhause:'#17122E',Arbeit:'#FFB000'};
+let PCOL={Zuhause:MC.strong,Arbeit:'#FFB000'};
 function placeCat(p){if(p[9]=='Zuhause')return 'Zuhause';if(p[7]=='Work'||p[7]=='Inferred Work')return 'Arbeit';if(p[8]>=0&&tripById[p[8]])return tripById[p[8]].w;return 'Alltag'}
 function catOfDay(di){const r=D.days[di];return r[6]>=0?tripById[r[6]].w:'Alltag'}
 function drawO(){
  TKEY='O'+SELV;drawTiles(()=>drawBase());worldT();const S=V.S;
- if(O.day!=null){ctx.lineJoin='round';ctx.lineCap='round';for(const i of byDay[O.day]||[]){const l=TR[i],a=l.p;ctx.beginPath();ctx.moveTo(a[0],a[1]);for(let j=2;j<a.length;j+=2)ctx.lineTo(a[j],a[j+1]);ctx.strokeStyle='#fff';ctx.lineWidth=7/S;ctx.stroke();ctx.strokeStyle=MCOL[TCLS[l.c]];ctx.lineWidth=3.6/S;ctx.stroke()}
+ if(O.day!=null){ctx.lineJoin='round';ctx.lineCap='round';for(const i of byDay[O.day]||[]){const l=TR[i],a=l.p;ctx.beginPath();ctx.moveTo(a[0],a[1]);for(let j=2;j<a.length;j+=2)ctx.lineTo(a[j],a[j+1]);ctx.strokeStyle=MC.ring;ctx.lineWidth=7/S;ctx.stroke();ctx.strokeStyle=MCOL[TCLS[l.c]];ctx.lineWidth=3.6/S;ctx.stroke()}
   const ds=D.days[O.day][0];for(const f of D.flights){const [fd,A,Bp]=f;if(fd!=ds||!flightSel(f))continue;strokeArc(arcPts(MX(A[1]),MY(A[0]),MX(Bp[1]),MY(Bp[0])),[MCOL.fly],2.4,8,6)}}
  endWorld();placed.length=0;usedNames.clear();O.hit=[];
  const fade=O.day!=null?.3:1,zf=Math.max(.55,Math.min(1.7,Math.log2(S/8000)/4));
  for(const p of O.pl){const [x,y]=toS(MX(p[1]),MY(p[0]));if(x<-30||y<-30||x>V.W+30||y>V.H+30)continue;const r=Math.min(24,(1.6+Math.sqrt(p[2])*.3)*zf);const c=PCOL[p.cat];ctx.globalAlpha=fade;ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.fillStyle=tint(c,.55);ctx.fill();ctx.lineWidth=1.3;ctx.strokeStyle=c;ctx.stroke();O.hit.push([x,y,Math.max(r,9),p])}
  ctx.globalAlpha=1;homeMark();
- if(O.day==null){let n=0;const seen=new Set();for(const p of O.pl){if(n>50)break;if(p[9]=='Zuhause'||seen.has(p[9]))continue;const [x,y]=toS(MX(p[1]),MY(p[0]));if(x<0||y<0||x>V.W||y>V.H)continue;const r=Math.min(24,(1.6+Math.sqrt(p[2])*.3)*zf);if(lbl(p[9],x+r+3,y+4,12,650,'#3C3560')){seen.add(p[9]);n++}}}
+ if(O.day==null){let n=0;const seen=new Set();for(const p of O.pl){if(n>50)break;if(p[9]=='Zuhause'||seen.has(p[9]))continue;const [x,y]=toS(MX(p[1]),MY(p[0]));if(x<0||y<0||x>V.W||y>V.H)continue;const r=Math.min(24,(1.6+Math.sqrt(p[2])*.3)*zf);if(lbl(p[9],x+r+3,y+4,12,650,MC.text)){seen.add(p[9]);n++}}}
  drawPlaceLabels();
 }
 function calLayout(){const c=$('calc'),w=c.parentElement.clientWidth;const yrs=DYEARS;const lab=28,cell=Math.max(4,Math.floor((w-lab)/53)),rowH=cell*7+10;return {c,w,yrs,lab,cell,rowH,h:rowH*yrs.length}}
@@ -318,8 +325,8 @@ function drawCal(){
  O.calHit=[];const d0=dateOf(D.days[0][0]);
  D.days.forEach((r,di)=>{const d=new Date(d0.getTime()+di*864e5),y=d.getUTCFullYear(),yi=y-DYEARS[0];const jan1=Date.UTC(y,0,1),doy=Math.round((d-jan1)/864e5),wd0=(new Date(jan1).getUTCDay()+6)%7,wd=(d.getUTCDay()+6)%7,col=Math.floor((doy+wd0)/7);
   const x=L.lab+col*L.cell,yy=yi*L.rowH+wd*L.cell;const cat=catOfDay(di),km=r[1]+r[2]+r[3]+r[4];let fill;
-  if(!daySel(di))fill='#F6F4FB';else if(cat!='Alltag')fill=WCOL[cat];else if(!r[7])fill='#F6F4FB';else if(km<1)fill='#E4E0F0';else{const t=Math.min(1,Math.log10(km)/2.6);fill=tint('#5B5479',.12+t*.6)}
-  g.fillStyle=fill;g.fillRect(x,yy,L.cell-1,L.cell-1);if(O.day===di){g.lineWidth=2;g.strokeStyle='#17122E';g.strokeRect(x-1,yy-1,L.cell+1,L.cell+1)}if(daySel(di))O.calHit.push([x,yy,L.cell,di])});
+  if(!daySel(di))fill=MC.empty;else if(cat!='Alltag')fill=WCOL[cat];else if(!r[7])fill=MC.empty;else if(km<1)fill=MC.cal0;else{const t=Math.min(1,Math.log10(km)/2.6);fill=tint(MC.calHi,.12+t*.6)}
+  g.fillStyle=fill;g.fillRect(x,yy,L.cell-1,L.cell-1);if(O.day===di){g.lineWidth=2;g.strokeStyle=MC.strong;g.strokeRect(x-1,yy-1,L.cell+1,L.cell+1)}if(daySel(di))O.calHit.push([x,yy,L.cell,di])});
 }
 function calAt(e){const r=$('calc').getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;return O.calHit.find(([cx,cy,s])=>x>=cx&&x<cx+s&&y>=cy&&y<cy+s)}
 $('calc').addEventListener('click',e=>{const h=calAt(e);if(h)selectDay(h[3])});
@@ -336,7 +343,7 @@ function sideO(){
  const sd=D.days.filter((r,i)=>daySel(i)),tripDays=sd.filter(r=>r[6]>=0).length,big=sd.reduce((b,r)=>{const k=r[1]+r[2]+r[3]+r[4];return k>b?k:b},0);
  if(!$('o1'))$('o-stats').innerHTML=statHTML([['o1','Tage auf Reisen'],['o2','Tage nie weiter als 30 km'],['o3','Orte mit Aufenthalt'],['o4','km am längsten Tag']]);
  count('o1',tripDays);count('o2',sd.filter(r=>r[7]&&r[6]<0&&r[5]<30).length);count('o3',O.pl.length);count('o4',big);
- $('o-legend').innerHTML=[...WHO.filter(w=>w!='Alltag').map(w=>[w,WCOL[w]]),['Alltag wenig','#D9D5E8'],['Alltag viel','#837CA0'],['keine Daten','#F6F4FB']].map(([n,c])=>`<span style="display:inline-flex;align-items:center;gap:6px"><i style="width:11px;height:11px;border-radius:2px;background:${c};box-shadow:inset 0 0 0 1px #E4DFF3"></i>${esc(n)}</span>`).join('');
+ $('o-legend').innerHTML=[...WHO.filter(w=>w!='Alltag').map(w=>[w,WCOL[w]]),['Alltag wenig',MC.cal0],['Alltag viel',tint(MC.calHi,.72)],['keine Daten',MC.empty]].map(([n,c])=>`<span style="display:inline-flex;align-items:center;gap:6px"><i style="width:11px;height:11px;border-radius:2px;background:${c};box-shadow:inset 0 0 0 1px #E4DFF3"></i>${esc(n)}</span>`).join('');
  topO();
 }
 function topO(){const q=O.q.trim().toLowerCase();const list=O.pl.filter(p=>p[9]!='Zuhause'&&(!q||p[9].toLowerCase().includes(q))).slice(0,q?20:10);
@@ -361,18 +368,18 @@ function aggReg(){if(RG.agg)return RG.agg;const m=selMask(),grp=SEL&&isGroup(SEL
  RG.agg=A;return A}
 function regFill(r){const v=aggReg().get(r.id);if(!v)return null;if(RG.color=='y')return ycol(+v.first.slice(0,4));if(RG.color=='d'){const i=v.days>=200?5:v.days>=50?4:v.days>=15?3:v.days>=5?2:v.days>=2?1:0;return DCOL[i]}return v.stay?'#00BFB3':'#B3ECE8'}
 function contentRG(){
- ctx.fillStyle='#FCFBFF';ctx.fill(B.land);const S=V.S,A=aggReg();
+ ctx.fillStyle=MC.land;ctx.fill(B.land);const S=V.S,A=aggReg();
  if(!RG.groups){RG.groups=new Map();RG.lines=new Path2D();const cs=new Set([...A.keys()].map(id=>RG.byId.get(id)?.a3));if(RG.cc)cs.add(RG.cc);
   for(const r of RG.list){if(cs.has(r.a3))RG.lines.addPath(r.p);const c=regFill(r);if(!c)continue;let p=RG.groups.get(c);if(!p){p=new Path2D();RG.groups.set(c,p)}p.addPath(r.p)}}
  for(const [c,p] of RG.groups){ctx.fillStyle=c;ctx.fill(p,'evenodd')}
- ctx.fillStyle='#C9D8F3';ctx.fill(B.lakes);
- ctx.strokeStyle='rgba(111,104,144,.55)';ctx.lineWidth=.8/S;ctx.stroke(RG.lines);
- ctx.strokeStyle='#17122E';ctx.lineWidth=1.3/S;ctx.stroke(B.borders)}
+ ctx.fillStyle=MC.lake;ctx.fill(B.lakes);
+ ctx.strokeStyle=MC.regLine;ctx.lineWidth=.8/S;ctx.stroke(RG.lines);
+ ctx.strokeStyle=MC.regBorder;ctx.lineWidth=1.3/S;ctx.stroke(B.borders)}
 function drawRG(){
  TKEY='G'+RG.color+'_'+SELV;drawTiles(contentRG);worldT();const S=V.S;
- if(RG.hit){ctx.strokeStyle='#17122E';ctx.lineWidth=3/S;ctx.stroke(RG.hit.p)}
+ if(RG.hit){ctx.strokeStyle=MC.strong;ctx.lineWidth=3/S;ctx.stroke(RG.hit.p)}
  endWorld();placed.length=0;usedNames.clear();homeMark();
- if(S>2500){const A=aggReg();const vis=RG.list.filter(r=>A.has(r.id)).map(r=>[r,toS(MX(r.lo),MY(r.la))]).filter(([,[x,y]])=>x>0&&y>0&&x<V.W&&y<V.H).sort((a,b)=>A.get(b[0].id).days-A.get(a[0].id).days);for(const [r,[x,y]] of vis.slice(0,120))lbl(r.name.replace(/^(Kanton|Département|Gespanschaft|Provinz|Provincia|Region|Regierungsbezirk|Bezirk|Comté|County of) /,''),x,y,S>20000?12:11,650,'#3C3560','center',3)}
+ if(S>2500){const A=aggReg();const vis=RG.list.filter(r=>A.has(r.id)).map(r=>[r,toS(MX(r.lo),MY(r.la))]).filter(([,[x,y]])=>x>0&&y>0&&x<V.W&&y<V.H).sort((a,b)=>A.get(b[0].id).days-A.get(a[0].id).days);for(const [r,[x,y]] of vis.slice(0,120))lbl(r.name.replace(/^(Kanton|Département|Gespanschaft|Provinz|Provincia|Region|Regierungsbezirk|Bezirk|Comté|County of) /,''),x,y,S>20000?12:11,650,MC.text,'center',3)}
 }
 function regAt(sx,sy){const [wx,wy]=toW(sx,sy);for(const r of RG.list){const b=r.bb;if(wx<b[0]||wx>b[2]||wy<b[1]||wy>b[3])continue;if(ctx.isPointInPath(r.p,wx,wy,'evenodd'))return r}return null}
 function sideRG(){
@@ -402,7 +409,7 @@ function prepZ(){
  Z.fl=new Map();(D.flights||[]).forEach(f=>{const [ds,A,B,fr]=f;if(!flightSel(f))return;const d=dayIdx(ds);if(!Z.fl.has(d))Z.fl.set(d,[]);Z.fl.get(d).push({A,B,s:fr==null?.4:fr})});
  const G=new Map(D.groups.map(g=>[g[0],g[1]]));const seen=new Set();
  const jumps=Z.trips.filter(o=>o.t.g).sort((x,y)=>y.t.km-x.t.km).filter(o=>{const k=o.t.g+o.t.y;if(seen.has(k))return false;seen.add(k);return true}).slice(0,14).sort((x,y)=>x.a-y.a);
- $('z-jump').innerHTML=`<button class="chip on" style="--c:#17122E" data-i="${Z.s0}"><i></i>Anfang</button>`+jumps.map(o=>`<button class="chip on" style="--c:${WCOL[o.t.w]||'#8B3DFF'}" data-i="${o.a}"><i></i>${esc(G.get(o.t.g)||o.t.name)} ’${String(o.t.y).slice(2)}</button>`).join('');
+ $('z-jump').innerHTML=`<button class="chip on" style="--c:${MC.strong}" data-i="${Z.s0}"><i></i>Anfang</button>`+jumps.map(o=>`<button class="chip on" style="--c:${WCOL[o.t.w]||'#8B3DFF'}" data-i="${o.a}"><i></i>${esc(G.get(o.t.g)||o.t.name)} ’${String(o.t.y).slice(2)}</button>`).join('');
  $('z-jump').querySelectorAll('.chip').forEach(b=>b.onclick=()=>jumpZ(+b.dataset.i));
  const c=$('z-line');const pos=e=>{const r=c.getBoundingClientRect();return Z.s0+Math.max(0,Math.min(1,(e.clientX-r.left)/r.width))*(Z.n-1-Z.s0)};
  c.onpointerdown=e=>{Z.drag=true;c.setPointerCapture(e.pointerId);setZ(pos(e));full()};
@@ -438,13 +445,13 @@ function drawZLine(){const c=$('z-line');if(!c||!Z.cum)return;const w=c.parentEl
  const bw=Math.max(1,w/Z.weeks.length);g.fillStyle='#D9D4EA';Z.weeks.forEach((k,i)=>{const bh=Math.sqrt(k/Z.wmax)*38;g.fillRect(i*bw,44-bh,Math.max(1,bw-.5),bh)});
  for(const o of Z.trips){g.fillStyle=WCOL[o.t.w]||'#8B3DFF';g.fillRect(X(Math.max(s0,o.a)),48,Math.max(2,X(o.b+1)-X(Math.max(s0,o.a))),8)}
  g.font='700 10px Inter, system-ui, sans-serif';g.fillStyle='#5B5479';let ly=-1;for(let d=s0;d<n;d++){const ds=D.days[d][0];if(ds.endsWith('-01-01')||d==s0){const x=X(d);if(x-ly>34){g.fillRect(x,58,1,4);g.fillText(ds.slice(0,4),x+2,70);ly=x}}}
- const x=X(Z.t);g.fillStyle='#17122E';g.fillRect(x-1,0,2,58);g.beginPath();g.arc(x,3,4,0,7);g.fill()}
+ const x=X(Z.t);g.fillStyle=MC.strong;g.fillRect(x-1,0,2,58);g.beginPath();g.arc(x,3,4,0,7);g.fill()}
 function drawZ(){
  const ti=Math.floor(Z.t),frac=Z.t-ti,from=Z.trail=='month'?Math.max(0,ti-30):0,upto=ti-6;
  const wk=Math.max(0,Math.floor(upto/14)*14),f0=Z.trail=='all'?0:Math.floor(from/14)*14;if(!Z.tr||Z.tr.wk!==wk||Z.tr.f0!==f0)Z.tr={wk,f0};
- TKEY='Z'+wk+'_'+f0+'_'+SELV;drawTiles(bb=>{drawBase();const S=V.S;ctx.globalAlpha=1;ctx.strokeStyle='#BDB6D6';ctx.lineJoin='round';ctx.lineCap='round';ctx.lineWidth=S<300000?1/(S*(V.tf||1)):1.4/S;tileDraw(Z.tr,li=>{const d=TR[li].d;return TR[li].on&&d<wk&&d>=f0?'o':null},()=>0,()=>{},bb);ctx.globalAlpha=1});
+ TKEY='Z'+wk+'_'+f0+'_'+SELV;drawTiles(bb=>{drawBase();const S=V.S;ctx.globalAlpha=1;ctx.strokeStyle=MC.oldT;ctx.lineJoin='round';ctx.lineCap='round';ctx.lineWidth=S<300000?1/(S*(V.tf||1)):1.4/S;tileDraw(Z.tr,li=>{const d=TR[li].d;return TR[li].on&&d<wk&&d>=f0?'o':null},()=>0,()=>{},bb);ctx.globalAlpha=1});
  worldT();const S=V.S;const lw=Math.max(1,Math.min(2.4,S/40000))/S;ctx.lineJoin='round';ctx.lineCap='round';const LK=lodKey();
- ctx.strokeStyle='#C9C3DD';ctx.lineWidth=lw;ctx.beginPath();
+ ctx.strokeStyle=MC.old;ctx.lineWidth=lw;ctx.beginPath();
  for(let d=Math.max(wk,from);d<upto;d++)for(const i of byDay[d]||[]){const a=TR[i][LK];ctx.moveTo(a[0],a[1]);for(let j=2;j<a.length;j+=2)ctx.lineTo(a[j],a[j+1])}ctx.stroke();
  /* the last days: colour by transport, fading */
  for(let d=Math.max(from,ti-6);d<ti;d++){const age=ti-d+frac;ctx.globalAlpha=Math.max(.15,1-age*.13);for(const i of byDay[d]||[]){const a=TR[i][LK];ctx.beginPath();ctx.moveTo(a[0],a[1]);for(let j=2;j<a.length;j+=2)ctx.lineTo(a[j],a[j+1]);ctx.strokeStyle=MCOL[TCLS[TR[i].c]];ctx.lineWidth=2.2/S;ctx.stroke()}
@@ -452,13 +459,13 @@ function drawZ(){
  ctx.globalAlpha=1;
  /* today: drawn as far as the clock has come, with a glowing head */
  let head=null,plane=null,headCol=MCOL.road;
- for(const i of byDay[ti]||[]){const [s0,s1]=trackT(i);if(frac<s0)continue;const p=Math.min(1,(frac-s0)/Math.max(.004,s1-s0));ctx.beginPath();const h=partial(i,p);ctx.strokeStyle='#fff';ctx.lineWidth=6/S;ctx.stroke();ctx.strokeStyle=MCOL[TCLS[TR[i].c]];ctx.lineWidth=3.4/S;ctx.stroke();head=h;headCol=MCOL[TCLS[TR[i].c]]}
+ for(const i of byDay[ti]||[]){const [s0,s1]=trackT(i);if(frac<s0)continue;const p=Math.min(1,(frac-s0)/Math.max(.004,s1-s0));ctx.beginPath();const h=partial(i,p);ctx.strokeStyle=MC.ring;ctx.lineWidth=6/S;ctx.stroke();ctx.strokeStyle=MCOL[TCLS[TR[i].c]];ctx.lineWidth=3.4/S;ctx.stroke();head=h;headCol=MCOL[TCLS[TR[i].c]]}
  for(const f of Z.fl.get(ti)||[]){if(frac<f.s)continue;const p=Math.min(1,(frac-f.s)/.12);const arc=arcPts(MX(f.A[1]),MY(f.A[0]),MX(f.B[1]),MY(f.B[0]));ctx.beginPath();ctx.moveTo(arc[0],arc[1]);const N=40;for(let k=1;k<=N*p;k++){const q=bez(arc,k/N);ctx.lineTo(q[0],q[1])}const q=bez(arc,p);ctx.lineTo(q[0],q[1]);ctx.setLineDash([8/S,6/S]);ctx.strokeStyle=MCOL.fly;ctx.lineWidth=2.8/S;ctx.stroke();ctx.setLineDash([]);if(p<1){const q2=bez(arc,Math.min(1,p+.01));plane=[q[0],q[1],Math.atan2(q2[1]-q[1],q2[0]-q[0])]}else{head=[arc[4],arc[5]];headCol=MCOL.fly}}
  endWorld();placed.length=0;usedNames.clear();
  if(!head&&!plane){for(let d=ti;d>=0&&!head;d--){const ids=(byDay[d]||[]).filter(i=>d<ti||trackT(i)[0]<=frac);if(ids.length){const a=TR[ids[ids.length-1]].p;head=[a[a.length-2],a[a.length-1]]}}}
  Z.pos=plane?[plane[0],plane[1]]:head;homeMark();drawPlaceLabels();
- if(plane){const [x,y]=toS(plane[0],plane[1]);ctx.save();ctx.translate(x,y);ctx.rotate(plane[2]);ctx.fillStyle=MCOL.fly;ctx.strokeStyle='#fff';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(11,0);ctx.lineTo(-7,-7);ctx.lineTo(-3,0);ctx.lineTo(-7,7);ctx.closePath();ctx.stroke();ctx.fill();ctx.restore()}
- else if(head){const [x,y]=toS(head[0],head[1]);const pulse=RED?0:(performance.now()/600)%1;ctx.beginPath();ctx.arc(x,y,8+pulse*14,0,7);ctx.fillStyle=`rgba(139,61,255,${.28*(1-pulse)})`;ctx.fill();ctx.beginPath();ctx.arc(x,y,6.5,0,7);ctx.fillStyle=headCol;ctx.fill();ctx.lineWidth=2.5;ctx.strokeStyle='#fff';ctx.stroke()}
+ if(plane){const [x,y]=toS(plane[0],plane[1]);ctx.save();ctx.translate(x,y);ctx.rotate(plane[2]);ctx.fillStyle=MCOL.fly;ctx.strokeStyle=MC.ring;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(11,0);ctx.lineTo(-7,-7);ctx.lineTo(-3,0);ctx.lineTo(-7,7);ctx.closePath();ctx.stroke();ctx.fill();ctx.restore()}
+ else if(head){const [x,y]=toS(head[0],head[1]);const pulse=RED?0:(performance.now()/600)%1;ctx.beginPath();ctx.arc(x,y,8+pulse*14,0,7);ctx.fillStyle=`rgba(139,61,255,${.28*(1-pulse)})`;ctx.fill();ctx.beginPath();ctx.arc(x,y,6.5,0,7);ctx.fillStyle=headCol;ctx.fill();ctx.lineWidth=2.5;ctx.strokeStyle=MC.ring;ctx.stroke()}
 }
 function tickZ(ts){if(!Z.play)return;const dt=Math.min(.1,(ts-(Z.last||ts))/1000);Z.last=ts;setZ(Z.t+dt*Z.speed);
  if(Z.cam=='follow'){const di=Math.floor(Z.t);const b=camBox(di);const k=1-Math.exp(-dt*(Z.speed>30?1.2:2.2));
@@ -475,7 +482,7 @@ document.addEventListener('keydown',e=>{if(TAB!='zeit'||e.target.closest('input,
 function legend(){const L=$('legend');const ln=(c,n,dash)=>`<div><svg width="26" height="10" aria-hidden="true"><path d="M2 5H24" stroke="${c}" stroke-width="3.2" stroke-linecap="round" ${dash?'stroke-dasharray="5 4"':''}/></svg>${esc(n)}</div>`;let it=[];
  if(TAB=='reisen'){it=R.color=='w'?WHO.map(w=>ln(WCOL[w],w)):MODES.map(m=>ln(MCOL[m],MNAME[m],m=='fly'));it.push('<div><svg width="26" height="12" aria-hidden="true"><rect x="2" y="1" width="22" height="10" rx="5" fill="#E6E1F5" stroke="#8E86AE" stroke-width="1.2"/></svg>viele kurze Wege</div>')}
  else if(TAB=='spuren'){it=SP.color=='m'?['road','rail','foot','fly'].map(m=>ln(MCOL[m],MNAME[m],m=='fly')):SP.color=='w'?WORDER().map(w=>ln(WCOL[w],w)):[`<div><svg width="130" height="10" aria-hidden="true"><defs><linearGradient id="yg">${YCOL.map((c,i)=>`<stop offset="${i/10}" stop-color="${c}"/>`).join('')}</linearGradient></defs><rect x="0" y="2" width="130" height="6" rx="3" fill="url(#yg)"/></svg></div><div style="justify-content:space-between;width:130px"><span>${Y0}</span><span>${Y1}</span></div>`]}
- else if(TAB=='orte')it=[['Zuhause','#17122E'],...((O.pl||[]).some(p=>p.cat=='Arbeit')?[['Arbeit','#FFB000']]:[]),['Alltag',WCOL.Alltag],...WHO.filter(w=>w!='Alltag').map(w=>['Reise '+w,WCOL[w]])].map(([n,c])=>`<div><svg width="14" height="14" aria-hidden="true"><circle cx="7" cy="7" r="5.5" fill="${tint(c,.55)}" stroke="${c}" stroke-width="1.3"/></svg>${esc(n)}</div>`);
+ else if(TAB=='orte')it=[['Zuhause',MC.strong],...((O.pl||[]).some(p=>p.cat=='Arbeit')?[['Arbeit','#FFB000']]:[]),['Alltag',WCOL.Alltag],...WHO.filter(w=>w!='Alltag').map(w=>['Reise '+w,WCOL[w]])].map(([n,c])=>`<div><svg width="14" height="14" aria-hidden="true"><circle cx="7" cy="7" r="5.5" fill="${tint(c,.55)}" stroke="${c}" stroke-width="1.3"/></svg>${esc(n)}</div>`);
  else if(TAB=='regionen')it=['<div>Region antippen für Details</div>'];
  else it=['road','rail','foot','fly'].map(m=>ln(MCOL[m],MNAME[m],m=='fly')).concat(['<div><svg width="26" height="10" aria-hidden="true"><path d="M2 5H24" stroke="#8A82AA" stroke-width="2" opacity=".6"/></svg>früher</div>']);
  L.innerHTML=it.join('')}
@@ -497,6 +504,9 @@ wrap.addEventListener('pointerup',e=>{const wasMoved=moved;up(e);if(wasMoved||e.
  else if(TAB=='orte'){const h=O.hit.findLast(([hx,hy,hr])=>Math.hypot(hx-sx,hy-sy)<hr);if(h)placeDetail(h[3])}
  else if(TAB=='regionen'){const r=regAt(sx,sy);RG.hit=r;full();if(r){const v=aggReg().get(r.id);openDetail(`<h3>${esc(r.name)}</h3><div class="dsub">${esc(RG.countries[r.a3]||r.a3)}</div>`+(v?`<div class="trip"><div class="s" style="background:${regFill(r)}"></div><div><div class="t1">Zum ersten Mal: ${dfmt(v.first)}</div><div class="t2">an ${fmt(v.days)} ${v.days==1?'Tag':'Tagen'} dort oder durchgefahren${v.stay?' · mit Aufenthalten':''}</div></div></div>`:'<div class="empty">Hier wart ihr laut den Daten noch nie.</div>'),()=>{RG.hit=null;full()})}else closeDetail()}});
 wrap.addEventListener('pointercancel',up);
+$('ztheme').onclick=()=>{const next=THEME=='dark'?'light':'dark';try{localStorage.setItem('wm-theme',next)}catch(e){}pickTheme();themeBtn();TC.clear();RG.groups=null;Z.tr=null;if(PCOL)PCOL.Zuhause=MC.strong;whoBar();if(TAB=='orte')drawCal();if(TAB=='zeit')drawZLine();enter(TAB)};
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{let t='auto';try{t=localStorage.getItem('wm-theme')||'auto'}catch(e){}if(t=='auto'){pickTheme();TC.clear();RG.groups=null;if(D)enter(TAB)}});
+themeBtn();
 $('zin').onclick=()=>zoomAt(1.7,V.W/2,V.H/2);$('zout').onclick=()=>zoomAt(1/1.7,V.W/2,V.H/2);
 $('zhome').onclick=()=>flyTo(MX(HOME[1]),MY(HOME[0]),260000);
 $('zch').onclick=()=>{const b=D.region.box;fit(b[0],b[1],b[2],b[3])};$('zeu').onclick=()=>{const s=V.S;fitTrips();const t={cx:V.cx,cy:V.cy,S:V.S};V.S=s;flyTo(t.cx,t.cy,t.S)};
@@ -507,7 +517,7 @@ function initData(){
  HOME=D.home;WHO=D.who.slice();for(const n of [...(D.persons||[]),...GCFG().map(g=>g.name)])if(!WHO.includes(n))WHO.splice(WHO.length-1,0,n);WCOL={};let pi=0;
  const CC=D.colors||{};const used=new Set(Object.values(CC));
  for(const w of WHO){if(CC[w])WCOL[w]=CC[w];else if(w=='Alltag')WCOL[w]='#8A82AA';else if(w=='offen')WCOL[w]='#B8B0D6';else if(GROUPCOL[w]&&!D.persons.includes(w))WCOL[w]=GROUPCOL[w];else{while((used.has(PALETTE[pi%PALETTE.length])||Object.values(GROUPCOL).includes(PALETTE[pi%PALETTE.length])&&!D.persons.includes(w))&&pi<PALETTE.length*2)pi++;WCOL[w]=PALETTE[pi++%PALETTE.length]}}
- PCOL={Zuhause:'#17122E',Arbeit:'#FFB000',...WCOL};
+ PCOL={Zuhause:MC.strong,Arbeit:'#FFB000',...WCOL};
  R.w=new Set(WHO);
  TYEARS=[...new Set(D.trips.map(t=>t.y))].sort((a,b)=>a-b);
  const dy0=+D.days[0][0].slice(0,4),dy1=+D.days[D.days.length-1][0].slice(0,4);DYEARS=[];for(let y=dy0;y<=dy1;y++)DYEARS.push(y);

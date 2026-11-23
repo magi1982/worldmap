@@ -25,6 +25,7 @@
 - Empty map explains what to do next (import, people & groups).
 - Trips without GPS (by hand or from trip lists) get offline kilometre estimates per transport (detour factors, airport
   transfers, driving on the spot) and count for the regions view.
+- Light and dark mode (system setting or the ☾/☀ button on the map, also for the settings).
 - Older configurations keep working (`routing: osrm` is read as `tiles`, plain group names become groups).
 
 ### Changed

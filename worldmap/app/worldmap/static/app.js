@@ -5,6 +5,7 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&': '&amp;', '<
 const NEON = ['#0A7CFF', '#FF3D9A', '#8B3DFF', '#00BFB3', '#FF8A00', '#12A84F', '#E03131', '#5C7CFA'];
 const CONF = ['tief', 'mittel', 'hoch', 'bestätigt'];
 const EMBED = new URLSearchParams(location.search).get('embed');
+(function theme() { let t = 'auto'; try { t = localStorage.getItem('wm-theme') || 'auto'; } catch (e) { /* ignore */ } document.documentElement.dataset.theme = t === 'dark' || (t === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light'; })();
 const st = {cfg: null, trips: [], questions: [], sort: ['start_date', -1], filter: {}, sel: new Set()};
 
 async function api(path, opt = {}) {

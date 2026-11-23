@@ -161,3 +161,12 @@ body.embed-new{background:transparent}
 .mem .chip{cursor:pointer;user-select:none}
 .prow.two{grid-template-columns:1fr 1fr}
 @media (max-width:640px){.who-head{grid-template-columns:1fr 44px auto}.who-head .ty{grid-column:1/-1}.who-detail{grid-template-columns:1fr}}
+/* dark mode (follows the choice made on the map, or the system) */
+[data-theme=dark]{color-scheme:dark;--bg:#0D0E1C;--card:#16172B;--ink:#F1EFFF;--mute:#A6A1C8;--line:#2E2F4D;--shadow:0 6px 24px rgba(0,0,0,.35)}
+[data-theme=dark] nav button.on,[data-theme=dark] nav a.back:hover{background:#2A2350}
+[data-theme=dark] .btn,[data-theme=dark] .card .opts button.btn{background:#25264A;color:var(--ink)}
+[data-theme=dark] .btn:hover{background:#2E2F57}
+[data-theme=dark] .chip,[data-theme=dark] .who-row,[data-theme=dark] .info,[data-theme=dark] .card .opts button:not(.primary):not(.sug),[data-theme=dark] .who-head .co{background:#1D1E36}
+[data-theme=dark] .who-row.g,[data-theme=dark] .infobox{background:#1A1B32}
+[data-theme=dark] .status{background:#25264A}
+[data-theme=dark] input,[data-theme=dark] select,[data-theme=dark] textarea{background:#1D1E36;border-color:var(--line)}

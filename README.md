@@ -24,6 +24,7 @@ fast, good-looking map with five views. Everything runs inside the add-on; no cl
 | 📡 **Live without cloud** | Positions from `person.*` / `device_tracker.*` entities and a built-in **OwnTracks** endpoint: the phone buffers positions while you are away and sends them when it is back in your home network – no Nabu Casa, no port opened to the internet. |
 | ✍️ **Trips by hand** | The "+" button asks a few questions (where, when, how long, who, how, how big was the area) – for old trips without any data. |
 | 🔔 **Notifications** | Choose one of your phones (found automatically) or a Home Assistant notification, how often (instant, daily, weekly) and send a test. |
+| 🌙 **Light & dark mode** | Follows the system or the ☾/☀ button on the map; lakes, borders and coasts stay visible in the dark. |
 | 📊 **Sensors** | `sensor.worldmap_km_this_year`, `sensor.worldmap_trips`, `sensor.worldmap_countries`, `sensor.worldmap_open_questions`, `sensor.worldmap_last_trip`. |
 
 | Tracks | Places & days | Regions | Time-lapse |
