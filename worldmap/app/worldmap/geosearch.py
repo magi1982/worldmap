@@ -157,6 +157,8 @@ def resolve_gmaps(url: str) -> dict | None:
     hit = parse_gmaps(url)
     if hit:
         return hit
+    if url.lower().startswith("http://"):
+        url = "https://" + url[7:]  # only ever encrypted
     try:
         for _ in range(4):  # follow redirects by hand so every hop is checked
             req = urllib.request.Request(url, method="HEAD", headers={"User-Agent": UA})
@@ -169,8 +171,8 @@ def resolve_gmaps(url: str) -> dict | None:
                 if not loc:
                     return None
                 url = urllib.parse.urljoin(url, loc)
-            if not is_gmaps(url):
-                return None
+            if not is_gmaps(url) or not url.lower().startswith("https://"):
+                return None  # a hop to another site or to plain http: stop
             hit = parse_gmaps(url)
             if hit:
                 return hit

@@ -15,8 +15,10 @@ jobs:
     name: Tests, lint and security scan
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.13"
           cache: pip
@@ -29,9 +31,9 @@ jobs:
       - name: Bandit
         run: bandit -q -r worldmap/app -c pyproject.toml
       - name: Dependency audit
-        run: pip-audit -r worldmap/requirements.txt
+        run: pip-audit -r worldmap/requirements.txt -r requirements-dev.txt
       - name: JavaScript syntax
-        run: node --check worldmap/app/worldmap/static/app.js
+        run: for f in worldmap/app/worldmap/static/*.js; do node --check "$f"; done
       - name: Privacy guard (no real data in the repo)
         run: python tools/privacy_check.py
 
@@ -39,7 +41,9 @@ jobs:
     name: Add-on lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
       - uses: frenck/action-addon-linter@v2
         with:
           path: "./worldmap"

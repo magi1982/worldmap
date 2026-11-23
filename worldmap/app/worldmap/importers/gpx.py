@@ -17,7 +17,7 @@ def _local(tag: str) -> str:
 
 
 def parse_xml(text: str):
-    if _FORBIDDEN.search(text[:65536]):
+    if _FORBIDDEN.search(text):  # anywhere in the file, not only at the start
         raise ValueError("XML with DOCTYPE/ENTITY declarations is not accepted")
     root = ET.fromstring(text)  # nosec B314 - DTD/entities rejected above
     kind = _local(root.tag).lower()

@@ -12,6 +12,7 @@ import base64
 import hmac
 import json
 import logging
+import threading
 import time
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -42,10 +43,47 @@ def parse(body: bytes, label: str) -> list[tuple]:
     return rows
 
 
+LOCK_AFTER = 10          # wrong passwords from one address …
+LOCK_WINDOW_S = 600     # … within 10 minutes …
+LOCK_FOR_S = 900        # … lock that address out for 15 minutes
+
+
+class Guard:
+    """Counts failed logins per address; too many and the address is locked out for a while."""
+
+    def __init__(self):
+        self._fails: dict = {}
+        self._lock = threading.Lock()
+
+    def locked(self, ip: str, now: float | None = None) -> bool:
+        now = time.time() if now is None else now
+        with self._lock:
+            f = self._fails.get(ip)
+            return bool(f and f.get("until", 0) > now)
+
+    def fail(self, ip: str, now: float | None = None) -> None:
+        now = time.time() if now is None else now
+        with self._lock:
+            if len(self._fails) > 10_000:  # never grow without bound
+                self._fails.clear()
+            f = self._fails.setdefault(ip, {"t": []})
+            f["t"] = [t for t in f["t"] if now - t < LOCK_WINDOW_S] + [now]
+            if len(f["t"]) >= LOCK_AFTER:
+                f["until"], f["t"] = now + LOCK_FOR_S, []
+                log.warning("OwnTracks: too many wrong passwords from %s – locked for %d min", ip, LOCK_FOR_S // 60)
+
+    def ok(self, ip: str) -> None:
+        with self._lock:
+            self._fails.pop(ip, None)
+
+
 def make_handler(engine):
+    guard = Guard()
+
     class Handler(BaseHTTPRequestHandler):
         server_version = "worldmap"
         sys_version = ""
+        timeout = 30  # a connection that sends nothing is closed (no hanging threads)
 
         def log_message(self, fmt, *args):
             log.debug("owntracks %s", fmt % args)
@@ -81,10 +119,16 @@ def make_handler(engine):
         def do_POST(self):  # noqa: N802
             if not engine.s.owntracks:
                 return self._reply(HTTPStatus.NOT_FOUND, b"{}")
+            ip = self.client_address[0]
+            if guard.locked(ip):
+                self.close_connection = True
+                return self._reply(HTTPStatus.TOO_MANY_REQUESTS, b"{}")
             user = self._user()
             if not user:
+                guard.fail(ip)
                 time.sleep(0.5)  # slow down guessing
                 return self._reply(HTTPStatus.UNAUTHORIZED, b"{}")
+            guard.ok(ip)
             try:
                 n = int(self.headers.get("Content-Length", "0"))
             except ValueError:

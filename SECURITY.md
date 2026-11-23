@@ -12,9 +12,11 @@ Do not open a public issue. You will get an answer within 7 days.
 - All database access is parameterised; all user input is validated and size-limited.
 - XML imports reject DTDs and entities (XXE); CSV exports neutralise spreadsheet formulas.
 - Strict Content-Security-Policy, no inline scripts, all API text is escaped in the UI.
-- The optional OwnTracks endpoint (port 8098, disabled unless mapped) accepts only `POST` with HTTP Basic auth, compares credentials in constant time and slows down failed attempts.
-- Map matching runs locally; only OpenStreetMap tiles are downloaded by tile number.
-- CI runs tests, Ruff, Bandit, pip-audit, CodeQL and Dependabot.
+- The optional OwnTracks endpoint (port 8098, disabled unless mapped) accepts only `POST` with HTTP Basic auth, compares credentials in constant time, slows down failed attempts and locks an address out for 15 minutes after 10 wrong passwords in 10 minutes. Use it in your local network only (or behind a VPN) – Basic auth is not encrypted on plain HTTP.
+- Both servers close connections that stall (no hanging threads); extra headers: Permissions-Policy, Cross-Origin-Opener/Resource-Policy.
+- Online place search (optional) talks only https to OpenStreetMap Nominatim or Google Places and sends only the search word; Google Maps links are followed only over https and only to Google hosts. The Google key stays in the add-on options and is never sent to the browser or logged.
+- Map matching runs locally; only map tiles are downloaded by tile number.
+- CI runs tests, Ruff, Bandit, pip-audit (add-on and dev tools), a JavaScript syntax check of all scripts, a privacy guard and CodeQL; GitHub Actions run on Node 24 with read-only permissions and without stored git credentials. Dependabot keeps dependencies and actions current.
 
 ## Privacy
 

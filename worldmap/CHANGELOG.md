@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.12.4 – 2026-11-23
+
+### Security
+- OwnTracks endpoint: an address that sends 10 wrong passwords within 10 minutes is locked out for 15 minutes
+  (answers 429); connections that stall are closed after 30 s.
+- Web UI: stalled connections are closed after 60 s; new headers Permissions-Policy (no location, camera,
+  microphone, payment, USB), Cross-Origin-Opener-Policy and Cross-Origin-Resource-Policy.
+- GPX/KML import: DTD/entity declarations are refused anywhere in the file, not only in the first 64 KB.
+- Google Maps short links are only followed over https.
+- CI: GitHub Actions on Node 24 (checkout v6, setup-python v6, CodeQL v4) without stored git credentials;
+  pip-audit also checks the dev tools; all JavaScript files are syntax-checked.
+
 ## 0.12.3 – 2026-11-23
 
 ### Security

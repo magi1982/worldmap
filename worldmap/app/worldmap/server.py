@@ -51,6 +51,9 @@ STATIC_FILES = {
 SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",
     "Referrer-Policy": "same-origin",
+    "Permissions-Policy": "geolocation=(), camera=(), microphone=(), payment=(), usb=()",
+    "Cross-Origin-Opener-Policy": "same-origin",
+    "Cross-Origin-Resource-Policy": "same-origin",
     "Content-Security-Policy": "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self';"
                                " connect-src 'self'; frame-ancestors 'self'; base-uri 'none'; form-action 'none'",
     "Cache-Control": "no-store",
@@ -64,7 +67,7 @@ class QuietServer(ThreadingHTTPServer):
     daemon_threads = True
 
     def handle_error(self, request, client_address):
-        if isinstance(sys.exc_info()[1], (BrokenPipeError, ConnectionResetError, ConnectionAbortedError)):
+        if isinstance(sys.exc_info()[1], (BrokenPipeError, ConnectionResetError, ConnectionAbortedError, TimeoutError)):
             return
         super().handle_error(request, client_address)
 
@@ -404,6 +407,7 @@ def make_handler(app: App):
     class Handler(BaseHTTPRequestHandler):
         server_version = "worldmap"
         sys_version = ""
+        timeout = 60  # per read/write on the socket: a stalled client never holds a thread forever
 
         def log_message(self, fmt, *args):  # route to logging, never print bodies
             log.debug("%s %s", self.address_string(), fmt % args)
