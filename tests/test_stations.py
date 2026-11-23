@@ -126,3 +126,36 @@ def test_detection_adds_stations_but_never_over_hand_made_ones(engine):
     engine.db.upsert_trip({"legs": hand}, t["id"])
     engine.rebuild()
     assert legs(engine.db.trip(t["id"]))[0]["name"] == "Mein Hotel"        # yours stays yours
+
+
+def test_old_transport_words_become_stations():
+    assert stations.words("Auto · Fähre") == ["Auto", "Schiff"]
+    assert stations.words("Flug · U-Bahn · unknown") == ["Flug", "Zug"]
+    st = stations.from_fields("Inselresort (Atoll)", "Malediven", 3.95, 72.83, "Flug via Dubai · Wasserflugzeug")
+    assert [(x.get("ap"), x["transport"]) for x in st] == [("DXB", "Flug"), ("MLE", "Flug"), (None, "Wasserflugzeug")]
+    one = stations.from_fields("Seehotel", "Italien", 45.9, 8.6, "Auto · Fähre")
+    assert len(one) == 1 and one[0]["transport"] == "Auto · Schiff"
+
+
+def test_seaplane_trip_from_old_fields_on_the_map(engine, tmp_path):
+    engine.db.upsert_trip({"start_date": "2007-06-30", "end_date": "2007-07-10", "destination": "Inselresort (Atoll)",
+                           "country": "Malediven", "lat": 3.95, "lon": 72.83, "nights": 10, "locked": 1,
+                           "transport": "Flug via Dubai · Wasserflugzeug", "source": "Fotos", "who": "Alex"})
+    t = load(A.Atlas(engine, str(tmp_path)), "core")["trips"][-1]
+    assert [x[0] for x in t["lg"]] == ["fly", "fly", "fly"]
+    assert [x[2] for x in t["lg"]] == [["ZRH", "DXB"], ["DXB", "MLE"], ["MLE", ""]]   # via Dubai, then the seaplane
+    assert not t.get("gr")                                                            # no ferry over the sea
+    assert t["p"] == [3.95, 72.83]
+
+
+def test_migration_v3_cleans_old_stations(tmp_path):
+    db = Database(str(tmp_path / "w.db"))
+    i = db.upsert_trip({"start_date": "2010-01-01", "end_date": "2010-01-08", "destination": "Hafen",
+                        "lat": 43.0, "lon": 9.4, "transport": "Auto · Fähre"})
+    db._conn.execute("UPDATE trips SET legs = ? WHERE id = ?", (json.dumps(
+        [{"name": "Hafen", "country": "", "lat": 43.0, "lon": 9.4, "transport": "Auto · Fähre", "auto": 1}]), i))
+    db._conn.execute("DELETE FROM meta WHERE key='stations_v3'")
+    db.close()
+    db = Database(str(tmp_path / "w.db"))
+    t = db.trip(i)
+    assert legs(t)[0]["transport"] == "Auto · Schiff" and t["transport"] == "Auto · Schiff" and t["lat"] == 43.0

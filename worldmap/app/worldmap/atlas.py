@@ -513,7 +513,7 @@ class Atlas:
                 if m not in modes:
                     modes.append(m)
             legs = _legs(t["legs"])
-            for lg_ in (x for x in legs if not x.get("auto")):  # found in the recording: the GPS shows the modes
+            for lg_ in (x for x in legs if not x.get("gps")):  # found in the recording: the GPS shows the modes
                 for m in modes_of_transport(lg_["transport"]):
                     if m not in modes:
                         modes.append(m)
@@ -536,7 +536,7 @@ class Atlas:
                 lat, lon, nopos = home[0], home[1], 2  # imported before 0.7.2: the middle of the country was stored
             dist = t["max_km"] if t["max_km"] is not None else haversine_km(home[0], home[1], lat, lon)
             fl, gr, lg = [], None, None
-            by_hand = any(not x.get("auto") for x in legs)  # stops found in the recording do not draw the estimate
+            by_hand = any(not x.get("gps") for x in legs)  # stops found in the recording do not draw the estimate
             if not k and by_hand and (len(legs) > 1 or any(x.get("ap") for x in legs)):  # several stops or an airport: each leg its own way
                 fl, gr, lg, k = self._leg_ways(home, h_ap, t, legs, used_ap)
                 if rad and rad <= 250:

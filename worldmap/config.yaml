@@ -1,5 +1,5 @@
 name: Worldmap
-version: "0.12.1"
+version: "0.12.2"
 slug: worldmap
 description: Your trips on a map – from Home Assistant, OwnTracks and Google exports, with smart questions. Works offline.
 url: https://github.com/magi1982/worldmap

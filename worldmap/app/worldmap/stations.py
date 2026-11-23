@@ -7,13 +7,14 @@ from the movement between the points. Short stops on the way (petrol, lunch) are
 """
 from __future__ import annotations
 
+import re
 from bisect import bisect_left, bisect_right
 from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 from . import airports, places
 from .geo import haversine_km
-from .modes import mode_of_pair
+from .modes import mode_of_pair, mode_of_text
 
 SAME_PLACE_KM = 25.0      # nights closer than this are the same station
 AIRPORT_OWN_KM = 15.0     # an airport further away from the place than this is a station of its own
@@ -112,11 +113,48 @@ def from_points(points: list[dict], start: str, end: str, tz: str, home: tuple[f
         ap = airports.snap(landed[0], landed[1]) if landed else None
         if ap and haversine_km(ap[2], ap[3], st["lat"], st["lon"]) > AIRPORT_OWN_KM:
             out.append({"name": ap[1], "country": "", "lat": ap[2], "lon": ap[3], "transport": "Flug",
-                        "ap": ap[0], "auto": 1})
+                        "ap": ap[0], "auto": 1, "gps": 1})
             words = [w for w in words if w != "Flug"] or ["Auto"]
         elif ap:
             words = ["Flug"] + [w for w in words if w != "Flug"]
         out.append({"name": name[:80], "country": country, "lat": round(st["lat"], 4), "lon": round(st["lon"], 4),
-                    "transport": " · ".join(words) or "Auto", "auto": 1, "n": st["nights"]})
+                    "transport": " · ".join(words) or "Auto", "auto": 1, "gps": 1, "n": st["nights"]})
         prev_end = st["last"]
     return out[:20]
+
+
+LEG_WORDS = ("Auto", "Zug", "Bus", "Flug", "Wasserflugzeug", "Schiff", "Wohnmobil", "Velo", "zu Fuss")
+
+
+def words(transport: str | None) -> list[str]:
+    """Free transport text → the words of the stations ("Auto · Fähre" → Auto, Schiff; "U-Bahn" → Zug)."""
+    out: list[str] = []
+    for part in re.split(r"\s*[·,/+]\s*", transport or ""):
+        part = re.sub(r"\s+via\s+.*$", "", part.strip(), flags=re.I)
+        w = part if part in LEG_WORDS else {"fly": "Flug", "rail": "Zug", "ferry": "Schiff", "road": "Auto",
+                                             "foot": "zu Fuss"}.get(mode_of_text(part) or "")
+        if w and w not in out:
+            out.append(w)
+    return out
+
+
+def from_fields(name: str, country: str, lat, lon, transport: str | None) -> list[dict]:
+    """Stations from the old fields of a trip: "Flug via Dubai · Wasserflugzeug" to a resort becomes
+    ✈ DXB → ✈ MLE → 🛩 resort; anything else one station with clean transport words."""
+    ws = words(transport)
+    stops: list[dict] = []
+    for city in re.findall(r"via\s+([^·,/+]+)", transport or "", flags=re.I)[:3]:  # a stopover by plane
+        ap = next((a for a in airports.search(city.strip()) if a["size"] == 2), None)
+        if ap:
+            stops.append({"name": ap["name"], "country": "", "lat": ap["lat"], "lon": ap["lon"], "transport": "Flug",
+                          "ap": ap["code"], "auto": 1})
+    dest_tr = [w for w in ws if not (stops and w == "Flug")] or ws
+    if "Wasserflugzeug" in ws and lat is not None and not airports.snap(lat, lon, 60, 0):
+        hub = airports.nearest_large(lat, lon, 400)  # the island has no big airport: land there, then seaplane
+        if hub:
+            stops.append({"name": hub[1], "country": "", "lat": hub[2], "lon": hub[3], "transport": "Flug",
+                          "ap": hub[0], "auto": 1})
+            dest_tr = ["Wasserflugzeug"]
+    stops.append({"name": (name or country or "Ziel")[:80] if lat is not None else (country or name or "Ziel")[:80],
+                  "country": country or "", "lat": lat, "lon": lon, "transport": " · ".join(dest_tr), "auto": 1})
+    return stops

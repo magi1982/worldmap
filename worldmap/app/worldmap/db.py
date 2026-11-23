@@ -130,6 +130,7 @@ class Database:
                 self._conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {decl}")  # nosec B608 - constant names
         self._migrate_airport_stations()
         self.migrate_stations()
+        self.migrate_stations_v3()
 
     def _migrate_airport_stations(self) -> None:
         """0.11.0: the airport at the destination (``ap_to``) becomes an airport stop in ``legs``.
@@ -287,10 +288,9 @@ class Database:
         if not legs:
             if r["lat"] is None and not (r["destination"] or r["country"]):
                 return
-            legs = [{"name": (r["destination"] or r["country"] or "Ziel")[:80] if r["lat"] is not None
-                     else (r["country"] or r["destination"])[:80],
-                     "country": r["country"] or "", "lat": r["lat"], "lon": r["lon"],
-                     "transport": r["transport"] or "", "auto": 1}]
+            from . import stations  # "Flug via Dubai · Wasserflugzeug" → ✈ DXB → ✈ MLE → 🛩 resort
+
+            legs = stations.from_fields(r["destination"] or "", r["country"] or "", r["lat"], r["lon"], r["transport"])
         elif len(legs) == 1 and "legs" not in changed:
             st = legs[0]
             if changed & {"lat", "lon"} and r["lat"] is not None:
@@ -298,7 +298,9 @@ class Database:
             if "country" in changed and r["country"]:
                 st["country"] = r["country"]
             if "transport" in changed:
-                st["transport"] = r["transport"] or ""
+                from . import stations
+
+                st["transport"] = " · ".join(stations.words(r["transport"]))
         countries: list = []
         for x in legs:
             for cc in str(x.get("country") or "").split(" · "):
@@ -326,6 +328,25 @@ class Database:
                   (json.dumps(legs[:20], ensure_ascii=False), country,
                    r["transport"] if "legs" in changed and "transport" in changed and r["transport"]
                    else " · ".join(transport) or (r["transport"] or ""), lat, lon, trip_id))
+
+    def migrate_stations_v3(self) -> int:
+        """0.12.2: stations made from old fields again, with clean transport words and stopovers ("via Dubai")."""
+        with self._lock:
+            if self._conn.execute("SELECT 1 FROM meta WHERE key='stations_v3'").fetchone():
+                return 0
+            n = 0
+            with self.tx() as c:
+                for r in c.execute("SELECT id, legs FROM trips").fetchall():
+                    try:
+                        legs = json.loads(r["legs"]) if r["legs"] else []
+                    except ValueError:
+                        continue
+                    if len(legs) == 1 and legs[0].get("auto") and not legs[0].get("gps"):
+                        c.execute("UPDATE trips SET legs = '' WHERE id = ?", (r["id"],))
+                        self._sync_stations(c, r["id"], {"legs"})  # transport words from the new stations
+                        n += 1
+                c.execute("INSERT OR REPLACE INTO meta(key, value) VALUES('stations_v3', '1')")
+            return n
 
     def migrate_stations(self) -> int:
         """0.12.0: every trip gets stations (its old destination becomes its name and its first station). Once."""

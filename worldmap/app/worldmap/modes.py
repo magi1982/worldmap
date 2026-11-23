@@ -9,8 +9,8 @@ MAX_KMH = {"rail": 320.0, "road": 200.0, "ferry": 80.0}
 # Google activity names and our transport words -> mode
 ACTIVITY = (
     ("fly", ("FLYING", "flying", "Flug", "flight", "Wasserflugzeug", "seaplane")),
-    ("ferry", ("FERRY", "ferry", "Schiff", "boat", "SAILING")),
-    ("rail", ("TRAIN", "SUBWAY", "TRAM", "BUS", "in train", "in subway", "in tram", "in bus", "Zug", "rail",
+    ("ferry", ("FERRY", "ferry", "Schiff", "Fähre", "boat", "SAILING")),
+    ("rail", ("TRAIN", "SUBWAY", "TRAM", "BUS", "in train", "in subway", "in tram", "in bus", "Zug", "rail", "U-Bahn", "Tram",
               "METRO", "in metro")),
     ("foot", ("WALKING", "RUNNING", "ON_FOOT", "CYCLING", "BICYCLE", "walking", "running", "cycling", "zu Fuss", "Velo")),
     ("road", ("VEHICLE", "DRIVING", "MOTORCYCLING", "passenger vehicle", "Auto", "Wohnmobil", "car", "driving", "Bus",

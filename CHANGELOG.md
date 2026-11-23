@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.12.2 – 2026-11-23
+
+### Fixed
+- A trip with "Flug via Dubai · Wasserflugzeug" to an island resort was drawn as a flight to Malé and a **ferry**
+  to the resort, without Dubai. Old transport texts now become stations: ✈ DXB → ✈ MLE → seaplane straight to
+  the resort (a seaplane needs no airport at the end). "Fähre" counts as ship, "U-Bahn"/"Tram" as train; words
+  without a transport ("Ski", "unknown") are left out, so such stations can be edited and saved again.
+- Migration (once, at start): stations made from old trip fields are made again with the clean words and stopovers.
+
+### Changed
+- Airport search also takes a country ("Malediven" → MLE, "Griechenland" → ATH, HER, …) and the airports all over
+  an island or region.
+- Clearer seaplane icon.
+
 ## 0.12.1 – 2026-11-23
 
 ### Fixed

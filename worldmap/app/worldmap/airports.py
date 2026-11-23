@@ -110,6 +110,8 @@ def search(query: str, limit: int = 8, near: tuple | None = None) -> list[dict]:
     if len(q) < 2:
         return []
     keys = {q}
+    found: dict = {}
+    near_km = LARGE_KM
     try:  # other-language town names: "mailand" → "milan"
         from . import places
 
@@ -117,14 +119,22 @@ def search(query: str, limit: int = 8, near: tuple | None = None) -> list[dict]:
         if alias:
             keys.add(_fold(alias[0]))
             near = near or (alias[1], alias[2])
-        if near is None and len(q) >= 3:  # an island or region ("Teneriffa", "Kreta"): the airports around it
-            hit = next((h for h in places.search(query, limit=3) if h.get("lat") is not None
-                        and h.get("kind") != "country"), None)
+        if near is None and len(q) >= 3:  # an island, region or country ("Teneriffa", "Malediven"): its airports
+            hits = places.search(query, limit=3)
+            land = next((h for h in hits if h.get("kind") == "country" and h.get("cc")), None)
+            if land and _fold(land["name"]) == q:
+                box = places.country_box(land["cc"])
+                if box:
+                    in_box = [r for rows in _index().values() for r in rows
+                              if box[0] <= r[3] <= box[2] and box[1] <= r[4] <= box[3]]
+                    for r in in_box:
+                        found.setdefault(r[0], (2 if r[5] == 2 else 5, r))
+            hit = next((h for h in hits if h.get("lat") is not None and h.get("kind") != "country"), None)
             if hit:
                 near = (hit["lat"], hit["lon"])
+                near_km = max(LARGE_KM, min(float(hit.get("radius_km") or 0), 250.0))
     except Exception:  # noqa: BLE001 – the search works without the alias list too
         pass
-    found: dict = {}
     for rows in _index().values():
         for r in rows:
             if len(q) == 3 and r[0].lower() == q:
@@ -143,7 +153,7 @@ def search(query: str, limit: int = 8, near: tuple | None = None) -> list[dict]:
         for rows in _index().values():
             for r in rows:
                 d = haversine_km(near[0], near[1], r[3], r[4])
-                if r[0] not in found and d <= (LARGE_KM if r[5] == 2 else MEDIUM_KM):
+                if r[0] not in found and d <= (near_km if r[5] == 2 else MEDIUM_KM):
                     found[r[0]] = (2 if r[5] == 2 else 5, r)
     ranked = sorted(found.values(), key=lambda x: (x[0], -x[1][5], x[1][1]))
     return [{"code": r[0], "name": r[1], "city": r[2] or "", "lat": r[3], "lon": r[4], "size": r[5]}
