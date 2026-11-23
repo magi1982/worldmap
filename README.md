@@ -24,6 +24,7 @@ fast, good-looking map with five views. Everything runs inside the add-on; no cl
 | 📥 **Import anything** | Trip lists (CSV/Excel with From, To, Destination …) – destinations are placed on the map automatically – Google Timeline (Takeout and the on-device export for Android and iPhone), iCloud/exiftool photo CSV, any CSV/Excel with coordinates, GPX, KML. A preview shows what was found before anything is saved; data that is already there is not stored twice. |
 | 📡 **Live without cloud** | Positions from `person.*` / `device_tracker.*` entities and a built-in **OwnTracks** endpoint: the phone buffers positions while you are away and sends them when it is back in your home network – no Nabu Casa, no port opened to the internet. |
 | ✍️ **Trips by hand** | The "+" button asks a few questions (where, when, how long, who, how, how big was the area) – for old trips without any data, anywhere in the world. Several stops with their own transport (plane to Tenerife, ship to La Gomera); places come from the built-in list, OpenStreetMap, Google Maps or a pasted Google Maps link. Cars follow motorways, trains railways, ships the sea. Vague trips (only a country) are marked in the trip list. |
+| 📊 **Dashboard** | The trips as numbers and small pictures instead of a map: key figures, around the world (and to the moon), records, a country passport with stamps, a postcard per trip with its route and stops, a calendar of travel days, a timeline with one lane per person, a travel wheel (when in the year and how), favourite places, km and estimated CO₂ per year, and "white spots" (how many regions of each country you know). Five ready-made dashboards – **Overview, Year in review, Family, Explorer, Wall tablet** (big type, the postcard changes every 15 seconds) – or your own choice of tiles. Every tile has an ⓘ explanation and follows the person/group bar. |
 | 🔔 **Notifications** | Choose one of your phones (found automatically) or a Home Assistant notification, how often (instant, daily, weekly) and send a test. |
 | ✨ **Animated map** | Little planes in the colour of the trip fly the flight arcs, trains and cars travel trips abroad. One switch on every map, smooth 60 fps. |
 | 🎨 **Map style with versions** | Every map has its own settings (arc height, label size, circle sizes, region borders, area shape, film tempo …), plus colours, six line types and the animation: which vehicles, from which distance, how many, how fast. Change them with the 🎨 button right on the map or on the settings page, where your own map is the live preview. Every save is a version you can go back to. |
@@ -37,6 +38,8 @@ fast, good-looking map with five views. Everything runs inside the add-on; no cl
 | People & groups | Questions | Trip list |
 |---|---|---|
 | ![People](docs/images/people.jpg) | ![Questions](docs/images/questions.jpg) | ![Trip list](docs/images/trips.jpg) |
+
+![Dashboard](docs/images/dashboard.jpg)
 
 ![Map style](docs/images/style.jpg)
 

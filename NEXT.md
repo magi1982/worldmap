@@ -109,3 +109,11 @@ Ideen werden zuerst hier gesammelt. Code entsteht erst nach einem ausdrückliche
 - [ ] AppArmor profile, signed images via the HA builder, CodeQL for JavaScript.
 - [ ] Export as KML/GPX and image poster.
 - [ ] OwnTracks / Traccar HTTP endpoint as an extra live source.
+
+## Dashboard (0.10.0 gebaut)
+- Gebaut: die 10 Design-Ideen als Dashboard-Kacheln, 5 fertige Dashboards (Übersicht, Jahresrückblick, Familie,
+  Entdecker, Wandtablet) und eine eigene Auswahl.
+- Offen / Ideen: Postkarte als Bild speichern oder teilen · Wandtablet als eigene Seite ohne Kopfzeile für das
+  Küchen-Tablet · eigene CO₂-Faktoren als Einstellung · Kacheln per Ziehen umsortieren · Dashboard-Wahl pro Gerät im
+  Add-on statt nur im Browser speichern.
+- Animations-Ideen (A1–A10) warten noch auf Feedback.

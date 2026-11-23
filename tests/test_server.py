@@ -251,3 +251,17 @@ def test_gzip_bomb_is_refused(monkeypatch):
     monkeypatch.setattr(importers, "MAX_UNZIPPED", 1000)
     with pytest.raises(importers.UserImportError):
         importers.detect_and_parse(gzip.compress(b" " * 5000), "x.gz")
+
+
+def test_closed_connections_are_not_logged(capsys):
+    from worldmap.server import QuietServer
+
+    class Srv(QuietServer):
+        def __init__(self):  # no socket needed for this check
+            pass
+
+    try:
+        raise BrokenPipeError
+    except BrokenPipeError:
+        Srv().handle_error(None, ("127.0.0.1", 1))
+    assert "Traceback" not in capsys.readouterr().err

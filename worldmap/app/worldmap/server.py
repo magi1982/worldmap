@@ -14,6 +14,7 @@ import json
 import logging
 import os
 import re
+import sys
 import threading
 from datetime import date
 from http import HTTPStatus
@@ -55,6 +56,17 @@ SECURITY_HEADERS = {
     "Cache-Control": "no-store",
 }
 _STATIC_CACHE: dict = {}
+
+
+class QuietServer(ThreadingHTTPServer):
+    """A browser that closes the page mid-download is normal: no stack trace in the log for that."""
+
+    daemon_threads = True
+
+    def handle_error(self, request, client_address):
+        if isinstance(sys.exc_info()[1], (BrokenPipeError, ConnectionResetError, ConnectionAbortedError)):
+            return
+        super().handle_error(request, client_address)
 
 
 @functools.lru_cache(maxsize=1)
@@ -780,6 +792,6 @@ def make_handler(app: App):
 
 def serve(engine: Engine, host: str = "0.0.0.0", port: int = 8099, allowed_ips: set[str] | None = None):  # nosec B104 - container network, IP allow-list below
     ips = allowed_ips or set(filter(None, os.environ.get("WORLDMAP_ALLOWED_IPS", "172.30.32.2,127.0.0.1").split(",")))
-    httpd = ThreadingHTTPServer((host, port), make_handler(App(engine, ips)))
+    httpd = QuietServer((host, port), make_handler(App(engine, ips)))
     httpd.daemon_threads = True
     return httpd

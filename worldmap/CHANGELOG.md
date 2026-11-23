@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.10.0 – 2026-11-23
+
+### Added
+- **Dashboard** (new tab 6): the trips as numbers and small pictures instead of a map – key figures, around the world
+  and to the moon, records, a country passport with stamps, a postcard per trip with its route and stops, a calendar of
+  travel days, a timeline with one lane per person (shared trips join the lanes), a travel wheel by month and transport,
+  favourite places, km and a rough CO₂ estimate per year, and "white spots" (known regions per country).
+  Five ready-made dashboards: Overview, Year in review (all tiles for one year), Family, Explorer and Wall tablet
+  (big type, the postcard changes every 15 seconds, off with reduced motion). "Tiles" lets you pick your own set; the
+  choice is kept in the browser. Every tile has an ⓘ explanation, follows the person/group bar, and works in light,
+  dark and on phones. Tapping a trip in the records, calendar or timeline opens its postcard.
+
+### Changed
+- A browser that leaves a page while it is still loading no longer writes a stack trace into the add-on log.
+
 ## 0.9.0 – 2026-11-23
 
 ### Added

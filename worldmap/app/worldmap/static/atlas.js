@@ -771,7 +771,7 @@ window.addEventListener('message',e=>{if(e.origin!==location.origin||e.source!==
 
 /* ================= Tabs ================= */
 let TAB='reisen';
-const NEEDS={reisen:['tracks'],spuren:['tracks'],orte:['tracks'],regionen:['reg'],zeit:['tracks']};
+const NEEDS={reisen:['tracks'],spuren:['tracks'],orte:['tracks'],regionen:['reg'],zeit:['tracks'],dash:[]};
 function need(k){if(!window.__T.t0)__T.t0=performance.now();if(ready[k])return ready[k];if(k=='tracks')ready[k]=loadJSON('api/atlas/tracks').then(T=>{const t=performance.now();__T.fetch=t-__T.t0;prepTracks(T);__T.prep=performance.now()-t});if(k=='reg')ready[k]=Promise.all([loadJSON('regions.json?v=__WMV__'),loadJSON('api/atlas/reg')]).then(([m,g])=>prepReg(m,g));return ready[k]}
 function setTab(t){
  TAB=t;closeDetail();hideTip();stopR();if(F.play)setPlayF(false);
@@ -784,6 +784,7 @@ function setTab(t){
 }
 const fitted={};let ENTERED=false;
 function enter(t){ENTERED=true;
+ if(t=='dash'){DRAW=()=>{};animRestart();dashEnter();return}dashLeave();
  legend();$('legend').style.display=t=='zeit'?'none':'';const _e=performance.now();setTimeout(()=>{__T.enter=performance.now()-_e},0);
  if(t=='reisen'){DRAW=drawR;chipsR();let _t=performance.now();buildR();__T.buildR=performance.now()-_t;sideR();if(!fitted.r){fitted.r=1;fitTrips()}}
  if(t=='spuren'){routeNote();DRAW=drawS;chipsS();let _t=performance.now();buildS();__T.buildS=performance.now()-_t;_t=performance.now();sideS();__T.sideS=performance.now()-_t;if(!fitted.s){fitted.s=1;const b=D.region.box;setFit(b[0],b[1],b[2],b[3])}}
@@ -802,6 +803,174 @@ document.querySelectorAll('.panel').forEach(pn=>{const h=pn.querySelector('h1');
  const wrapH=document.createElement('div');wrapH.className='ph';head.insertBefore(wrapH,h);wrapH.appendChild(h);
  const btn=document.createElement('button');btn.className='info';btn.textContent='i';btn.setAttribute('aria-label','Was zeigt diese Karte?');btn.setAttribute('aria-expanded','false');btn.setAttribute('aria-controls',box.id);
  btn.onclick=()=>{box.hidden=!box.hidden;btn.setAttribute('aria-expanded',String(!box.hidden))};wrapH.appendChild(btn);head.appendChild(box)});
+/* Dashboard: the trips as numbers and small pictures instead of a map.
+   Uses the globals of atlas.js (D, SEL, tripSel, members, WCOL, MCOL, MNAME, esc, fmt …). */
+const DASH={tiles:null,pc:null,year:null,preset:null,kt:0};
+/* five ready-made dashboards; "eigene" is the user's own choice of tiles */
+const DPRESETS=[
+ ['all','Übersicht','Alles auf einer Seite.',null,{}],
+ ['year','Jahresrückblick','Ein Jahr wählen – alle Kacheln zeigen nur dieses Jahr.',['kpi','calendar','records','postcard','passport','wheel','co2'],{year:1}],
+ ['family','Familie','Wer war wann wo – und die Orte, an die ihr immer wieder geht.',['kpi','lanes','postcard','favs','passport'],{}],
+ ['explorer','Entdecker','Wie viel Welt ihr schon gesehen habt – und was noch fehlt.',['earth','passport','blank','records','co2'],{}],
+ ['kiosk','Wandtablet','Grosse Schrift für das Tablet am Kühlschrank; die Postkarte wechselt alle 15 Sekunden.',['kpi','postcard','earth','calendar'],{kiosk:1}],
+];
+function dPreset(){if(DASH.preset)return DASH.preset;let v='all';try{v=localStorage.getItem('wm-dash-preset')||'all'}catch(e){}DASH.preset=DPRESETS.some(p=>p[0]==v)||v=='own'?v:'all';return DASH.preset}
+function dOpts(){const p=DPRESETS.find(x=>x[0]==dPreset());return p?p[4]:{}}
+function dOrder(){const p=DPRESETS.find(x=>x[0]==dPreset());if(p&&p[3])return p[3];const on=dTilesOn();return DTILES.map(t=>t[0]).filter(k=>p||on.has(k))}
+const DTILES=[
+ ['kpi','Auf einen Blick','Die wichtigsten Zahlen der gewählten Person oder Gruppe.'],
+ ['earth','Um die Erde','Alle Reise-Kilometer zusammen, gemessen am Erdumfang (40’075 km) und am Weg zum Mond (384’400 km). Alltag zählt nicht mit.'],
+ ['records','Rekorde','Weiteste, längste und kilometerreichste Reise, längste Autofahrt und das Jahr mit den meisten Ländern. Antippen öffnet die Postkarte.'],
+ ['passport','Länder-Pass','Ein Stempel pro Land, mit dem Jahr des ersten Besuchs. Je mehr Reisen, desto kräftiger der Stempel.'],
+ ['postcard','Reise-Postkarte','Eine Reise als Postkarte: Route mit den Stationen, Daten, Verkehrsmittel und wer dabei war.'],
+ ['calendar','Reise-Kalender','Alle Tage eines Jahres; farbig sind die Reisetage, nach Person oder Gruppe gefärbt.'],
+ ['lanes','Familien-Zeitstrahl','Eine Spur pro Person über die Jahre. Gemeinsame Reisen verbinden die Spuren mit einer Linie.'],
+ ['wheel','Reise-Rad','Wann im Jahr ihr reist: pro Monat die Reisenächte, nach dem wichtigsten Verkehrsmittel der Reise gefärbt.'],
+ ['favs','Lieblingsorte','Orte, an die ihr immer wieder geht (ohne Zuhause und Arbeit). Grösse = Tage dort, Ring = Anzahl Besuche.'],
+ ['co2','Unterwegs-Bilanz','Reise-Kilometer pro Jahr nach Verkehrsmittel und ein grob geschätztes CO₂ pro Person (Flug 0.25, Auto 0.17, Schiff 0.12, Zug 0.03 kg pro km).'],
+ ['blank','Weisse Flecken','Pro Land: wie viele Regionen (Kantone, Bundesländer, Provinzen) ihr schon kennt – und wie viele noch fehlen.'],
+];
+const CO2={fly:.25,road:.17,ferry:.12,rail:.03,foot:0};
+function dTilesOn(){if(DASH.tiles)return DASH.tiles;let off=[];try{off=JSON.parse(localStorage.getItem('wm-dash-off')||'[]')}catch(e){}DASH.tiles=new Set(DTILES.map(t=>t[0]).filter(k=>!off.includes(k)));return DASH.tiles}
+function dSaveTiles(){try{localStorage.setItem('wm-dash-off',JSON.stringify(DTILES.map(t=>t[0]).filter(k=>!DASH.tiles.has(k))))}catch(e){}}
+const dHav=(a,b,c,d)=>{const r=Math.PI/180,x=Math.sin((c-a)*r/2)**2+Math.cos(a*r)*Math.cos(c*r)*Math.sin((d-b)*r/2)**2;return 12742*Math.asin(Math.sqrt(x))};
+const dHash=s=>{let h=7;for(const c of String(s))h=(h*31+c.charCodeAt(0))>>>0;return h};
+const dCol=w=>WCOL[w]||'#8B3DFF';
+function dTrips(){return D.trips.filter(t=>tripSel(t)).sort((a,b)=>a.a<b.a?-1:1)}
+function dMain(t){let best=null,v=-1;for(const m in t.k||{})if(t.k[m]>v){v=t.k[m];best=m}return best||(t.m&&t.m[0])||'road'}
+function dCountries(t){return String(t.c||'').split(/\s*[,·]\s*/).filter(Boolean)}
+function dFar(t){return t.nopos?0:dHav(HOME[0],HOME[1],t.p[0],t.p[1])}
+function dRange(t){return `${t.a.slice(8,10)}.${t.a.slice(5,7)}.${t.a.slice(0,4)}${t.b!=t.a?' – '+t.b.slice(8,10)+'.'+t.b.slice(5,7)+'.'+t.b.slice(0,4):''}`}
+
+/* ---------------------------------------------------------------- tiles */
+function tKpi(T){const cs=new Set(T.flatMap(dCountries)),n=T.reduce((s,t)=>s+(t.n||0),0),km=T.reduce((s,t)=>s+(t.km||0),0);
+ const ys=new Set(T.map(t=>t.y));
+ return `<div class="dk">${[[T.length,T.length==1?'Reise':'Reisen'],[cs.size,cs.size==1?'Land':'Länder'],[fmt(n),'Nächte unterwegs'],[fmt(km),'km gereist'],[ys.size,ys.size==1?'Jahr mit Reisen':'Jahre mit Reisen']].map(([v,l])=>`<div><b>${v}</b><span>${l}</span></div>`).join('')}</div>`}
+
+function tEarth(T){const km=T.reduce((s,t)=>s+(t.km||0),0),E=40075,M=384400,laps=km/E,f=laps%1,full=Math.floor(laps),R=62,C=2*Math.PI*R;
+ const by={};for(const t of T)for(const m in t.k||{})by[m]=(by[m]||0)+t.k[m];
+ let off=0;const segs=MODES.filter(m=>by[m]>0).map(m=>{const l=Math.min(1,by[m]/Math.max(km,1))*C;const s=`<circle r="${R}" cx="80" cy="80" fill="none" stroke="${MCOL[m]}" stroke-width="14" stroke-dasharray="${l} ${C-l}" stroke-dashoffset="${-off}" transform="rotate(-90 80 80)"/>`;off+=l;return s}).join('');
+ return `<div class="dearth"><svg viewBox="0 0 160 160" width="160" height="160" role="img" aria-label="${laps.toFixed(1)} mal um die Erde">
+  <circle r="${R}" cx="80" cy="80" fill="none" stroke="var(--soft)" stroke-width="14"/>${segs}
+  <circle r="${R-16}" cx="80" cy="80" fill="none" stroke="var(--acc)" stroke-width="4" stroke-dasharray="${f*2*Math.PI*(R-16)} 999" transform="rotate(-90 80 80)" stroke-linecap="round"/>
+  <text x="80" y="78" text-anchor="middle" font-size="30" font-weight="800" fill="var(--ink)">${laps.toFixed(1)}×</text><text x="80" y="98" text-anchor="middle" font-size="11" fill="var(--mute)">um die Erde</text></svg>
+  <div><p><b>${fmt(km)} km</b> auf Reisen – ${full?`${full}× ganz um die Erde und ${Math.round(f*100)} % der nächsten Runde`:`${Math.round(f*100)} % einer Erdumrundung`}.</p>
+  <p class="dmute">Bis zum Mond: ${Math.min(100,km/M*100).toFixed(1)} % geschafft.</p><div class="dmoon"><i style="width:${Math.min(100,km/M*100)}%"></i></div>
+  <div class="dleg">${MODES.filter(m=>by[m]>0).map(m=>`<span><i style="background:${MCOL[m]}"></i>${MNAME[m]} ${fmt(by[m])} km</span>`).join('')}</div></div></div>`}
+
+function tRecords(T){if(!T.length)return '<div class="empty">Noch keine Reisen.</div>';
+ const mx=(f)=>T.reduce((b,t)=>f(t)>f(b)?t:b,T[0]);
+ const far=mx(dFar),lon=mx(t=>t.n||0),kms=mx(t=>t.km||0),car=mx(t=>(t.k||{}).road||0);
+ const cy={};for(const t of T)for(const c of dCountries(t))(cy[t.y]=cy[t.y]||new Set()).add(c);const by=Object.entries(cy).sort((a,b)=>b[1].size-a[1].size)[0];
+ const row=(ico,l,t,v)=>t?`<button class="drec" data-trip="${t.id}"><span class="di">${ico}</span><span><small>${l}</small><b>${esc(t.name)}</b><em>${v}</em></span></button>`:'';
+ return `<div class="drecs">${row('🧭','Am weitesten weg',far,fmt(dFar(far))+' km Luftlinie · '+far.y)}${row('🌙','Am längsten',lon,(lon.n||0)+' Nächte · '+lon.y)}${row('📏','Meiste Kilometer',kms,fmt(kms.km)+' km · '+kms.y)}${(car.k||{}).road?row('🚗','Längste Autofahrt',car,fmt(car.k.road)+' km im Auto · '+car.y):''}
+  ${by?`<div class="drec"><span class="di">🗺️</span><span><small>Meiste Länder in einem Jahr</small><b>${by[0]}</b><em>${by[1].size} Länder: ${esc([...by[1]].join(', '))}</em></span></div>`:''}</div>`}
+
+function tPassport(T){const first={},cnt={};for(const t of T)for(const c of dCountries(t)){if(!first[c]||t.a<first[c])first[c]=t.a;cnt[c]=(cnt[c]||0)+1}
+ const cs=Object.keys(first).sort((a,b)=>first[a]<first[b]?-1:1);if(!cs.length)return '<div class="empty">Noch keine Länder.</div>';
+ const pal=['#FF3D9A','#0A7CFF','#12A84F','#8B3DFF','#FF8A00','#00BFB3','#D23DB0'],A3={};for(const k in (RG.countries||{}))A3[RG.countries[k].toLowerCase()]=k;
+ return `<div class="dpass">${cs.map(c=>{const h=dHash(c),col=pal[h%pal.length],rot=(h%23)-11,op=Math.min(1,.55+cnt[c]*.12);
+  return `<div class="dstamp" style="--c:${col};transform:rotate(${rot}deg);opacity:${op}" title="${esc(c)}: ${cnt[c]} ${cnt[c]==1?'Reise':'Reisen'}"><b>${esc(A3[c.toLowerCase()]||c.slice(0,3).toUpperCase())}</b><span>${esc(c)}</span><em>${first[c].slice(0,4)}</em></div>`}).join('')}</div>`}
+
+function tPostcard(T){if(!T.length)return '<div class="empty">Noch keine Reisen.</div>';
+ const t=T.find(x=>x.id==DASH.pc)||T[T.length-1];DASH.pc=t.id;
+ const pts=[[HOME[0],HOME[1],'Zuhause']].concat(t.st&&t.st.length?t.st:t.nopos?[]:[[t.p[0],t.p[1],t.name]]);
+ let la0=90,la1=-90,lo0=180,lo1=-180;for(const [a,b] of pts){la0=Math.min(la0,a);la1=Math.max(la1,a);lo0=Math.min(lo0,b);lo1=Math.max(lo1,b)}
+ const W=260,H=170,pad=22,kx=Math.cos((la0+la1)/2*Math.PI/180),sw=Math.max((lo1-lo0)*kx,.2),sh=Math.max(la1-la0,.2),s=Math.min((W-2*pad)/sw,(H-2*pad)/sh);
+ const X=b=>W/2+((b-(lo0+lo1)/2)*kx)*s,Y=a=>H/2-(a-(la0+la1)/2)*s;
+ const legs=(t.lg||[]);let path='';
+ for(let i=1;i<pts.length;i++){const [a,b]=pts[i-1],[c,d]=pts[i];const m=legs[i-1]&&legs[i-1].m||dMain(t);const x1=X(b),y1=Y(a),x2=X(d),y2=Y(c);
+  const bend=m=='fly'?.25:0,mx=(x1+x2)/2-(y2-y1)*bend,my=(y1+y2)/2+(x2-x1)*bend;
+  path+=`<path d="M${x1.toFixed(1)} ${y1.toFixed(1)} Q${mx.toFixed(1)} ${my.toFixed(1)} ${x2.toFixed(1)} ${y2.toFixed(1)}" fill="none" stroke="${MCOL[m]||'#8B3DFF'}" stroke-width="3" stroke-linecap="round" ${m=='fly'?'stroke-dasharray="1 6"':''}/>`}
+ const dots=pts.map(([a,b,n],i)=>`<circle cx="${X(b).toFixed(1)}" cy="${Y(a).toFixed(1)}" r="${i?5:4}" fill="${i?dCol(t.w):'var(--ink)'}" stroke="var(--paper)" stroke-width="2"/>${pts.length<=6?`<text x="${X(b).toFixed(1)}" y="${(Y(a)-9).toFixed(1)}" text-anchor="middle" font-size="10" font-weight="700" fill="var(--ink)">${esc(String(n).slice(0,18))}</text>`:''}`).join('');
+ const opts=[...T].reverse().map(x=>`<option value="${x.id}" ${x.id==t.id?'selected':''}>${x.y} · ${esc(x.name)}</option>`).join('');
+ return `<select class="dsel" id="dpc-sel" aria-label="Reise wählen">${opts}</select>
+ <div class="dpc"><div class="dpc-m"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Route ${esc(t.name)}"><rect width="${W}" height="${H}" rx="10" fill="var(--sea)"/>${path}${dots}</svg><div class="dpc-stamp" style="--c:${dCol(t.w)}">${t.y}</div></div>
+ <div class="dpc-t"><h4>${esc(t.name)}</h4><p>${dRange(t)} · ${t.n||0} ${t.n==1?'Nacht':'Nächte'}</p>
+  <p>${esc(dCountries(t).join(', ')||'Land offen')}</p><p>${(t.m||[]).map(m=>`<span class="dpill" style="--c:${MCOL[m]}">${MNAME[m]}</span>`).join(' ')}</p>
+  <p><span class="dpill" style="--c:${dCol(t.w)}">${esc(t.w)}</span> · ${fmt(t.km||0)} km${t.approx||t.nopos?' · <span class="dmute">ungenau</span>':''}</p>
+  ${t.st&&t.st.length>1?`<p class="dmute">Stationen: ${t.st.map(x=>esc(x[2])).join(' → ')}</p>`:''}</div></div>`}
+
+function tCalendar(T){const ys=[...new Set(T.map(t=>t.y))].sort();if(!ys.length)return '<div class="empty">Noch keine Reisen.</div>';
+ if(!ys.includes(DASH.year))DASH.year=ys[ys.length-1];const Y=DASH.year,day={};
+ for(const t of T){let d=dateOf(t.a);const e=dateOf(t.b);while(d<=e){const k=d.toISOString().slice(0,10);if(k.startsWith(Y+''))day[k]=t;d=new Date(d.getTime()+864e5)}}
+ const jan1=Date.UTC(Y,0,1),wd0=(new Date(jan1).getUTCDay()+6)%7,n=(Y%4==0&&(Y%100||Y%400==0))?366:365,c=11,g=2;let cells='';
+ for(let i=0;i<n;i++){const d=new Date(jan1+i*864e5),k=d.toISOString().slice(0,10),col=Math.floor((i+wd0)/7),row=(d.getUTCDay()+6)%7,t=day[k];
+  cells+=`<rect x="${26+col*(c+g)}" y="${14+row*(c+g)}" width="${c}" height="${c}" rx="2.5" fill="${t?dCol(t.w):'var(--soft)'}"${t?` data-trip="${t.id}"`:''}><title>${k}${t?' · '+esc(t.name):''}</title></rect>`}
+ const mon=['Jan','Feb','Mär','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'].map((m,i)=>{const col=Math.floor((Math.round((Date.UTC(Y,i,1)-jan1)/864e5)+wd0)/7);return `<text x="${26+col*(c+g)}" y="9" font-size="9" fill="var(--mute)">${m}</text>`}).join('');
+ const wl=['Mo','','Mi','','Fr','',''].map((l,i)=>l?`<text x="0" y="${23+i*(c+g)}" font-size="9" fill="var(--mute)">${l}</text>`:'').join('');
+ const nd=Object.keys(day).length,who=[...new Set(Object.values(day).map(t=>t.w))];
+ return `${dOpts().year?'':`<div class="dyears">${ys.map(y=>`<button class="${y==Y?'on':''}" data-y="${y}">${y}</button>`).join('')}</div>`}
+  <div class="dcal"><svg viewBox="0 0 ${26+54*(c+g)} ${14+7*(c+g)}" role="img" aria-label="${nd} Reisetage ${Y}">${mon}${wl}${cells}</svg></div>
+  <p class="dmute">${nd} von ${n} Tagen unterwegs (${Math.round(nd/n*100)} %)</p><div class="dleg">${who.map(w=>`<span><i style="background:${dCol(w)}"></i>${esc(w)}</span>`).join('')}</div>`}
+
+function tLanes(T){const ps=(D.persons||[]).filter(p=>!SEL||members(SEL).includes(p));if(!T.length||!ps.length)return '<div class="empty">Keine Personen oder Reisen.</div>';
+ const y0=Math.min(...T.map(t=>t.y)),y1=Math.max(...T.map(t=>t.y))+1,W=1240,L=80,lh=34,H=lh*ps.length+26,X=s=>{const d=dateOf(s);return L+((d.getUTCFullYear()+(d-Date.UTC(d.getUTCFullYear(),0,1))/31536e6)-y0)/(y1-y0)*(W-L-8)};
+ let g='';ps.forEach((p,i)=>{g+=`<text x="0" y="${i*lh+22}" font-size="12" font-weight="700" fill="var(--ink)">${esc(p.slice(0,10))}</text><line x1="${L}" x2="${W-8}" y1="${i*lh+18}" y2="${i*lh+18}" stroke="var(--line)" stroke-width="2"/>`});
+ for(let y=y0;y<=y1;y++){const x=L+(y-y0)/(y1-y0)*(W-L-8);g+=`<line x1="${x}" x2="${x}" y1="4" y2="${H-18}" stroke="var(--line)" stroke-dasharray="2 4"/>${(y<y1)&&(y1-y0<=14||y%2==0)?`<text x="${x+2}" y="${H-4}" font-size="10" fill="var(--mute)">${y}</text>`:''}`}
+ for(const t of T){const ms=members(t.w).filter(p=>ps.includes(p));if(!ms.length)continue;const x=X(t.a),w=Math.max(4,X(t.b)-x),rows=ms.map(p=>ps.indexOf(p)).sort((a,b)=>a-b),col=dCol(t.w);
+  if(rows.length>1)g+=`<line x1="${x+w/2}" x2="${x+w/2}" y1="${rows[0]*lh+18}" y2="${rows[rows.length-1]*lh+18}" stroke="${col}" stroke-width="2.5" opacity=".7"/>`;
+  for(const r of rows)g+=`<rect x="${x}" y="${r*lh+11}" width="${w}" height="14" rx="4" fill="${col}" data-trip="${t.id}"><title>${esc(t.name)} · ${dRange(t)} · ${esc(t.w)}</title></rect>`}
+ return `<div class="dscroll"><svg viewBox="0 0 ${W} ${H}" style="min-width:640px" role="img" aria-label="Zeitstrahl pro Person">${g}</svg></div>`}
+
+function tWheel(T){const mon=Array.from({length:12},()=>({}));for(const t of T){const m=+t.a.slice(5,7)-1,k=dMain(t);mon[m][k]=(mon[m][k]||0)+Math.max(1,t.n||0)}
+ const tot=mon.map(o=>Object.values(o).reduce((a,b)=>a+b,0)),mx=Math.max(1,...tot),cx=110,cy=110,r0=34,r1=96;let g='';
+ const ML=['J','F','M','A','M','J','J','A','S','O','N','D'];
+ mon.forEach((o,i)=>{const a0=(i/12)*2*Math.PI-Math.PI/2+.04,a1=((i+1)/12)*2*Math.PI-Math.PI/2-.04;let r=r0;
+  const arc=(ra,rb,col,tt)=>{const p=(rr,a)=>`${(cx+rr*Math.cos(a)).toFixed(1)} ${(cy+rr*Math.sin(a)).toFixed(1)}`;return `<path d="M${p(ra,a0)} A${ra} ${ra} 0 0 1 ${p(ra,a1)} L${p(rb,a1)} A${rb} ${rb} 0 0 0 ${p(rb,a0)}Z" fill="${col}"><title>${tt}</title></path>`};
+  g+=arc(r0,r1,'var(--soft)','');for(const m of MODES){if(!o[m])continue;const dr=o[m]/mx*(r1-r0);g+=arc(r,r+dr,MCOL[m],`${ML[i]}: ${o[m]} Nächte · ${MNAME[m]}`);r+=dr}
+  const am=(a0+a1)/2;g+=`<text x="${(cx+(r1+10)*Math.cos(am)).toFixed(1)}" y="${(cy+(r1+10)*Math.sin(am)+4).toFixed(1)}" text-anchor="middle" font-size="10" font-weight="700" fill="var(--mute)">${ML[i]}</text>`});
+ const top=tot.indexOf(Math.max(...tot)),MN=['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+ return `<div class="dwheel"><svg viewBox="0 0 220 220" width="220" height="220" role="img" aria-label="Reisenächte pro Monat">${g}<text x="${cx}" y="${cy+4}" text-anchor="middle" font-size="11" font-weight="800" fill="var(--ink)">${T.length?MN[top].slice(0,3):''}</text></svg>
+ <div><p>${T.length?`Am meisten unterwegs im <b>${MN[top]}</b> (${tot[top]} Nächte über alle Jahre).`:''}</p><div class="dleg">${MODES.filter(m=>mon.some(o=>o[m])).map(m=>`<span><i style="background:${MCOL[m]}"></i>${MNAME[m]}</span>`).join('')}</div></div></div>`}
+
+function tFavs(){const P=D.places.filter(p=>placeSel(p)&&p[7]!='Home'&&p[7]!='Work'&&p[3]>=2).sort((a,b)=>b[4]-a[4]).slice(0,14);
+ if(!P.length)return '<div class="empty">Noch keine Orte mit mehreren Besuchen.</div>';const mx=Math.max(...P.map(p=>p[4]));
+ return `<div class="dfavs">${P.map(p=>{const s=Math.round(34+Math.sqrt(p[4]/mx)*58),ring=Math.min(8,1+Math.log2(p[3]));const col=p[8]>=0&&tripById[p[8]]?dCol(tripById[p[8]].w):'#8B3DFF';
+  return `<div class="dfav" title="${esc(p[9])}: ${p[3]} Besuche, ${p[4]} Tage"><i style="width:${s}px;height:${s}px;--c:${col};border-width:${ring.toFixed(1)}px"><b>${p[4]}</b></i><span>${esc(p[9])}</span><em>${p[3]}× besucht</em></div>`}).join('')}</div>`}
+
+function tCo2(T){const by={};for(const t of T){const o=by[t.y]=by[t.y]||{};for(const m in t.k||{})o[m]=(o[m]||0)+t.k[m]}
+ const ys=Object.keys(by).sort();if(!ys.length)return '<div class="empty">Noch keine Reisen.</div>';
+ const tot=ys.map(y=>Object.values(by[y]).reduce((a,b)=>a+b,0)),mx=Math.max(1,...tot),bw=Math.max(10,Math.min(34,560/ys.length-6)),W=ys.length*(bw+6)+40,H=170;let g='';
+ ys.forEach((y,i)=>{let yy=H-20;const x=36+i*(bw+6);for(const m of MODES){const v=by[y][m]||0;if(!v)continue;const h=v/mx*(H-40);yy-=h;g+=`<rect x="${x}" y="${yy.toFixed(1)}" width="${bw}" height="${Math.max(1,h-1).toFixed(1)}" rx="2" fill="${MCOL[m]}"><title>${y} · ${MNAME[m]}: ${fmt(v)} km</title></rect>`}
+  g+=`<text x="${x+bw/2}" y="${H-6}" text-anchor="middle" font-size="9.5" fill="var(--mute)">${String(y).slice(2)}</text>`});
+ g+=`<text x="0" y="16" font-size="9.5" fill="var(--mute)">${fmt(mx)} km</text><line x1="34" x2="${W}" y1="20" y2="20" stroke="var(--line)" stroke-dasharray="2 4"/>`;
+ const kg=T.reduce((s,t)=>s+Object.entries(t.k||{}).reduce((a,[m,v])=>a+v*(CO2[m]||0),0),0),hours=T.reduce((s,t)=>s+Object.entries(t.k||{}).reduce((a,[m,v])=>a+v/({fly:750,road:75,rail:90,ferry:30,foot:4.5}[m]||60),0),0);
+ return `<div class="dscroll"><svg viewBox="0 0 ${W} ${H}" style="min-width:${Math.min(W,560)}px" role="img" aria-label="Kilometer pro Jahr">${g}</svg></div>
+ <div class="dk sm"><div><b>${fmt(kg/1000)} t</b><span>CO₂ geschätzt pro Person</span></div><div><b>${fmt(hours)} h</b><span>unterwegs (Fahrzeit grob)</span></div><div><b>${fmt(T.reduce((s,t)=>s+t.km,0)/Math.max(1,ys.length))} km</b><span>pro Jahr mit Reisen</span></div></div>`}
+
+function tBlank(){if(!RG.list)return '<div class="empty">Regionen werden geladen …</div>';const A=aggReg(),tot={},seen={};
+ for(const r of RG.list){tot[r.a3]=(tot[r.a3]||0)+1;if(A.has(r.id))seen[r.a3]=(seen[r.a3]||0)+1}
+ const cs=Object.keys(seen).sort((a,b)=>(b==RG.cc)-(a==RG.cc)||seen[b]/tot[b]-seen[a]/tot[a]).slice(0,12);if(!cs.length)return '<div class="empty">Noch keine Regionen besucht.</div>';
+ return `<div class="dblank">${cs.map(c=>{const p=seen[c]/tot[c];return `<div><span>${esc(RG.countries[c]||c)}</span><div class="dbar"><i style="width:${(p*100).toFixed(1)}%"></i></div><em>${seen[c]} / ${tot[c]}</em></div>`}).join('')}</div>
+ <p class="dmute">Fehlende Regionen siehst du auf der Karte „Regionen“.</p>`}
+
+/* ---------------------------------------------------------------- layout */
+function buildDash(){const box=document.getElementById('dashb');if(!box||!D)return;const O=dOpts();let T=dTrips();const allY=[...new Set(T.map(t=>t.y))].sort();
+ if(O.year){if(!allY.includes(DASH.year))DASH.year=allY[allY.length-1];T=T.filter(t=>t.y==DASH.year)}
+ const order=dOrder(),on=new Set(order);document.getElementById('dash').classList.toggle('kiosk',!!O.kiosk);
+ document.getElementById('dash-presets').innerHTML=DPRESETS.concat([['own','Eigene','Deine eigene Auswahl über „Kacheln“.']]).map(([k,n,d])=>`<button class="${dPreset()==k?'on':''}" data-p="${k}" title="${esc(d)}">${n}</button>`).join('');
+ document.querySelectorAll('#dash-presets button').forEach(b=>b.onclick=()=>{DASH.preset=b.dataset.p;try{localStorage.setItem('wm-dash-preset',DASH.preset)}catch(e){}buildDash()});
+ const pd=DPRESETS.find(x=>x[0]==dPreset());document.getElementById('dash-pdesc').innerHTML=(pd?esc(pd[2]):'Deine eigene Auswahl über „Kacheln“.')+(O.year?` <span class="dyears">${allY.map(y=>`<button class="${y==DASH.year?'on':''}" data-y="${y}">${y}</button>`).join('')}</span>`:'');
+ const fn={kpi:tKpi,earth:tEarth,records:tRecords,passport:tPassport,postcard:tPostcard,calendar:tCalendar,lanes:tLanes,wheel:tWheel,favs:tFavs,co2:tCo2,blank:tBlank};
+ const wide={kpi:1,calendar:1,lanes:1};
+ box.innerHTML=order.map(k=>DTILES.find(t=>t[0]==k)).map(([k,ti,info])=>{let body='';try{body=fn[k](T)}catch(e){body='<div class="empty">Diese Kachel konnte nicht gezeichnet werden.</div>';console.error(e)}
+  return `<section class="dtile${wide[k]?' wide':''}" id="dt-${k}"><div class="dth"><h3>${ti}</h3><button class="info" aria-expanded="false" aria-controls="dti-${k}" aria-label="Was zeigt diese Kachel?">i</button></div><p class="dinfo" id="dti-${k}" hidden>${info}</p>${body}</section>`}).join('')||'<div class="empty">Alle Kacheln sind ausgeblendet. Mit „Kacheln“ oben wieder einblenden.</div>';
+ box.querySelectorAll('.dth .info').forEach(b=>b.onclick=()=>{const p=document.getElementById(b.getAttribute('aria-controls'));p.hidden=!p.hidden;b.setAttribute('aria-expanded',String(!p.hidden))});
+ const sel=document.getElementById('dpc-sel');if(sel)sel.onchange=()=>{DASH.pc=+sel.value;buildDash()};
+ document.querySelectorAll('#dash .dyears button').forEach(b=>b.onclick=()=>{DASH.year=+b.dataset.y;buildDash()});
+ box.querySelectorAll('[data-trip]').forEach(el=>el.addEventListener('click',()=>{DASH.pc=+el.dataset.trip;if(!dTilesOn().has('postcard'))return;buildDash();const pc=document.getElementById('dt-postcard');if(pc)pc.scrollIntoView({behavior:'smooth',block:'nearest'})}));
+ document.getElementById('dash-sub').textContent=(SEL?SEL+' · ':'')+(O.year?DASH.year+' · ':'')+T.length+' '+(T.length==1?'Reise':'Reisen');
+ clearInterval(DASH.kt);if(O.kiosk&&T.length>1&&!matchMedia('(prefers-reduced-motion: reduce)').matches)DASH.kt=setInterval(()=>{if(TAB!='dash'||document.hidden)return;const i=T.findIndex(t=>t.id==DASH.pc);DASH.pc=T[(i+1)%T.length].id;const el=document.getElementById('dt-postcard');if(!el)return;const n=document.createElement('div');n.innerHTML=tPostcard(T);el.querySelector('.dpc').replaceWith(n.querySelector('.dpc'));const sl=el.querySelector('#dpc-sel');if(sl)sl.value=DASH.pc},15000);
+ if(!RG.list)need('reg').then(()=>{if(TAB=='dash')buildDash()}).catch(()=>{});
+}
+function dashTiles(){const m=document.getElementById('dash-menu');if(!m.hidden){m.hidden=true;return}if(dPreset()!='own')DASH.tiles=new Set(dOrder());const on=dTilesOn();
+ m.innerHTML=DTILES.map(([k,t])=>`<label><input type="checkbox" data-k="${k}" ${on.has(k)?'checked':''}> ${t}</label>`).join('');m.hidden=false;
+ m.querySelectorAll('input').forEach(i=>i.onchange=()=>{i.checked?on.add(i.dataset.k):on.delete(i.dataset.k);dSaveTiles();DASH.preset='own';try{localStorage.setItem('wm-dash-preset','own')}catch(e){}buildDash()})}
+function dashEnter(){document.getElementById('dash-tiles').onclick=dashTiles;document.querySelector('.app').hidden=true;const d=document.getElementById('dash');d.hidden=false;
+ const wb=document.getElementById('whobar');document.getElementById('dash-who').appendChild(wb);buildDash()}
+function dashLeave(){clearInterval(DASH.kt);const d=document.getElementById('dash');if(d.hidden)return;d.hidden=true;document.querySelector('.app').hidden=false;
+ const wb=document.getElementById('whobar'),side=document.querySelector('.side');side.insertBefore(wb,side.firstChild);document.getElementById('dash-menu').hidden=true}
 window.__T={};
 sizeCV();
 setInterval(()=>{if(!document.hidden)badge()},60000);
