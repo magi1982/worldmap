@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import logging
 import math
+import re
 from functools import lru_cache
 from pathlib import Path
 
@@ -15,6 +16,9 @@ from .geo import haversine_km
 
 log = logging.getLogger(__name__)
 DATA = Path(__file__).parent / "data" / "airports.json"
+# words that only say "airport" – the search looks for the town or name without them
+AIRPORT_WORDS = {"flughafen", "airport", "aeroport", "aeroporto", "aeropuerto", "flugplatz", "lufthavn", "flygplats",
+                 "luchthaven", "lotnisko", "havalimani", "intl", "international", "internationaler", "apt"}
 LARGE_KM = 60.0
 MEDIUM_KM = 35.0
 
@@ -109,6 +113,11 @@ def search(query: str, limit: int = 8, near: tuple | None = None) -> list[dict]:
     Big airports come first. -> [{"code", "name", "city", "lat", "lon", "size"}]
     """
     q = _fold(query)
+    plain = " ".join(w for w in re.split(r"[\s,/()-]+", q) if w and w not in AIRPORT_WORDS)
+    if not plain:
+        return []  # only "airport": nothing to look for
+    if plain != q:  # "Male Flughafen", "Airport Zürich": the town is what counts
+        q, query = plain, plain
     if len(q) < 2:
         return []
     keys = {q}
@@ -149,7 +158,7 @@ def search(query: str, limit: int = 8, near: tuple | None = None) -> list[dict]:
                 if city == k or city.startswith(k + " ") or city.startswith(k + "("):
                     best = 0.5 if k in name else 1  # "Dubai International" before "Al Maktoum (Dubai)"
                     found.setdefault(r[0], (best if r[5] == 2 else 2, r))
-                elif k in name.replace("-", " ") or (len(k) >= 4 and k in city):
+                elif re.search(r"(^|[\s/(])" + re.escape(k), name.replace("-", " ")) or (len(k) >= 4 and re.search(r"(^|[\s/(])" + re.escape(k), city)):
                     found.setdefault(r[0], (1.5 if r[5] == 2 else 4, r))
     if near:
         for rows in _index().values():

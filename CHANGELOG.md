@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.12.5 – 2026-11-23
+
+### Added
+- Stations can be moved up and down (▲ ▼) in the "+" wizard and in the trip list.
+
+### Changed
+- Airport search understands "Male Flughafen", "Malé Airport", "Flughafen Zürich": words that only say "airport"
+  are ignored and airports come first in the results. Towns and names match whole words only, so "Male" no longer
+  finds Tamale or Trincomalee.
+
 ## 0.12.4 – 2026-11-23
 
 ### Security

@@ -173,7 +173,7 @@ function stopsEditor(box, stops, onChange, opts = {}) {
     const flies = stops.some((x) => x.transport === 'Flug' || x.ap);
     box.innerHTML = `${opts.onDep && flies ? `<div class="dep"><span class="small">Abflug ab</span><b>${opts.dep ? `✈︎ ${esc(opts.dep)}${opts.depName ? ' · ' + esc(opts.depName) : ''}` : 'automatisch (dein Flughafen)'}</b>${opts.dep ? '<button type="button" class="rm" data-dep="0" aria-label="Abflug automatisch">✕</button>' : ''}
         <input class="dq" placeholder="anderer Abflug, z. B. Basel" autocomplete="off" aria-label="Abflughafen suchen"><div class="sugg dsg"></div></div>` : ''}
-     <ol class="stops">${stops.map((x, i) => `<li class="${x.ap ? 'ap' : ''}"><select data-leg="${i}" aria-label="Wie nach ${esc(x.name)}">${(TRANSPORT.includes(x.transport) || !x.transport ? TRANSPORT : [x.transport, ...TRANSPORT]).map((tr) => `<option ${tr === (x.transport || (x.ap ? 'Flug' : 'Auto')) ? 'selected' : ''}>${esc(tr)}</option>`).join('')}</select><span class="arr">→</span><b>${stopLabel(x)}</b><span class="small">${x.lat == null ? 'nur Land – genauer Ort unbekannt' : esc(x.country || '')}</span><button type="button" class="rm" data-rm="${i}" aria-label="${esc(x.name)} entfernen">✕</button></li>`).join('')}</ol>
+     <ol class="stops">${stops.map((x, i) => `<li class="${x.ap ? 'ap' : ''}"><select data-leg="${i}" aria-label="Wie nach ${esc(x.name)}">${(TRANSPORT.includes(x.transport) || !x.transport ? TRANSPORT : [x.transport, ...TRANSPORT]).map((tr) => `<option ${tr === (x.transport || (x.ap ? 'Flug' : 'Auto')) ? 'selected' : ''}>${esc(tr)}</option>`).join('')}</select><span class="arr">→</span><b>${stopLabel(x)}</b><span class="small">${x.lat == null ? 'nur Land – genauer Ort unbekannt' : esc(x.country || '')}</span><span class="mvs"><button type="button" class="mv" data-up="${i}" ${i ? '' : 'disabled'} aria-label="${esc(x.name)} nach oben" title="nach oben">▲</button><button type="button" class="mv" data-down="${i}" ${i < stops.length - 1 ? '' : 'disabled'} aria-label="${esc(x.name)} nach unten" title="nach unten">▼</button></span><button type="button" class="rm" data-rm="${i}" aria-label="${esc(x.name)} entfernen">✕</button></li>`).join('')}</ol>
      <input class="sq" placeholder="${stops.length ? 'Nächste Station – Ort oder Flughafen' : 'Ort, Insel, Flughafen – oder Google-Maps-Link'}" autocomplete="off" aria-label="Ort oder Flughafen suchen"><div class="sugg ssg"></div>
      <p class="small">${stops.length ? 'Pro Station: wie ihr dorthin gekommen seid. Ein Flughafen als Station heisst: genau dort gelandet – die nächste Station startet von dort.' : 'Suche einen Ort oder Flughafen (Stadt, Name oder Code) – oder füge einen Link aus Google Maps ein.'}${ONLINE ? ` Online-Suche: ${st.cfg.place_search === 'google' ? 'Google Maps' : 'OpenStreetMap'}.` : ''}</p>`;
     const q = box.querySelector('.sq'), sg = box.querySelector('.ssg'); let tm, res = [], seq = 0;
@@ -185,7 +185,8 @@ function stopsEditor(box, stops, onChange, opts = {}) {
         const [pl, ap] = await Promise.all([api('api/places?q=' + encodeURIComponent(v)), isLink ? [] : api('api/airports?q=' + encodeURIComponent(v)).catch(() => [])]);
         if (my !== seq) return;
         const aps = ap.slice(0, 5).map((a) => ({...a, kind: 'airport'}));
-        res = /^[a-z]{3}$/i.test(v) && aps.some((a) => a.code === v.toUpperCase()) ? aps.concat(pl.slice(0, 5)) : pl.slice(0, 6).concat(aps); show();
+        const wantsAp = /flughafen|airport|a[eé]roport|aeropuerto|flugplatz/i.test(v) || (/^[a-z]{3}$/i.test(v) && aps.some((a) => a.code === v.toUpperCase()));
+        res = wantsAp ? aps.concat(pl.slice(0, 5)) : pl.slice(0, 6).concat(aps); show();
         if (ONLINE && v.length > 2 && !isLink) { const more = await api('api/places?online=1&q=' + encodeURIComponent(v)); if (my !== seq) return; const seen = new Set(res.map((p) => p.name.toLowerCase() + (p.country || ''))); res = res.concat(more.filter((p) => p.kind === 'online' && !seen.has(p.name.toLowerCase() + p.country))); show(); } } catch (e) { /* offline */ } }, 220); };
     sg.onclick = (e) => { const b = e.target.closest('button'); if (!b) return; const p = res[+b.dataset.i];
       if (p.kind === 'airport') stops.push({name: p.name, country: '', lat: p.lat, lon: p.lon, ap: p.code, transport: 'Flug'});
@@ -193,6 +194,10 @@ function stopsEditor(box, stops, onChange, opts = {}) {
       else stops.push({name: p.name, country: p.country || '', lat: p.lat, lon: p.lon, radius_km: p.radius_km || null, transport: stops.length && stops[stops.length - 1].ap ? 'Auto' : (stops.length ? 'Auto' : opts.firstTransport || 'Auto')});
       onChange(); draw(); box.querySelector('.sq').focus(); };
     box.querySelectorAll('[data-rm]').forEach((b) => (b.onclick = () => { stops.splice(+b.dataset.rm, 1); onChange(); draw(); }));
+    const move = (i, j) => { if (j < 0 || j >= stops.length) return; [stops[i], stops[j]] = [stops[j], stops[i]]; onChange(); draw();
+      const btn = box.querySelector(`[data-${j < i ? 'up' : 'down'}="${j}"]`) || box.querySelector(`[data-${j < i ? 'down' : 'up'}="${j}"]`); if (btn) btn.focus(); };
+    box.querySelectorAll('[data-up]').forEach((b) => (b.onclick = () => move(+b.dataset.up, +b.dataset.up - 1)));
+    box.querySelectorAll('[data-down]').forEach((b) => (b.onclick = () => move(+b.dataset.down, +b.dataset.down + 1)));
     box.querySelectorAll('[data-leg]').forEach((sel) => (sel.onchange = () => { stops[+sel.dataset.leg].transport = sel.value; onChange(); draw(); }));
     const dq = box.querySelector('.dq');
     if (dq) { apSearchBox(dq, box.querySelector('.dsg'), (a) => { opts.dep = a.code; opts.depName = a.name; opts.onDep(a.code); onChange(); draw(); });

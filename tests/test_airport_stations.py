@@ -88,3 +88,11 @@ def test_old_airport_fields_become_stops(tmp_path):
     db.close()
     db = Database(str(tmp_path / "w.db"))                                  # runs only once
     assert next(t for t in db.trips() if t["id"] == t4["id"])["ap_to"] == "HER"
+
+
+def test_airport_words_and_whole_words():
+    codes = lambda q: [x["code"] for x in airports.search(q)]  # noqa: E731
+    assert codes("Male Flughafen")[0] == "MLE" and codes("Malé Airport")[0] == "MLE"
+    assert codes("Flughafen Zürich") == ["ZRH"] and codes("Basel Flughafen") == ["BSL"]
+    assert "TML" not in codes("Male") and "TRR" not in codes("Male")   # not Tamale, not Trincomalee
+    assert codes("Airport") == [] and codes("Flughafen") == []
