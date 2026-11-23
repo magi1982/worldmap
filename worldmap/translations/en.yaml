@@ -38,6 +38,9 @@ configuration:
   show_work:
     name: Show the workplace on the map
     description: Off = the workplace is never shown on the map (it still never counts as a trip).
+  home_airport:
+    name: Home airport (IATA code)
+    description: Flights without GPS start here, e.g. ZRH. Empty = the airport most of your recorded flights start from.
   timezone:
     name: Time zone
     description: Used to turn timestamps into local days, e.g. Europe/Zurich.

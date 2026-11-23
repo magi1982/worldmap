@@ -34,7 +34,8 @@ DEFAULT: dict = {
         "foot": {"color": "#FF8A00", "dash": "solid", "width": 1.0},
     },
     "areas": {"show": True, "opacity": 1.0, "size": 1.0, "outline": True},
-    "map": {"rivers": True, "provinces": True, "labels": "normal", "theme": "auto", "palette": "neon", "basemap": "standard"},
+    "map": {"rivers": True, "provinces": True, "labels": "normal", "theme": "auto", "palette": "neon", "basemap": "standard",
+            "gaps": "dotted"},
     "anim": {"on": True, "planes": True, "vehicles": True, "hide_line": True, "speed": 1.0, "size": 1.0},
     "timelapse": {"cinema": True, "skip_everyday": True, "glow": True},
 }
@@ -85,6 +86,8 @@ def validate(raw) -> dict:
         b["palette"] = mp["palette"]
     if mp.get("basemap") in BASEMAPS:
         b["basemap"] = mp["basemap"]
+    if mp.get("gaps") in ("dotted", "straight", "open"):
+        b["gaps"] = mp["gaps"]
     an = raw.get("anim") if isinstance(raw.get("anim"), dict) else {}
     c = out["anim"]
     for k in ("on", "planes", "vehicles", "hide_line"):

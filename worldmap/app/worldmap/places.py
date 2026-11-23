@@ -138,12 +138,30 @@ def search(query: str, limit: int = 10) -> list[dict]:
             break
     regions = [{"name": n, "lat": la, "lon": lo, "country": c, "kind": "region", "radius_km": r}
                for n, la, lo, c, r in REGIONS if _fold(n).startswith(q) or q in _fold(n)]
+    ex = _exonyms().get(q)
+    if ex:  # "Wien", "Mailand", "Genf": the city itself comes first
+        regions.insert(0, {"name": query.strip()[:60], "lat": ex[1], "lon": ex[2], "country": COUNTRY_DE.get(ex[3], ex[3]),
+                           "kind": "place"})
     out = regions + [{"name": n, "lat": la, "lon": lo, "country": COUNTRY_DE.get(cc, cc), "kind": "place"}
            for _, n, la, lo, cc in sorted(starts)[:limit] + sorted(contains)[:limit]][:limit]
     return out[:limit]
 
 
 WORLD = Path(__file__).with_name("data") / "world_cities.json.gz"
+EXONYMS = Path(__file__).with_name("data") / "exonyms.json.gz"
+
+
+@lru_cache(maxsize=1)
+def _exonyms() -> dict:
+    """Other-language names of world cities (Natural Earth, public domain): "wien" → ("Vienna", lat, lon, cc)."""
+    try:
+        rows = json.loads(gzip.decompress(EXONYMS.read_bytes()))
+    except (OSError, ValueError):
+        return {}
+    out: dict = {}
+    for alias, name, lat, lon, cc, _pop in rows:  # sorted by population: the biggest city wins
+        out.setdefault(alias, (name, lat, lon, cc))
+    return out
 
 
 @lru_cache(maxsize=1)

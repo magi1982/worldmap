@@ -27,6 +27,7 @@ class Settings:
     work_lon: float | None = None
     work_radius_m: int = 300
     show_work: bool = False                               # show the workplace on the map
+    home_airport: str = ""                                # IATA code; empty = the airport most flights start from
     timezone: str = "Europe/Zurich"
     min_trip_km: float = 30.0
     min_day_trip_km: float = 100.0                        # a day without a night away counts from this distance
@@ -116,6 +117,8 @@ def from_dict(raw: dict) -> Settings:
     s.home_radius_m = max(0, min(5000, int(s.home_radius_m or 0)))
     s.work_radius_m = max(50, min(5000, int(s.work_radius_m or 300)))
     s.show_work = s.show_work is True or str(s.show_work).lower() == "true"
+    ha = str(s.home_airport or "").strip().upper()
+    s.home_airport = ha if len(ha) == 3 and ha.isalpha() else ""
     for k in ("home_lat", "home_lon", "work_lat", "work_lon"):
         v = getattr(s, k)
         try:

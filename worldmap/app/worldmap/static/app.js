@@ -286,6 +286,7 @@ async function loadPeople() {
     <p class="small keep">Aktuell: ${h.resolved ? 'bekannt' : 'unbekannt'} · Umkreis ${esc(h.radius_used_m)} m</p>
     <div class="prow two"><label class="field">Breitengrad (leer = Zone)<input id="hlat" inputmode="decimal" value="${h.lat ?? ''}" placeholder="aus ${esc(h.zone || 'zone.home')}"></label><label class="field">Längengrad<input id="hlon" inputmode="decimal" value="${h.lon ?? ''}"></label></div>
     <label class="field">Umkreis in Metern (0 = Radius der Zone)<input id="hrad" type="number" min="0" max="5000" step="50" value="${h.radius_m || 0}"></label>
+    <label class="field">Heimatflughafen (IATA, leer = automatisch)<input id="hap" maxlength="3" autocapitalize="characters" value="${esc(h.airport || '')}" placeholder="z. B. ZRH"></label>
     <div class="opts"><button class="primary" id="saveH">Speichern</button></div></div>
   <div class="card"><h3>💼 Arbeit</h3>
     <p class="small">Die Arbeit zählt nie als Reise. Ohne Koordinaten wird sie automatisch erkannt (der Ort mit den meisten Stunden an Werktagen). Du entscheidest, ob sie auf der Karte erscheint.</p>
@@ -305,7 +306,7 @@ async function loadPeople() {
     save({persons: ps.map((r) => ({label: r.label.trim(), entity: r.entity, camera_models: r.cams.trim(), color: r.color})),
       groups: gs.map((r) => ({name: r.label.trim(), members: (r.members || []).filter((m) => ps.some((p) => p.label.trim() === m)), extra: r.extra || 0, color: r.color}))}, loadPeople); };
   const num = (id) => ($(id).value.trim() === '' ? null : +$(id).value.replace(',', '.'));
-  $('saveH').onclick = () => save({home_lat: num('hlat'), home_lon: num('hlon'), home_radius_m: +$('hrad').value || 0}, loadPeople);
+  $('saveH').onclick = () => save({home_lat: num('hlat'), home_lon: num('hlon'), home_radius_m: +$('hrad').value || 0, home_airport: $('hap').value.trim().toUpperCase()}, loadPeople);
   $('saveWk').onclick = () => save({work_lat: num('wlat'), work_lon: num('wlon'), work_radius_m: +$('wrad').value || 300, show_work: $('wshow').checked}, loadPeople);
   syncButtons(box);
 }
@@ -363,7 +364,8 @@ async function loadStyle() {
       <div class="opts-col">${sw('map.rivers', c.map.rivers, 'Flüsse')}${sw('map.provinces', c.map.provinces, 'Grenzen von Kantonen und Regionen')}
       <div class="field">Ortsnamen ${seg('map.labels', [['many', 'viele'], ['normal', 'normal'], ['few', 'wenige'], ['off', 'keine']], c.map.labels)}</div>
       <div class="field">Erscheinungsbild ${seg('map.theme', [['auto', 'wie das Gerät'], ['light', '☀ hell'], ['dark', '☾ dunkel']], c.map.theme)}</div>
-      <div class="field">Kartenfarben (hell) ${seg('map.basemap', BASEMAP_UI, c.map.basemap)}</div></div></div>
+      <div class="field">Kartenfarben (hell) ${seg('map.basemap', BASEMAP_UI, c.map.basemap)}</div>
+      <div class="field">Lücken ohne bekannte Strecke ${seg('map.gaps', [['dotted', 'fein gepunktet'], ['straight', 'gerade Linie'], ['open', 'offen lassen']], c.map.gaps)}</div></div></div>
     <div class="card"><h3>🌈 Farben für Personen &amp; Gruppen</h3>
       <p class="small">Wer keine eigene Farbe hat (unter Personen &amp; Gruppen), bekommt eine aus dieser Palette.</p>
       <div class="pal" role="radiogroup" data-name="map.palette">${Object.entries(PALETTE_UI).map(([k, [n, cs]]) => `<button type="button" role="radio" aria-checked="${k === c.map.palette}" class="${k === c.map.palette ? 'on' : ''}" data-v="${k}"><span>${cs.map((x) => `<i style="background:${x}"></i>`).join('')}</span>${n}</button>`).join('')}</div></div>

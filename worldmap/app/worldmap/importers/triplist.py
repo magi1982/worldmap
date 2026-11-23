@@ -9,7 +9,7 @@ from __future__ import annotations
 import re
 from datetime import UTC, date, datetime
 
-from .. import places
+from .. import airports, places
 from ..db import CONFIDENCE
 from ..timeparse import parse_ts
 from .tabular import _find
@@ -54,24 +54,63 @@ def _date(v) -> str | None:
     return datetime.fromtimestamp(ts, UTC).date().isoformat()
 
 
-def geocode(name: str, country: str = "") -> tuple[float, float, float | None] | None:
-    """(lat, lon, radius_km) for a free-text destination like "Mallorca (Porto Cristo)"."""
+def _fold(s: str) -> str:
+    return places._fold(s)
+
+
+def geocode(name: str, country: str = "", home: tuple | None = None,
+            max_km: float | None = None) -> tuple[float, float, float | None] | None:
+    """(lat, lon, radius_km) for a free-text destination like "Mallorca (Porto Cristo)".
+
+    With ``home`` and ``max_km`` (how far the trip went) the place that fits the distance wins:
+    Brühl near Cologne instead of Brühl near Mannheim, London in England instead of London in Canada.
+    """
     cc = COUNTRY_CC.get((country or "").strip().lower())
     cname = places.COUNTRY_DE.get(cc, country or "")
     parts = [name]
-    parts += [p for p in re.split(r"\s+[–-]\s+|\s*[(),/]\s*|\s+bei\s+|\s+und\s+", name) if p]
-    for part in parts:
+    parts += [p for p in re.split(r"\s+[–-]\s+|\s*[(),/&]\s*|\s+bei\s+|\s+und\s+", name) if p]
+    words = [w for w in re.split(r"[\s(),/&–-]+", name) if len(w) >= 4 and w[:1].isupper()]
+    fits = None
+    if home and max_km and max_km > 0:
+        from ..geo import haversine_km
+
+        def off(h):  # how badly a place fits the distance of the trip
+            return abs(haversine_km(home[0], home[1], h["lat"], h["lon"]) - max_km)
+
+        def fits(h):
+            return off(h) <= max(60.0, max_km * .35)
+    for n, part in enumerate(parts + words):
         part = part.strip(" )·")
         if len(part) < 3:
             continue
-        hits = places.search(part, limit=10)
+        hits = [h for h in places.search(part, limit=10) if h.get("lat") is not None]
         if cname:
             same = [h for h in hits if h.get("country") == cname]
             hits = same or ([] if hits and all(h.get("country") for h in hits) and cc else hits)
         exact = [h for h in hits if h["name"].lower() == part.lower()]
-        h = (exact or hits or [None])[0]
-        if h and h.get("lat") is not None:
+        if n >= len(parts):  # single words: exact names only
+            hits = exact
+        if fits:
+            good = [h for h in exact if fits(h)] or [h for h in hits if fits(h)]  # exact names first
+            if not good:
+                continue
+            h = min(good, key=off)
+        elif home:  # distance unknown: only names that match exactly (no guessing "Gommer See" → somewhere)
+            h = (exact or [x for x in hits if x.get("kind") == "region" and _fold(x["name"]) == _fold(part)] or [None])[0]
+        else:
+            h = (exact or hits or [None])[0]
+        if h:
             return h["lat"], h["lon"], h.get("radius_km")
+    for part in parts:  # a holiday town with its own airport ("Marsa Alam")
+        ap = airports.by_city(part.strip(" )·"))
+        if ap:
+            return ap[2], ap[3], None
+    for part in parts:  # a country as destination ("Kenia", "Kroatien")
+        pc = COUNTRY_CC.get(part.strip(" )·").lower())
+        if pc and pc != cc:
+            box = places.country_box(pc)
+            if box:
+                return (box[0] + box[2]) / 2, (box[1] + box[3]) / 2, None
     if cc:  # at least the country
         box = places.country_box(cc)
         if box:

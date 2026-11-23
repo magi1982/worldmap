@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.6.2 – 2026-11-23
+
+### Fixed
+- **Airports**: flights now start and end at the real airport (OurAirports data, public domain, offline) with a small
+  IATA tag on the map. A flight recorded in pieces (points every few minutes in the air) is one flight again instead of
+  several hops over random airports; 0-minute "jumps" and taxiing are no longer flights.
+- Flights without GPS start at your **home airport**: the airport most of your recorded flights start from, or the new
+  option `home_airport` (IATA code, also in Settings → Home). Destinations use the big airport (London → LHR).
+- **Trips without coordinates** (older trip lists, packages) were drawn at home. Their place is now found offline by name:
+  German and other names of world cities (Wien, Mailand, Genf), countries (Kenia), holiday towns with an airport,
+  and the trip distance picks the right one (Brühl near Cologne, not near Mannheim). Unknown places are no longer shown
+  at home.
+- **Interrupted lines**: gaps without a known road or rail route are drawn as a fine dotted link in the same colour
+  instead of leaving the line open. New map style option "Gaps without a known route": dotted / straight line / open.
+
 ## 0.6.1 – 2026-11-23
 
 ### Fixed

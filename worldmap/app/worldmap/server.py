@@ -56,7 +56,7 @@ FILENAME_RE = re.compile(r"[^\w.\-]+")
 MAX_JSON = 256 * 1024
 CONNECTOR_KEYS = ("persons", "groups", "owntracks", "notify_service", "notify_mode", "who_options", "school_holidays",
                   "routing", "min_trip_km", "min_day_trip_km", "ask_below", "hint_keywords", "routine_days", "home_lat", "home_lon",
-                  "home_radius_m", "work_lat", "work_lon", "work_radius_m", "show_work")
+                  "home_radius_m", "work_lat", "work_lon", "work_radius_m", "show_work", "home_airport")
 TEXT_LIMITS = {"destination": 120, "country": 60, "who": 60, "transport": 80, "reason": 300, "note": 1000, "source": 80}
 
 
@@ -238,6 +238,11 @@ def validate_connectors(data: dict) -> dict:
             out[k] = max(0 if k == "home_radius_m" else 50, min(5000, int(v)))
         elif k == "show_work":
             out[k] = bool(v)
+        elif k == "home_airport":
+            code = str(v or "").strip().upper()
+            if code and not (len(code) == 3 and code.isalpha()):
+                raise ValueError("home_airport must be a 3-letter IATA code")
+            out[k] = code
         elif k in ("min_trip_km", "min_day_trip_km"):
             out[k] = max(1.0, min(2000.0, float(v)))
         elif k == "routine_days":
@@ -303,7 +308,8 @@ def make_handler(app: App):
             "routing": eng.s.routing, "min_trip_km": eng.s.min_trip_km, "min_day_trip_km": eng.s.min_day_trip_km, "ask_below": eng.s.ask_below,
             "routine_days": eng.s.routine_days,
             "home": {"zone": eng.s.home_zone, "lat": eng.s.home_lat, "lon": eng.s.home_lon, "radius_m": eng.s.home_radius_m,
-                     "resolved": eng.resolve_home(), "radius_used_m": round(eng.home_radius_km() * 1000)},
+                     "resolved": eng.resolve_home(), "radius_used_m": round(eng.home_radius_km() * 1000),
+                     "airport": eng.s.home_airport},
             "work": {"lat": eng.s.work_lat, "lon": eng.s.work_lon, "radius_m": eng.s.work_radius_m, "show": eng.s.show_work},
             "hint_keywords": [f"{k}={v}" for k, v in eng.s.hint_keywords.items()],
             "points_by_source": by_src, "imports": imports,

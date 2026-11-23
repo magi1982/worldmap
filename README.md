@@ -16,7 +16,7 @@ fast, good-looking map with five views. Everything runs inside the add-on; no cl
 | | |
 |---|---|
 | 🗺️ **Five map views** | **Trips** (who went where and how, destinations, flight arcs, estimated areas for trips without GPS), **Tracks** (every route, coloured by transport, year or person), **Places & days** (where you spent time, a calendar of every day), **Regions** (states, provinces and cantons worldwide) and **Time-lapse** (your history as a film, hour by hour, with animated flights and a timeline). |
-| 🛤️ **Real rail and road lines** | Gaps between GPS points are map-matched onto the real rail and road network from OpenStreetMap. The network is built from map tiles that are downloaded once by tile number and kept in the add-on – no positions are ever sent, afterwards it works offline. Gaps without a plausible path stay open instead of becoming straight lines. |
+| 🛤️ **Real rail and road lines** | Gaps between GPS points are map-matched onto the real rail and road network from OpenStreetMap. The network is built from map tiles that are downloaded once by tile number and kept in the add-on – no positions are ever sent, afterwards it works offline. Gaps without a plausible path are joined by a fine dotted line (adjustable: dotted, straight, open). Flights start and end at the real airport (OurAirports, offline). |
 | ❓ **Smart questions – no AI needed** | Similar trips (same area, same kind of day, same suggestion) are asked **once** – one answer for all. Answers can be remembered as **rules**, so the same question never comes again. Answers: every person and group, "no trip (everyday life)", "merge with the trip before", "ask one by one". |
 | 👥 **People & groups** | Single persons and groups (couple, family …) with colours. A bar on top of every map shows everyone, one person or one group. Home and work with radius; the workplace is hidden on the map unless you switch it on. |
 | 📋 **Excel-style trip list** | In the settings: filter per column, sort, edit cells in place, delete rows, paste rows straight from Excel or Google Sheets (Ctrl+V). Duplicates are detected. |
@@ -71,6 +71,7 @@ Everything can be set in the app (⚙️ **Settings**) or in the add-on configur
 | `home_radius_m` | 0 | home radius in metres; 0 = radius of the home zone |
 | `work_lat` / `work_lon` / `work_radius_m` | – / – / 300 | workplace; empty = detected automatically |
 | `show_work` | false | show the workplace on the map |
+| `home_airport` | "" | IATA code of your home airport (e.g. ZRH); empty = the airport most recorded flights start from |
 | `min_trip_km` | 30 | with a night away, a trip starts at this distance |
 | `min_day_trip_km` | 100 | a day out without a night away counts as a trip from this distance |
 | `routine_days` | 20 | places visited on this many days (work, school) never start a trip; 0 = off |
@@ -102,7 +103,8 @@ Ideas and the roadmap live in [NEXT.md](NEXT.md).
 
 ## Credits
 
-Map and place data: [Natural Earth](https://www.naturalearthdata.com/) (public domain, including the regions),
+Map and place data: [Natural Earth](https://www.naturalearthdata.com/) (public domain, including the regions and city names in other languages),
+airports: [OurAirports](https://ourairports.com/data/) (public domain),
 place names: [GeoNames](https://www.geonames.org/) (CC BY 4.0). Rail and road network: © [OpenStreetMap](https://www.openstreetmap.org/copyright)
 contributors via [OpenFreeMap](https://openfreemap.org/).
 

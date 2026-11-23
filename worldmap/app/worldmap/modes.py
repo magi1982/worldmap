@@ -39,8 +39,10 @@ def mode_of_pair(a: dict, b: dict, dist_km: float) -> str:
     speed = dist_km / dt_h
     hinted = mode_of_text(b.get("hint")) or mode_of_text(a.get("hint"))
     if speed >= FLIGHT_KMH or (dist_km > 800 and dt_h < 24):
-        if dist_km < MIN_FLIGHT_KM:
-            return "jump"  # a few fast kilometres are GPS jumps, not flights
+        if hinted == "fly" and dist_km >= 20 and b["ts"] - a["ts"] >= 120 and speed <= 1200:
+            return "fly"  # a piece of a recorded flight (points every few minutes while flying)
+        if dist_km < MIN_FLIGHT_KM or b["ts"] - a["ts"] < 300:
+            return "jump"  # a few fast kilometres or hundreds of km in no time are GPS jumps, not flights
         if hinted in ("rail", "road", "ferry") and dist_km < 600:
             return hinted  # a train or car trip with a gap in the recording
         return "fly"

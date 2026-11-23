@@ -60,7 +60,7 @@ def test_core_shape(filled, tmp_path):
     assert "fly" in holiday["m"] and holiday["fl"] and holiday["g"]
     day_trip = next(t for t in core["trips"] if t["a"] == "2025-03-01")
     assert day_trip["m"][0] == "rail"
-    assert core["flights"] and len(core["flights"][0]) == 5 and 0 <= core["flights"][0][3] <= 1
+    assert core["flights"] and len(core["flights"][0]) == 7 and 0 <= core["flights"][0][3] <= 1
     assert {f[4] for f in core["flights"]} == {0, 1}  # person index per flight
     assert len(core["trackP"]) == len(core["trackT"]) and set(core["trackP"]) <= {-1, 0, 1}
     assert len(core["dayP"]) == len(core["days"]) and any(m == 3 for m in core["dayP"])
@@ -142,6 +142,7 @@ def test_gps_jumps_are_not_flights():
     a = {"ts": 0, "lat": 47.0, "lon": 8.0, "hint": None}
     assert A.mode_of_pair(a, {"ts": 20, "lat": 47.02, "lon": 8.0, "hint": None}, 2.2) == "jump"
     assert A.mode_of_pair(a, {"ts": 3600, "lat": 48.0, "lon": 8.0, "hint": None}, 111) == "road"
+    assert A.mode_of_pair(a, {"ts": 300, "lat": 47.6, "lon": 8.6, "hint": "flying"}, 80) == "fly"  # piece of a flight
 
 
 def test_estimate_km_without_gps():
@@ -181,3 +182,37 @@ def test_overflown_regions_do_not_count():
            {"ts": 90100, "lat": 40.0, "lon": 22.0, "person": "Sam", "hint": "FLYING"}]
     air = A._airborne(pts)
     assert {0, 1, 2, 4} <= air and 3 not in air
+
+
+def test_flight_ends_snap_to_airports():
+    from worldmap import airports
+    assert airports.snap(51.503, 0.2005)[0] == "LCY"          # first GPS point after landing, 10 km away
+    assert airports.snap(51.43, -0.41)[0] == "LHR"
+    assert airports.snap(48.04, 16.57)[0] == "VIE"
+    assert airports.snap(40.0, -40.0) is None                  # middle of the Atlantic
+    assert airports.by_iata("vie")[0] == "VIE" and airports.by_iata("XX1") is None
+
+
+def test_flight_in_pieces_is_one_flight(engine, tmp_path):
+    # sparse points while flying: airport → over the Alps → over Italy → airport; plus a 0-minute jump
+    t0 = ts("2025-05-29T20:00:00")
+    pts = [(t0 - 3600, 47.458, 8.548), (t0, 47.46, 8.55), (t0 + 960, 46.46, 11.33), (t0 + 2100, 44.9, 13.9),
+           (t0 + 5100, 39.2, 22.3), (t0 + 5700, 38.0, 23.5), (t0 + 9000, 35.34, 25.18), (t0 + 12000, 35.34, 25.18)]
+    rows = [(t, la, lo, "Alex", "t", None, None) for t, la, lo in pts]
+    rows += [(ts("2025-06-10T12:00:00"), 47.46, 8.55, "Alex", "t", None, None),
+             (ts("2025-06-10T12:00:00"), 49.0, 2.55, "Alex", "t", None, None)]   # same second, 480 km apart
+    engine.import_points(rows)
+    engine.rebuild()
+    core = load(A.Atlas(engine, str(tmp_path)), "core")
+    assert [(f[5], f[6]) for f in core["flights"]] == [("ZRH", "HER")]
+    assert set(core["airports"]) == {"ZRH", "HER"}
+
+
+def test_trips_without_coordinates_find_their_place():
+    from worldmap.importers.triplist import geocode
+    home = (47.0, 8.0)
+    assert abs(geocode("Wien", "", home, 600)[1] - 16.36) < .1                   # German name of a world city
+    assert abs(geocode("Phantasialand (Brühl)", "", home, 400)[0] - 50.83) < .1  # the Brühl that fits the distance
+    assert geocode("Kenia", "", home, 6400)[0] < 5                                # a country
+    assert abs(geocode("Sample Town (Marsa Alam)", "", home, 3300)[1] - 34.59) < .1  # town with its own airport
+    assert geocode("Neujahr (Gommer See)", "", home, None) is None               # no distance, no exact name: no guess

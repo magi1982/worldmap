@@ -194,13 +194,14 @@ def test_validate_groups_home_work():
     ok = validate_connectors({"persons": [{"label": "Alex", "color": "#112233"}, {"label": "Sam"}],
                               "groups": [{"name": "Paar", "members": ["Alex", "Sam"], "extra": 30, "color": "#00FF00"}],
                               "home_lat": "47.1", "home_lon": 8.2, "home_radius_m": 99999, "work_lat": None,
-                              "work_radius_m": 10, "show_work": True})
+                              "work_radius_m": 10, "show_work": True, "home_airport": " zrh"})
+    assert ok["home_airport"] == "ZRH"
     assert ok["groups"] == [{"name": "Paar", "members": "Alex, Sam", "extra": 20, "color": "#00FF00"}]
     assert ok["who_options"] == ["Paar"] and ok["persons"][0]["color"] == "#112233"
     assert ok["home_lat"] == 47.1 and ok["home_radius_m"] == 5000 and ok["work_lat"] is None and ok["work_radius_m"] == 50
     assert ok["show_work"] is True
     for bad in ({"groups": [{"name": "<x>"}]}, {"groups": [{"name": "A", "members": ["<b>"]}]},
-                {"groups": [{"name": "A", "color": "red"}]}, {"home_lat": 91}, {"work_lon": "x"},
+                {"groups": [{"name": "A", "color": "red"}]}, {"home_lat": 91}, {"work_lon": "x"}, {"home_airport": "ZRH1"}, {"home_airport": "<a>"},
                 {"persons": [{"label": "Alex"}], "groups": [{"name": "Alex"}]}):
         with pytest.raises(ValueError):
             validate_connectors(bad)

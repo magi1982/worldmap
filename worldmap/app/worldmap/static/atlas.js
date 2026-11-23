@@ -203,10 +203,16 @@ function buildR(){
  // estimates
  for(const [ti,la,lo,rk] of D.est){const t=tripById[ti];if(!t||!onIds.has(t.id))continue;est.push([la,lo,rk,R.color=='w'?WCOL[t.w]:MCOL[t.m[0]]])}
  // flights
- const pairs=new Map();if(R.m.has('fly'))for(const t of on){for(const [x,y] of t.fl){const A=ptGroup(x,t),Bg=ptGroup(y,t);if(!A||!Bg||A==Bg)continue;const k=[A,Bg].sort((p,q)=>(p!='home')-(q!='home')||p.localeCompare(q)).join('>');let e=pairs.get(k);if(!e){e={k,ws:new Set()};pairs.set(k,e)}e.ws.add(t.w)}}
+ const pairs=new Map();if(R.m.has('fly'))for(const t of on){for(const [x,y,ia,ib] of t.fl){const A=ia?'ap:'+ia:ptGroup(x,t),Bg=ib?'ap:'+ib:ptGroup(y,t);if(!A||!Bg||A==Bg)continue;const hm=q=>q=='home'||(q.startsWith('ap:')&&D.airports[q.slice(3)]&&km2(D.airports[q.slice(3)][0],D.airports[q.slice(3)][1],HOME[0],HOME[1])<150);const k=[A,Bg].sort((p,q)=>hm(q)-hm(p)||p.localeCompare(q)).join('>');let e=pairs.get(k);if(!e){e={k,ws:new Set(),g:new Set()};pairs.set(k,e)}e.ws.add(t.w);if(t.g&&!t.gps)e.g.add(t.g)}}
  RC={own:out,far,est,near,pairs:[...pairs.values()],on,onIds,st:{},ver:(RC?RC.ver:0)+1};
 }
-function gpos(g){if(g=='home')return [MX(HOME[1]),MY(HOME[0])];if(g.startsWith('p:')){const [a,b]=g.slice(2).split(',').map(Number);return [MX(b),MY(a)]}const G=D.groups.find(x=>x[0]==g);return [MX(G[3]),MY(G[2])]}
+/* airports at the ends of flight arcs: a small tag with the IATA code */
+function apMarks(keys){const S=V.S;if(S<1500)return;const seen=new Set();ctx.font='800 10.5px Inter,system-ui,sans-serif';ctx.textBaseline='middle';
+ for(const k of keys){if(!k.startsWith('ap:')||seen.has(k))continue;seen.add(k);const code=k.slice(3),a=D.airports[code];if(!a)continue;const [x,y]=toS(MX(a[1]),MY(a[0]));if(x<-30||y<-30||x>V.W+30||y>V.H+30)continue;
+  const w=ctx.measureText(code).width+20;ctx.fillStyle=MC.land;ctx.strokeStyle=MCOL.fly;ctx.lineWidth=1.4;ctx.beginPath();ctx.roundRect(x+6,y-9,w,18,9);ctx.fill();ctx.stroke();
+  ctx.fillStyle=MCOL.fly;ctx.fillText('✈',x+10,y+.5);ctx.fillStyle=MC.strong;ctx.fillText(code,x+21,y+.5);ctx.beginPath();ctx.arc(x,y,3.2,0,7);ctx.fillStyle=MCOL.fly;ctx.fill();ctx.strokeStyle=MC.ring;ctx.lineWidth=1.5;ctx.stroke();placed.push([x+6,y-9,x+6+w,y+9])}
+ ctx.textBaseline='alphabetic'}
+function gpos(g){if(g=='home')return [MX(HOME[1]),MY(HOME[0])];if(g.startsWith('ap:')){const a=D.airports[g.slice(3)];return [MX(a[1]),MY(a[0])]}if(g.startsWith('p:')){const [a,b]=g.slice(2).split(',').map(Number);return [MX(b),MY(a)]}const G=D.groups.find(x=>x[0]==g);return [MX(G[3]),MY(G[2])]}
 function areaLayer(cells,S){
  const G=.02,cellpx=G*1.4/360*S,k=Math.max(1,Math.round(7*(STYLE?STYLE.areas.size:1)/cellpx));const key=k;if(cells._k===key)return cells._own;
  const agg=new Map();for(const [kk,c] of cells){const [a,b]=kk.split(',').map(Number);const A=Math.floor(a/k),Bb=Math.floor(b/k),K=A+','+Bb;let o=agg.get(K);if(!o){o={};agg.set(K,o)}for(const q in c)o[q]=(o[q]||0)+c[q]}
@@ -228,21 +234,22 @@ function contentR(bb){
  ctx.lineJoin='round';ctx.lineCap='round';
  const lw=Math.max(1.6,Math.min(3.2,S/6000))/S;
  const vb=[V.cx-V.W/2/S,V.cy-V.H/2/S,V.cx+V.W/2/S,V.cy+V.H/2/S];
- tileDraw(RC.st,li=>{const l=TR[li],r=D.days[l.d];if(!l.on)return null;if(!r||r[6]<0)return null;const t=tripById[r[6]];if(!RC.onIds.has(t.id))return null;if(!t.g&&!ZOOMED)return null;const m=TCLS[l.c];if(!R.m.has(m))return null;return (R.color=='w'?WCOL[t.w]:MCOL[m])+'|'+m+(t.g?'|f':'|n')},k=>k.endsWith('|f')?1:0,k=>{const f=k.endsWith('|f'),m=k.slice(8,-2);ctx.strokeStyle=k.slice(0,7);ctx.lineWidth=(f?lw:lw*.75)*SM(m).width;setDash(m,V.S);ctx.globalAlpha=1},bb);ctx.setLineDash([]);ctx.globalAlpha=1}
+ tileDraw(RC.st,li=>{const l=TR[li],r=D.days[l.d];if(!l.on)return null;if(!r||r[6]<0)return null;const t=tripById[r[6]];if(!RC.onIds.has(t.id))return null;if(!t.g&&!ZOOMED)return null;const m=TCLS[l.c];if(!R.m.has(m))return null;return (R.color=='w'?WCOL[t.w]:MCOL[m])+'|'+m+(t.g?'|f':'|n')},k=>k.endsWith('|f')?1:0,k=>{const f=k.endsWith('|f'),m=k.slice(8,-2);ctx.strokeStyle=k.slice(0,7);ctx.lineWidth=(f?lw:lw*.75)*SM(m).width;setDash(m,V.S);ctx.globalAlpha=1},bb);ctx.setLineDash([]);ctx.globalAlpha=1;
+ drawGaps(g=>{const r=D.days[g[0]];if(!r||r[6]<0||!gapSel(g))return null;const t=tripById[r[6]];if(!RC.onIds.has(t.id)||(!t.g&&!ZOOMED))return null;const m=TCLS[g[1]];if(!R.m.has(m))return null;return R.color=='w'?WCOL[t.w]:MCOL[m]},lw,bb)}
 function drawR(){
  TKEY='R'+RC.ver+(V.S>=150000?'Z':V.S>=55000?'z':'');drawTiles(contentR);worldT();const S=V.S;ctx.globalAlpha=1;
  for(const [la,lo,rk,c] of RC.est){const r=rk/(40075*Math.cos(la*Math.PI/180));ctx.beginPath();ctx.arc(MX(lo),MY(la),r,0,7);ctx.fillStyle=tint(c,.82);ctx.globalAlpha=.55;ctx.fill();ctx.globalAlpha=1;ctx.setLineDash([1/S,5/S]);ctx.lineCap='round';ctx.strokeStyle=c;ctx.lineWidth=2.8/S;ctx.stroke();ctx.setLineDash([])}
  // flights
  if(!(AN.on&&STYLE&&STYLE.anim.planes))for(const e of RC.pairs){const [A,Bg]=e.k.split('>');const [x1,y1]=gpos(A),[x2,y2]=gpos(Bg);const a=arcPts(x1,y1,x2,y2,A=='home'?.2:.18);strokeArc(a,R.color=='w'?WHO.filter(w=>e.ws.has(w)).map(w=>WCOL[w]):[MCOL.fly],2.4,8,6)}
  endWorld();placed.length=0;usedNames.clear();
- homeMark();
+ homeMark();apMarks(RC.pairs.flatMap(e=>e.k.split(">")));
  // destinations
  RC.mbox=null;let off=null;
  for(const G of D.groups){const [g,name,la,lo,an,fs,major,gkm]=G;const ts=RC.on.filter(t=>t.g==g);if(!ts.length)continue;const [x,y]=toS(MX(lo),MY(la));if(x<-80||y<-40||x>V.W+80||y>V.H+40){if(gkm>1500&&(!off||gkm>off[0][7]))off=[G,ts];continue}
   const cs=R.color=='w'?WHO.filter(w=>ts.some(t=>t.w==w)).map(w=>WCOL[w]):[...new Set(ts.flatMap(t=>t.m).filter(m=>R.m.has(m)))].map(m=>MCOL[m]);const r=major?7.5:5.5;pieS(x,y,r,cs);
   lbl(name,an=='end'?x-r-6:an=='middle'?x:x+r+6,an=='middle'?y-r-6:y+5,fs,major?780:650,major?MC.strong:MC.text,an=='end'?'right':an=='middle'?'center':'left',4.5,true)}
  // near trips
- const near={};for(const t of RC.on){if(t.g)continue;const k=t.name;(near[k]=near[k]||{name:k,p:t.p,ts:[]}).ts.push(t)}
+ const near={};for(const t of RC.on){if(t.g||t.nopos)continue;const k=t.name;(near[k]=near[k]||{name:k,p:t.p,ts:[]}).ts.push(t)}
  const ns=Object.values(near).sort((a,b)=>b.ts.length-a.ts.length);
  for(const q of ns){const [x,y]=toS(MX(q.p[1]),MY(q.p[0]));if(x<-20||y<-20||x>V.W+20||y>V.H+20)continue;const r=Math.min(9,3+Math.sqrt(q.ts.length)*1.3)*(S>40000?1:.75);const cs=R.color=='w'?WHO.filter(w=>q.ts.some(t=>t.w==w)).map(w=>WCOL[w]):[...new Set(q.ts.flatMap(t=>t.m).filter(m=>R.m.has(m)))].map(m=>MCOL[m]);pieS(x,y,r,cs);q.sx=x;q.sy=y;q.r=r;if(S>45000)lbl(q.name,x+r+4,y+4,12,650,MC.text)}
  RC.ndots=ns;
@@ -295,14 +302,20 @@ function buildS(){
  SP.chunks=[...ch.values()].sort((a,b)=>order?order.indexOf(a.k)-order.indexOf(b.k):(+a.k)-(+b.k));
  SP.fl=[];if(SP.modes.has('fly')){const d0=dateOf(D.days[0][0]);for(const f of D.flights){const [ds,A,Bp]=f;const di=Math.round((dateOf(ds)-d0)/864e5);if(!dayOk(di)||!flightSel(f))continue;SP.fl.push([arcPts(MX(A[1]),MY(A[0]),MX(Bp[1]),MY(Bp[0])),SP.color=='m'?MCOL.fly:SP.color=='y'?ycol(dayInfo[di].y):WCOL[dayInfo[di].who]])}}
 }
+/* gaps without a known route: a soft dotted link instead of an interrupted line (setting: dotted / straight / open) */
+function gapSel(g){if(!SEL)return true;const pn=g[6]>=0?D.persons[g[6]]:null;const t=dayTrip(g[0]);if(isGroup(SEL)){const ms=members(SEL);return !!t&&t.w==SEL&&(!ms.length||ms.includes(pn))}return pn==SEL}
+function drawGaps(colOf,lw,bb){const st=STYLE?STYLE.map.gaps:'dotted';if(st=='open'||!D.gaps)return;const S=V.S,by=new Map();
+ for(const g of D.gaps){const c=colOf(g);if(!c)continue;const x1=MX(g[3]),y1=MY(g[2]),x2=MX(g[5]),y2=MY(g[4]);if(Math.max(x1,x2)<bb[0]||Math.min(x1,x2)>bb[2]||Math.max(y1,y2)<bb[1]||Math.min(y1,y2)>bb[3])continue;let p=by.get(c);if(!p){p=new Path2D();by.set(c,p)}p.moveTo(x1,y1);p.lineTo(x2,y2)}
+ ctx.save();ctx.lineCap='round';ctx.setLineDash(st=='straight'?[]:[.01/S,Math.max(3.2,lw*S*2.4)/S]);ctx.lineWidth=lw*(st=='straight'?.7:1.15);ctx.globalAlpha=st=='straight'?.55:.8;for(const [c,p] of by){ctx.strokeStyle=c;ctx.stroke(p)}ctx.restore()}
 function contentS(bb){
  drawBase();const S=V.S,lw=S<300000?1/(S*(V.tf||1)):Math.min(2.4,S/250000)/S;
  ctx.lineWidth=lw;ctx.lineJoin='round';ctx.lineCap='round';ctx.globalAlpha=1;
- tileDraw(SP.st,li=>{const l=TR[li];return l.on&&SP.modes.has(TCLS[l.c])&&dayOk(l.d)?keyS(l)+'|'+TCLS[l.c]:null},kk=>{const k=kk.split('|')[0];return SP.color=='m'?['foot','road','rail'].indexOf(k):SP.color=='w'?WORDER().indexOf(k):+k},kk=>{const [k,m]=kk.split('|');ctx.strokeStyle=S<300000?colS(k):tint(colS(k),.85);ctx.lineWidth=lw*SM(m).width;setDash(m,S)},bb);ctx.setLineDash([]);ctx.globalAlpha=1}
+ tileDraw(SP.st,li=>{const l=TR[li];return l.on&&SP.modes.has(TCLS[l.c])&&dayOk(l.d)?keyS(l)+'|'+TCLS[l.c]:null},kk=>{const k=kk.split('|')[0];return SP.color=='m'?['foot','road','rail'].indexOf(k):SP.color=='w'?WORDER().indexOf(k):+k},kk=>{const [k,m]=kk.split('|');ctx.strokeStyle=S<300000?colS(k):tint(colS(k),.85);ctx.lineWidth=lw*SM(m).width;setDash(m,S)},bb);ctx.setLineDash([]);ctx.globalAlpha=1;
+ drawGaps(g=>SP.modes.has(TCLS[g[1]])&&dayOk(g[0])&&gapSel(g)?colS(keyS({d:g[0],c:g[1]})):null,lw,bb)}
 function drawS(){
  TKEY='S'+SP.ver;drawTiles(contentS);worldT();const S=V.S;
  ctx.globalAlpha=S>40000?.4:.75;if(!(AN.on&&STYLE&&STYLE.anim.planes))for(const [a,c] of SP.fl)strokeArc(a,[c],S>40000?1.3:1.8,7,5);
- ctx.globalAlpha=1;endWorld();placed.length=0;usedNames.clear();homeMark();drawPlaceLabels();
+ ctx.globalAlpha=1;endWorld();placed.length=0;usedNames.clear();homeMark();if(SP.modes.has('fly'))apMarks((SP.flKeys=SP.flKeys||D.flights.flatMap(f=>[f[5]?'ap:'+f[5]:'',f[6]?'ap:'+f[6]:''])).filter(Boolean));drawPlaceLabels();
 }
 function sideS(){
  const km={road:0,rail:0,foot:0,fly:0},I=[['road',1],['rail',2],['foot',3],['fly',4]];let nd=0;
@@ -670,7 +683,7 @@ document.querySelectorAll('.panel').forEach(pn=>{const h=pn.querySelector('h1');
 window.__T={};
 sizeCV();
 setInterval(()=>{if(!document.hidden)badge()},60000);
-window.__wm={AN,V,MX,MY,full,get TAB(){return TAB}};
+window.__wm={AN,V,MX,MY,full,get D(){return D},get TAB(){return TAB}};
 Promise.all([loadJSON('api/atlas/core'),loadJSON('base.json'),loadJSON('api/atlas/labels'),loadJSON('api/style').catch(()=>null)]).then(([c,b,l,st])=>{
  if(st){applyStyle(st.style);pickTheme();themeBtn()}
  D=c;LAB=l;prepBase(b);initData();badge();D.trips.forEach(t=>tripById[t.id]=t);

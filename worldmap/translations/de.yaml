@@ -38,6 +38,9 @@ configuration:
   show_work:
     name: Arbeit auf der Karte zeigen
     description: Aus = die Arbeit erscheint nie auf der Karte (sie zählt trotzdem nie als Reise).
+  home_airport:
+    name: Heimatflughafen (IATA-Code)
+    description: Flüge ohne GPS starten hier, z. B. ZRH. Leer = der Flughafen, von dem die meisten aufgezeichneten Flüge starten.
   timezone:
     name: Zeitzone
     description: Für die Umrechnung in lokale Tage, z. B. Europe/Zurich.

@@ -18,13 +18,24 @@ import math
 import threading
 from collections import Counter, defaultdict
 from datetime import date, datetime, timedelta
+from functools import lru_cache
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from . import places
+from . import airports, places
 from .geo import haversine_km, simplify
-from .modes import estimate_km, mode_of_pair, mode_of_text, modes_of_transport  # noqa: F401 - re-exported for tests
+from .modes import MIN_FLIGHT_KM, estimate_km, mode_of_pair, mode_of_text, modes_of_transport  # noqa: F401 - re-exported for tests
 from .timeparse import local_date
+
+
+@lru_cache(maxsize=2048)
+def _geocode(name: str, country: str, home: tuple, max_km):
+    from .importers.triplist import geocode
+
+    try:
+        return geocode(name, country, home, max_km)
+    except (ValueError, TypeError):
+        return None
 
 log = logging.getLogger(__name__)
 
@@ -134,6 +145,8 @@ class Atlas:
         who_idx = {w: i for i, w in enumerate(self.who_list(trip_rows))}
         p_idx = {w: i for i, w in enumerate(s.labels)}
         track_p: list = []
+        used_ap: dict = {}
+        gaps: list = []
         day_p = [0] * len(days)
         alltag_i = who_idx["Alltag"]
 
@@ -168,6 +181,7 @@ class Atlas:
             cur = []
 
         prev = None
+        air = None  # the flight we are in while the plane has not landed: {"i": index in flights, "ts", "person"}
         for p in pts:
             day = year_of(p["ts"])
             di = day_index[day]
@@ -200,6 +214,12 @@ class Atlas:
             mode = mode_of_pair(prev, p, dkm)
             if seg and seg["mode"] == "flight":
                 mode = "fly"
+            if air and (air["person"] != p["person"] or prev["ts"] != air["ts"]
+                        or (dt > 5400 and airports.snap(prev["lat"], prev["lon"], 25, 15))):
+                air = None  # landed: a new piece after a long stop at an airport is a new flight
+            if (air and mode != "fly" and dkm / max(1e-6, dt / 3600) >= 150
+                    and not airports.snap(prev["lat"], prev["lon"], 25, 15)):
+                mode = "fly"  # still in the air between two sparse points of the same flight
             if mode == "jump":  # GPS jump: no line, no kilometres
                 flush()
                 cur_key = None
@@ -215,7 +235,15 @@ class Atlas:
                     geom = seg["geometry"]
                     dkm = sum(haversine_km(*geom[i], *geom[i + 1]) for i in range(len(geom) - 1))
                 elif dkm > 3 and ((seg and seg["mode"] == "none") or dt > 3600 or dkm > 50):
-                    # a long gap without a route: do not draw a straight line
+                    # a long gap without a route: no solid line – the map shows it as a soft dotted link
+                    if dkm <= 400:
+                        gaps.append([di, TCLS.get(mode, 0), round(prev["lat"], 4), round(prev["lon"], 4),
+                                     round(p["lat"], 4), round(p["lon"], 4), pi])
+                    days[di][km_idx] += dkm
+                    if tid >= 0:
+                        trip_km[tid][mode] += dkm
+                    else:
+                        alltag_year[day[:4]][mode] += dkm
                     flush()
                     cur_key = None
                     prev = p
@@ -228,8 +256,17 @@ class Atlas:
             if mode == "fly":
                 flush()
                 cur_key = None
-                flights.append([day, [round(prev["lat"], 4), round(prev["lon"], 4)], [round(p["lat"], 4), round(p["lon"], 4)],
-                                round(tod(prev["ts"]), 4), pi])
+                b_ap = airports.snap(p["lat"], p["lon"])
+                b_pt = [b_ap[2], b_ap[3]] if b_ap else [round(p["lat"], 4), round(p["lon"], 4)]
+                if air:  # one flight recorded in pieces (ZRH → over the Alps → HER): extend it, no stopovers
+                    f = flights[air["i"]]
+                    f[2], f[6] = b_pt, b_ap[0] if b_ap else ""
+                else:
+                    a_ap = airports.snap(prev["lat"], prev["lon"])
+                    flights.append([day, [a_ap[2], a_ap[3]] if a_ap else [round(prev["lat"], 4), round(prev["lon"], 4)],
+                                    b_pt, round(tod(prev["ts"]), 4), pi, a_ap[0] if a_ap else "", b_ap[0] if b_ap else ""])
+                # a next piece that starts right here belongs to this flight (sparse points while flying)
+                air = {"i": air["i"] if air else len(flights) - 1, "ts": p["ts"], "person": p["person"]}
                 prev = p
                 continue
             key = (di, mode)
@@ -252,6 +289,14 @@ class Atlas:
                 cells[(ca, cb, w, MODES.index(mode), yr)] += dkm
             prev = p
         flush()
+        # pieces that start and end at the same airport (taxiing, holding patterns) are no flights
+        flights[:] = [f for f in flights if not (f[5] and f[5] == f[6])
+                      and haversine_km(*f[1], *f[2]) >= MIN_FLIGHT_KM * .6]
+        for f in flights:
+            for code in (f[5], f[6]):
+                ap = airports.by_iata(code) if code else None
+                if ap:
+                    used_ap[code] = [ap[2], ap[3], ap[1]]
         for r in days:
             for i in (1, 2, 3, 4):
                 r[i] = round(r[i], 1)
@@ -259,30 +304,49 @@ class Atlas:
 
         # ---- trips in the map format
         out_trips, est = [], []
+        # home airport: the setting, else the airport most GPS flights near home start or end at, else the nearest large one
+        h_ap = airports.by_iata(getattr(s, "home_airport", ""))
+        if not h_ap:
+            near = Counter(c for f in flights for c, pt in ((f[5], f[1]), (f[6], f[2]))
+                           if c and haversine_km(home[0], home[1], *pt) <= 150)
+            h_ap = airports.by_iata(near.most_common(1)[0][0]) if near else airports.snap(home[0], home[1], 150, 0)
         for i, t in enumerate(trip_rows):
             k = {m: round(v) for m, v in trip_km.get(i, {}).items() if v >= 1}
             modes = [m for m in MODES if m in k] or modes_of_transport(t["transport"]) or ["road"]
             for m in modes_of_transport(t["transport"]):
                 if m not in modes:
                     modes.append(m)
-            lat = t["lat"] if t["lat"] is not None else home[0]
-            lon = t["lon"] if t["lon"] is not None else home[1]
+            lat, lon, nopos, approx, rad = t["lat"], t["lon"], 0, t["approx"], t["radius_km"]
+            if lat is None or lon is None:  # trips without coordinates: find the place by its name (offline)
+                hit = _geocode(t["destination"] or "", t["country"] or "", (round(home[0], 2), round(home[1], 2)),
+                               t["max_km"])
+                if hit:
+                    lat, lon, approx, rad = hit[0], hit[1], 1, rad or hit[2]
+                else:  # unknown place: never pretend the trip was at home
+                    lat, lon, nopos = home[0], home[1], 1
             dist = t["max_km"] if t["max_km"] is not None else haversine_km(home[0], home[1], lat, lon)
             fl = []
             if not k:  # no GPS: estimate the distance there and back
                 k = estimate_km(dist, modes, t["nights"] or 0)
-                if "fly" in modes and t["lat"] is not None:
-                    fl = [[[home[0], home[1]], [lat, lon]], [[lat, lon], [home[0], home[1]]]]
-                if t["radius_km"]:
-                    est.append([i, lat, lon, t["radius_km"]])
+                if "fly" in modes and not nopos:
+                    d_ap = airports.snap(lat, lon, 200, 0) or airports.snap(lat, lon, 200, 80)  # big airports first
+                    ha = [h_ap[2], h_ap[3]] if h_ap else [home[0], home[1]]
+                    da = [d_ap[2], d_ap[3]] if d_ap else [lat, lon]
+                    hc, dc = (h_ap[0] if h_ap else ""), (d_ap[0] if d_ap else "")
+                    for ap in (h_ap, d_ap):
+                        if ap:
+                            used_ap[ap[0]] = [ap[2], ap[3], ap[1]]
+                    fl = [[ha, da, hc, dc], [da, ha, dc, hc]]
+                if rad and not nopos:
+                    est.append([i, lat, lon, rad])
             else:
-                fl = [[f[1], f[2]] for f in flights if t["start_date"] <= f[0] <= t["end_date"]]
+                fl = [[f[1], f[2], f[5], f[6]] for f in flights if t["start_date"] <= f[0] <= t["end_date"]]
             name = t["destination"] or "Reise"
             out_trips.append({
                 "id": i, "dbid": t["id"], "a": t["start_date"], "b": t["end_date"], "y": int(t["start_date"][:4]),
                 "n": t["nights"], "w": t["who"] or "offen", "name": name, "c": t["country"], "m": modes, "g": None,
                 "km": sum(k.values()), "dw": wd(t["start_date"]), "dwb": wd(t["end_date"]), "fl": fl, "k": k,
-                "p": [round(lat, 4), round(lon, 4)], "conf": t["confidence"], "approx": t["approx"],
+                "p": [round(lat, 4), round(lon, 4)], "conf": t["confidence"], "approx": approx, "nopos": nopos,
                 "r": t["radius_km"], "fixed": 1 if (t["source"] == "manual" or t["locked"]) else 0,
             })
 
@@ -295,7 +359,7 @@ class Atlas:
         core = {
             "home": [round(home[0], 4), round(home[1], 4)],
             "who": who, "persons": s.labels, "groups_who": s.who_options, "groups_cfg": s.groups,
-            "colors": s.colors(), "trackP": track_p, "dayP": day_p,
+            "colors": s.colors(), "trackP": track_p, "dayP": day_p, "airports": used_ap, "gaps": gaps,
             "trips": out_trips, "days": days,
             "alltagYear": {y: {m: round(v) for m, v in ms.items()} for y, ms in alltag_year.items()},
             "flights": flights, "groups": groups, "places": place_list,

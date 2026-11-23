@@ -1,5 +1,5 @@
 name: Worldmap
-version: "0.6.1"
+version: "0.6.2"
 slug: worldmap
 description: Your trips on a map – from Home Assistant, OwnTracks and Google exports, with smart questions. Works offline.
 url: https://github.com/magi1982/worldmap
@@ -27,6 +27,7 @@ options:
   home_radius_m: 0
   work_radius_m: 300
   show_work: false
+  home_airport: ""
   timezone: Europe/Zurich
   min_trip_km: 30
   min_day_trip_km: 100
@@ -64,6 +65,7 @@ schema:
   work_lon: float(-180,180)?
   work_radius_m: int(50,5000)
   show_work: bool
+  home_airport: match(^([A-Za-z]{3})?$)?
   timezone: str
   min_trip_km: float(1,1000)
   min_day_trip_km: float(1,2000)?
