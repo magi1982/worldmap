@@ -47,19 +47,40 @@ Ideen werden zuerst hier gesammelt. Code entsteht erst nach einem ausdrückliche
 - Animated map (planes, trains, cars), cinema time-lapse with trip cards, colour palettes, base map colours, more line types,
   sticky header on phones, smooth level-of-detail fades, continuous rail/road matching with progress.
 
-## Next update – waiting for "mach es" / Nächstes Update – wartet auf „mach es“
+## Next update (0.7) – waiting for "mach es" / Nächstes Update – wartet auf „mach es“
 
-- [ ] Export/import of a map style as a small JSON file (share a style).
-- [ ] Time-lapse as a video file (WebM) to share.
-- [ ] Reload new rail/road lines on the open map without reopening it.
-- [ ] Every fix gets a new version number (so Home Assistant always offers it as an update).
+### A. Settings you can feel / Einstellungen, die man sieht
+- [ ] **Style drawer on the map**: a 🎨 button opens a panel right on the real map; every slider changes the map live
+      (no guessing), "Save as version" at the end. The settings page keeps the full list.
+- [ ] **Preview with your own data**: a mini map of your home region plus one real trip instead of a made-up picture;
+      every change flashes "✓ applied"; before/after slider.
+- [ ] **Theme gallery**: whole looks in one tap – "Neon Night", "Atlas paper", "Minimal", "Retro railway", "Pastel summer",
+      "Random" – each sets palette, base map, line types, areas and animation together.
+- [ ] Areas: **outline width**, outline colour (like fill / darker / white), softness, shape (circles / hexagons / cloud).
+- [ ] Lines: glow/neon, drop shadow, colour gradient along a route (old → new), width by frequency (often driven = thicker).
 
-## Next
+### B. Animation
+- [ ] Contrails behind planes, comet tails behind cars and trains, landing "ripples" at destinations.
+- [ ] Flight arcs with a soft shadow on the ground and height by distance (2.5D look).
+- [ ] Countries/regions light up the first time you were there (in the regions map and the film).
+- [ ] **Play a trip**: tap a trip → the camera flies the route day by day, the vehicle drives along, title card per day.
 
-- [ ] Actionable notifications ("who was there?" answered directly on the phone).
-- [ ] Offline network package: pre-load the rail/road tiles for a whole country with one click.
-- [ ] Finer worldwide gazetteer (towns outside Europe).
-- [ ] Dashboard card (Lovelace) with a small live map.
+### C. Time-lapse as a real film / Zeitraffer als echter Film
+- [ ] **Storyboard instead of a sliding day counter**: world view → zoom into a trip → route animates → zoom out;
+      everyday life is skipped (or shown as a short "weeks at home" interlude).
+- [ ] Chapters per year with a title screen and an animated year summary (km, countries, longest trip).
+- [ ] Glowing comet trails, vehicles, animated counters, small country flags when a new country appears.
+- [ ] Modes: "Trips only", "Everything", "One person / group".
+- [ ] **Export as video** (WebM, in the browser) to share.
+
+### D. New ways to look at your data / Neue Ansichten
+- [ ] **Year in review ("Wrapped")**: swipeable story slides – km, countries, new regions, top trip, most visited place.
+- [ ] **Globe** for long-haul trips (rotating, orthographic).
+- [ ] **Time range slider** (from–to with two handles + play) shared by all maps.
+- [ ] Together vs. apart: where did two persons travel together, shown side by side.
+- [ ] Tracks: favourite routes highlighted, colour by time of day (morning/evening).
+- [ ] Places & days: animated calendar heat map, "play this day".
+- [ ] Regions: "sticker album" with progress rings per country, new regions sparkle.
 
 ## Ideas for later
 

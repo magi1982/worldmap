@@ -37,8 +37,13 @@ def route_worker(engine: Engine, stop: threading.Event) -> None:
                 n = engine.fill_routes(budget_s=180)
                 if n:
                     warm(engine)
-                if not n or not engine.route_progress.get("todo"):
+                if not engine.route_progress.get("todo"):
                     break
+                if not n:  # the tile server asked us to wait: continue after the pause
+                    src = getattr(engine.matcher, "source", None)
+                    wait = (getattr(src, "pause_until", 0) - time.monotonic()) if src else 0
+                    if wait <= 0 or stop.wait(min(wait + 5, 900)):
+                        break
         except Exception:  # noqa: BLE001 - keep the add-on alive
             log.exception("routing failed")
 

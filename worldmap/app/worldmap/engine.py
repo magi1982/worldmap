@@ -300,8 +300,11 @@ class Engine:
         try:
             n = routing.fill_gaps(self.db, self.matcher, budget_s=budget_s, progress=prog)
         finally:
+            src = getattr(self.matcher, "source", None)
             self.route_progress = {"running": False, "todo": max(0, prog.get("todo", 0) - n),
-                                   "segments": prog.get("done_total", 0) + n, "ts": int(time.time())}
+                                   "segments": prog.get("done_total", 0) + n, "ts": int(time.time()),
+                                   "paused_s": max(0, int(getattr(src, "pause_until", 0) - time.monotonic())) if src else 0,
+                                   "error": getattr(src, "last_error", "") if src else ""}
         log.info("routing: %d new segments %s", n, dict(self.matcher.stats))
         if n:
             self.touch()

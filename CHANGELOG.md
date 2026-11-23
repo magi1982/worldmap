@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.1 – 2026-11-23
+
+### Fixed
+- Rail/road network: when the map tile server answers "too many requests" or is unreachable, downloads pause
+  (2–5 minutes) and continue automatically instead of failing thousands of times; slower, polite download rate.
+  The reason is written to the log and shown in the Tracks map.
+
 ## 0.6.0 – 2026-11-23
 
 ### Added

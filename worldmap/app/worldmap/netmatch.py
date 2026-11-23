@@ -191,7 +191,7 @@ class TileSource:
 class OpenFreeMapTiles(TileSource):
     """Downloads zoom-12 vector tiles once and keeps the decoded lines on disk."""
 
-    def __init__(self, cache_dir: str, tilejson: str = TILEJSON, timeout: float = 20.0, min_interval: float = 0.05,
+    def __init__(self, cache_dir: str, tilejson: str = TILEJSON, timeout: float = 20.0, min_interval: float = 0.2,
                  allow_http: bool = False):
         self.dir = Path(cache_dir)
         self.dir.mkdir(parents=True, exist_ok=True)
@@ -204,6 +204,9 @@ class OpenFreeMapTiles(TileSource):
         self._lock = threading.Lock()
         self.downloaded = 0
         self.allow_http = allow_http
+        self.pause_until = 0.0  # back off when the tile server says "too many requests" or is down
+        self.last_error = ""
+        self._warned = 0.0
 
     def _template(self) -> str:
         if self._url and time.time() - self._url_t < 86400:
@@ -223,6 +226,8 @@ class OpenFreeMapTiles(TileSource):
                 return json.loads(gzip.decompress(f.read_bytes()))
             except (OSError, ValueError):
                 pass
+        if time.monotonic() < self.pause_until:
+            return None
         with self._lock:
             wait = self.min_interval - (time.monotonic() - self._last)
             if wait > 0:
@@ -237,16 +242,24 @@ class OpenFreeMapTiles(TileSource):
             if exc.code == 404:  # empty sea tile
                 data = b""
             else:
-                log.debug("tile %s/%s failed: %s", x, y, exc)
+                self._failed(exc, 300 if exc.code == 429 else 120)
                 return None
         except (OSError, ValueError) as exc:
-            log.debug("tile %s/%s failed: %s", x, y, exc)
+            self._failed(exc, 120)
             return None
         lines = decode_mvt(data, Z, x, y) if data else []
         compact = [[c, [[round(a, 6), round(b, 6)] for a, b in pts]] for c, pts in lines]
         f.write_bytes(gzip.compress(json.dumps(compact, separators=(",", ":")).encode(), 6))
         self.downloaded += 1
         return compact
+
+    def _failed(self, exc, pause_s: float) -> None:
+        """Pause downloads for a while instead of hammering the server; tell the log once in a while why."""
+        self.last_error = str(exc)[:200]
+        self.pause_until = time.monotonic() + pause_s
+        if time.monotonic() - self._warned > 600:
+            self._warned = time.monotonic()
+            log.warning("map tiles: download paused for %d s (%s)", pause_s, self.last_error)
 
 
 class StaticLines(TileSource):

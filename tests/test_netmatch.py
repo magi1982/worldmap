@@ -151,3 +151,19 @@ def test_openfreemap_download_and_cache(tmp_path):
         assert strict.lines(5, 5) is None  # plain http tile URLs are refused in production
     finally:
         srv.shutdown()
+
+
+def test_tile_server_backoff(tmp_path, monkeypatch):
+    import urllib.error
+
+    from worldmap import netmatch
+    src = netmatch.OpenFreeMapTiles(str(tmp_path), min_interval=0)
+    src._url, src._url_t = "https://tiles.example/{z}/{x}/{y}.pbf", 9e18
+    calls = []
+
+    def boom(req, timeout=0):
+        calls.append(1)
+        raise urllib.error.HTTPError(req.full_url, 429, "Too Many Requests", {}, None)
+    monkeypatch.setattr(netmatch.urllib.request, "urlopen", boom)
+    assert src.lines(1, 2) is None and src.pause_until > 0 and "429" in src.last_error
+    assert src.lines(1, 3) is None and len(calls) == 1  # paused: no second request
