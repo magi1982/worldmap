@@ -219,11 +219,9 @@ function apMarks(keys){const S=V.S;if(S<1500)return;const seen=new Set();ctx.fon
  ctx.textBaseline='alphabetic'}
 function gpos(g){if(g=='home')return [MX(HOME[1]),MY(HOME[0])];if(g.startsWith('ap:')){const a=D.airports[g.slice(3)];return [MX(a[1]),MY(a[0])]}if(g.startsWith('p:')){const [a,b]=g.slice(2).split(',').map(Number);return [MX(b),MY(a)]}const G=D.groups.find(x=>x[0]==g);return [MX(G[3]),MY(G[2])]}
 /* estimated way of a trip without GPS (from the server: straight runs over land / sea), gently curved, in world units */
-function estRoute(t){if(!t.gr)return null;const k=ST('est').curve??1;if(t._er&&t._erk===k)return t._er;
- const ax=MX(HOME[1]),ay=MY(HOME[0]),bx=MX(t.gr[t.gr.length-1][4]),by=MY(t.gr[t.gr.length-1][3]);const dx=bx-ax,dy=by-ay,L=Math.hypot(dx,dy)||1e-9;let nx=-dy/L,ny=dx/L;if(ny>0){nx=-nx;ny=-ny}const bend=.07*k*L;
- const at=(la,lo)=>{const x=MX(lo),y=MY(la);const u=Math.max(0,Math.min(1,((x-ax)*dx+(y-ay)*dy)/(L*L)));const o=Math.sin(Math.PI*u)*bend;return [x+nx*o,y+ny*o]};
- const out=t.gr.map(([sea,la1,lo1,la2,lo2])=>{const n=14,pts=[];for(let i=0;i<=n;i++){const f=i/n;pts.push(at(la1+(la2-la1)*f,lo1+(lo2-lo1)*f))}return {sea:!!sea,pts}});
- t._er=out;t._erk=k;return out}
+function estRoute(t){if(!t.gr)return null;if(t._er)return t._er;
+ /* the server sends the way over land (and ferries where needed) as runs of lat/lon pairs */
+ t._er=t.gr.map(([sea,a])=>{const pts=[];for(let i=0;i+1<a.length;i+=2)pts.push([MX(a[i+1]),MY(a[i])]);return {sea:!!sea,pts}});return t._er}
 function drawEst(list,lwBase){const E=ST('est');if(E.show===false||!list||!list.length)return;const S=V.S;ctx.save();ctx.lineCap='round';ctx.lineJoin='round';ctx.globalAlpha=(E.opacity??.8)*(S>60000?.45:S>25000?.7:1);
  for(const g of list){const rs=estRoute(g.t);if(!rs)continue;for(const r of rs){if(r.sea&&E.ferry===false)continue;ctx.beginPath();r.pts.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));
   if(r.sea){ctx.strokeStyle=MCOL.ferry;ctx.lineWidth=lwBase*1.1;ctx.setLineDash([.01/S,5.5/S])}else{ctx.strokeStyle=g.col;ctx.lineWidth=lwBase;ctx.setLineDash(dashFor(E.dash||'dashed',S))}ctx.stroke()}}
@@ -680,8 +678,8 @@ function legend(){const L=$('legend');const DA={dashed:'5 4',dotted:'0.1 5',long
 
 /* ================= Interaktion ================= */
 const wrap=$('wrap');const ptrs=new Map();let pinch=null,moved=false,downAt=null;
-wrap.addEventListener('wheel',e=>{if(e.target.closest('.detail'))return;e.preventDefault();const r=wrap.getBoundingClientRect();zoomAt(Math.exp(-e.deltaY*.0018),e.clientX-r.left,e.clientY-r.top)},{passive:false});
-wrap.addEventListener('pointerdown',e=>{if(e.target.closest('.ctrl,.detail,.legend'))return;ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});moved=false;downAt={x:e.clientX,y:e.clientY};wrap.setPointerCapture(e.pointerId);wrap.classList.add('drag');if(ptrs.size==2){const [a,b]=[...ptrs.values()];pinch={d:Math.hypot(a.x-b.x,a.y-b.y)}}});
+wrap.addEventListener('wheel',e=>{if(e.target.closest('.detail,.sdrawer'))return;e.preventDefault();const r=wrap.getBoundingClientRect();zoomAt(Math.exp(-e.deltaY*.0018),e.clientX-r.left,e.clientY-r.top)},{passive:false});
+wrap.addEventListener('pointerdown',e=>{if(e.target.closest('.ctrl,.detail,.legend,.sdrawer'))return;ptrs.set(e.pointerId,{x:e.clientX,y:e.clientY});moved=false;downAt={x:e.clientX,y:e.clientY};wrap.setPointerCapture(e.pointerId);wrap.classList.add('drag');if(ptrs.size==2){const [a,b]=[...ptrs.values()];pinch={d:Math.hypot(a.x-b.x,a.y-b.y)}}});
 wrap.addEventListener('pointermove',e=>{
  const r=wrap.getBoundingClientRect(),sx=e.clientX-r.left,sy=e.clientY-r.top;
  if(!ptrs.size&&e.pointerType=='mouse'){if(TAB=='orte'&&O.hit){const h=O.hit.findLast(([hx,hy,hr])=>Math.hypot(hx-sx,hy-sy)<hr);h?showTip(e,`${h[3][9]} · ${fmt(h[3][2])} h`):hideTip()}else if(TAB=='regionen'&&RG.list){const r=regAt(sx,sy);const v=r&&aggReg().get(r.id);r?showTip(e,r.name+' · '+(RG.countries[r.a3]||r.a3)+(v?` · seit ${v.first.slice(0,4)}`:' · noch nie')):hideTip()}}
@@ -690,7 +688,7 @@ wrap.addEventListener('pointermove',e=>{
  if(ptrs.size==2&&pinch){const [a,b]=[...ptrs.values()];const d=Math.hypot(a.x-b.x,a.y-b.y);zoomAt(d/pinch.d,(a.x+b.x)/2-r.left,(a.y+b.y)/2-r.top);pinch.d=d;return}
  V.cx-=(cur.x-prev.x)/V.S;V.cy-=(cur.y-prev.y)/V.S;redraw()});
 function up(e){ptrs.delete(e.pointerId);if(ptrs.size<2)pinch=null;if(!ptrs.size){wrap.classList.remove('drag');clearTimeout(idleT);idleT=setTimeout(full,60)}}
-wrap.addEventListener('pointerup',e=>{const wasMoved=moved;up(e);if(wasMoved||e.target.closest('.ctrl,.detail,.legend'))return;const r=wrap.getBoundingClientRect(),sx=e.clientX-r.left,sy=e.clientY-r.top;
+wrap.addEventListener('pointerup',e=>{const wasMoved=moved;up(e);if(wasMoved||e.target.closest('.ctrl,.detail,.legend,.sdrawer'))return;const r=wrap.getBoundingClientRect(),sx=e.clientX-r.left,sy=e.clientY-r.top;
  if(TAB=='reisen'){const f=hitR(sx,sy);f?f():closeDetail()}
  else if(TAB=='orte'){const h=O.hit.findLast(([hx,hy,hr])=>Math.hypot(hx-sx,hy-sy)<hr);if(h)placeDetail(h[3])}
  else if(TAB=='regionen'){const r=regAt(sx,sy);RG.hit=r;full();if(r){const v=aggReg().get(r.id);openDetail(`<h3>${esc(r.name)}</h3><div class="dsub">${esc(RG.countries[r.a3]||r.a3)}</div>`+(v?`<div class="trip"><div class="s" style="background:${regFill(r)}"></div><div><div class="t1">Zum ersten Mal: ${dfmt(v.first)}</div><div class="t2">an ${fmt(v.days)} ${v.days==1?'Tag':'Tagen'} dort oder durchgefahren${v.stay?' · mit Aufenthalten':''}</div></div></div>`:'<div class="empty">Hier wart ihr laut den Daten noch nie.</div>'),()=>{RG.hit=null;full()})}else closeDetail()}});

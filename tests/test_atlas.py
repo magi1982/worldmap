@@ -223,6 +223,7 @@ def test_estimated_ground_route_finds_the_ferry():
     home = (47.4, 8.5)                                     # sample home, not a real address
     corsica = a.ground_route(home, (42.2, 9.1))
     assert [r[0] for r in corsica] == [0, 1, 0]            # land – sea (ferry) – land
-    assert corsica[0][1:3] == [47.4, 8.5] and corsica[-1][3:] == [42.2, 9.1]
+    assert corsica[0][1][:2] == [47.4, 8.5] and corsica[-1][1][-2:] == [42.2, 9.1]
+    assert [r[0] for r in a.ground_route(home, (41.1, 1.1))] == [0]          # around the Gulf of Lion by land
     assert [r[0] for r in a.ground_route(home, (52.0, -1.0))] == [0, 1, 0]   # across the Channel / North Sea
     assert [r[0] for r in a.ground_route(home, (48.2, 16.4))] == [0]        # all on land

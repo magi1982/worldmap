@@ -12,11 +12,10 @@ const WM_SPEC = [
     ['trips.label_size', 'r', 'Schriftgrösse', [0.7, 1.8, 0.05, '×']],
     ['trips.airports', 'b', 'Flughafen-Schilder (IATA)'],
   ]},
-  {id: 'est', tabs: ['reisen', 'zeit'], icon: '🛣️', title: 'Geschätzte Wege', info: 'Reisen ohne GPS (z. B. alte Autoferien) bekommen eine geschätzte Linie von zuhause zum Ziel. Über Meer wird daraus eine Fähre.', fields: [
+  {id: 'est', tabs: ['reisen', 'zeit'], icon: '🛣️', title: 'Geschätzte Wege', info: 'Reisen ohne GPS (z. B. alte Autoferien) bekommen einen geschätzten Weg von zuhause zum Ziel – über Land, ums Meer herum. Nur wo es keinen Landweg gibt (Inseln, England), wird daraus eine Fähre.', fields: [
     ['est.show', 'b', 'Geschätzte Wege zeigen'],
     ['est.dash', 's', 'Linientyp', DASH_OPTS],
     ['est.opacity', 'r', 'Deckkraft', [0.2, 1, 0.05, '%']],
-    ['est.curve', 'r', 'Bogen', [0, 2.5, 0.1, '×']],
     ['est.ferry', 'b', 'Fähren übers Meer zeigen'],
   ]},
   {id: 'areas', tabs: ['reisen'], icon: '🫧', title: 'Flächen', info: 'Wo du dich oft auf kleinem Raum bewegst (Ferienort, Stadt), zeigt die Karte statt vieler Striche eine weiche Fläche. „Verbunden“ lässt nahe Flächen zu einer Form verschmelzen.', fields: [

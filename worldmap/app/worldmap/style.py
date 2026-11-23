@@ -39,7 +39,7 @@ SCHEMA: dict = {
         "basemap": (E, "standard", BASEMAPS), "gaps": (E, "dotted", ("dotted", "straight", "open")),
     },
     "est": {  # estimated way for trips without GPS (car, train, ferry)
-        "show": (B, True), "dash": (E, "dashed", DASHES), "opacity": (N, 0.8, 0.2, 1.0), "ferry": (B, True),
+        "show": (B, True), "dash": (E, "solid", DASHES), "opacity": (N, 0.7, 0.2, 1.0), "ferry": (B, True),
         "curve": (N, 1.0, 0.0, 2.5),
     },
     "anim": {

@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.7.1 – 2026-11-23
+
+### Fixed
+- The 🎨 style panel on the map could not be closed (and its sliders moved the map): taps inside the panel no longer
+  reach the map.
+- Estimated routes for trips without GPS now follow the land on a coarse offline land grid (around the Gulf of Lion to
+  Spain, through Italy to the ferry to Corsica, to the Channel to England) and are drawn as a solid soft line, so they no
+  longer look like flights; ferries are only drawn where there is no way by land.
+- Flights without GPS only get an airport tag when the destination has a big airport within 60 km (London → LHR,
+  Vienna → VIE); no more guessed island airports.
+- Map data is recomputed after every add-on update (the cache key now includes the code version) and is no longer
+  recomputed after every restart.
+
 ## 0.7.0 – 2026-11-23
 
 ### Added

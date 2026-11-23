@@ -12,6 +12,7 @@ Everything is computed from points, segments and trips and cached by a data fing
 from __future__ import annotations
 
 import gzip
+import hashlib
 import json
 import logging
 import math
@@ -26,6 +27,18 @@ from . import airports, places
 from .geo import haversine_km, simplify
 from .modes import MIN_FLIGHT_KM, estimate_km, mode_of_pair, mode_of_text, modes_of_transport  # noqa: F401 - re-exported for tests
 from .timeparse import local_date
+
+
+@lru_cache(maxsize=1)
+def _code_version() -> str:
+    h = hashlib.sha256()
+    here = Path(__file__).parent
+    for name in ("atlas.py", "modes.py", "airports.py", "places.py", "importers/triplist.py", "data/airports.json"):
+        try:
+            h.update((here / name).read_bytes())
+        except OSError:
+            pass
+    return h.hexdigest()[:12]
 
 
 @lru_cache(maxsize=2048)
@@ -70,7 +83,8 @@ class Atlas:
             db.scalar("SELECT SUM(id) FROM trips"), db.scalar("SELECT COUNT(*) FROM segments"),
             json.dumps([self.engine.s.labels, self.engine.s.who_options, self.engine.home]),
         )
-        return "a2-" + str(abs(hash(parts)) % 10**12)
+        # stable across restarts, and new with every add-on version (new code = new map data)
+        return "a3-" + hashlib.sha256((json.dumps(parts, default=str) + _code_version()).encode()).hexdigest()[:16]
 
     def get(self, part: str) -> bytes:
         """gzip-compressed JSON of one part: core | tracks | labels | reg."""
@@ -329,7 +343,7 @@ class Atlas:
             if not k:  # no GPS: estimate the distance there and back
                 k = estimate_km(dist, modes, t["nights"] or 0)
                 if "fly" in modes and not nopos:
-                    d_ap = airports.snap(lat, lon, 200, 0) or airports.snap(lat, lon, 200, 80)  # big airports first
+                    d_ap = airports.snap(lat, lon, 60, 0)  # only the big airport of a city (London → LHR); no guessing beyond
                     ha = [h_ap[2], h_ap[3]] if h_ap else [home[0], home[1]]
                     da = [d_ap[2], d_ap[3]] if d_ap else [lat, lon]
                     hc, dc = (h_ap[0] if h_ap else ""), (d_ap[0] if d_ap else "")
@@ -495,38 +509,132 @@ class Atlas:
         return any(bb[0] <= lo <= bb[2] and bb[1] <= la <= bb[3] and _pip(lo, la, poly)
                    for _rid, poly, bb in self._regions().get((math.floor(lo), math.floor(la)), ()))
 
+    def _land_cell(self, la: float, lo: float) -> bool:
+        cache = Atlas.__dict__.get("_LANDC")
+        if cache is None:
+            cache = Atlas._LANDC = {}
+        k = (round(la, 3), round(lo, 3))
+        v = cache.get(k)
+        if v is None:
+            v = cache[k] = self.on_land(la, lo)
+            if len(cache) > 400000:
+                cache.clear()
+        return v
+
     def ground_route(self, a: tuple, b: tuple) -> list:
-        """Estimated way by car or train for a trip without GPS: [[sea 0/1, lat1, lon1, lat2, lon2], ...].
+        """Estimated way by car or train for a trip without GPS: [[sea 0/1, [lat, lon, lat, lon, ...]], ...].
 
-        The straight way home → destination, split where it crosses the sea (a ferry: Corsica, England, islands).
-        Short bits of sea (lakes, simplified coasts) count as land, tiny islands on the way as sea.
+        A shortest path over a coarse land grid (offline, from the region polygons): it goes around bays and seas
+        on land and only crosses water where there is no way by land (a ferry: Corsica, Mallorca, England).
         """
+        import heapq
+
         d = haversine_km(a[0], a[1], b[0], b[1])
-        n = max(6, min(240, int(d / 8)))
-        pts = [(a[0] + (b[0] - a[0]) * i / n, a[1] + (b[1] - a[1]) * i / n) for i in range(n + 1)]
-        land = [self.on_land(la, lo) for la, lo in pts]
-        land[0] = land[-1] = True  # both ends are where people are
-        step = d / n
+        if d > 3500:  # very far by car: just the straight way
+            return [[0, [round(a[0], 3), round(a[1], 3), round(b[0], 3), round(b[1], 3)]]]
+        g = max(0.08, min(0.3, d / 1400))  # grid step in degrees
+        pad = max(1.2, 0.3 * d / 111)
+        la0, la1 = min(a[0], b[0]) - pad, max(a[0], b[0]) + pad
+        lo0, lo1 = min(a[1], b[1]) - pad * 1.4, max(a[1], b[1]) + pad * 1.4
+        ni, nj = int((la1 - la0) / g) + 1, int((lo1 - lo0) / g) + 1
+        cell = lambda la, lo: (int((la - la0) / g), int((lo - lo0) / g))  # noqa: E731
+        ctr = lambda i, j: (la0 + (i + .5) * g, lo0 + (j + .5) * g)  # noqa: E731
+        start, goal = cell(*a), cell(*b)
+        coslat = math.cos(math.radians((a[0] + b[0]) / 2))
+        land = {}
 
-        def runs():
-            out, s = [], 0
-            for i in range(1, n + 1):
-                if land[i] != land[s]:
-                    out.append([s, i, land[s]])
-                    s = i
-            out.append([s, n, land[s]])
-            return out
+        def is_land(c):
+            if c in (start, goal):
+                return True
+            v = land.get(c)
+            if v is None:
+                v = land[c] = self._land_cell(*ctr(*c))
+            return v
 
-        for want, min_km in ((False, 30), (True, 12)):  # sea < 30 km → land; land < 12 km between seas → sea
-            for s, e, is_land in runs():
-                if is_land == want and (e - s) * step < min_km and s > 0 and e < n:
-                    for i in range(s, e):
-                        land[i] = not want
-        out = []
-        for s, e, is_land in runs():
-            e2 = min(n, e)
-            out.append([0 if is_land else 1, round(pts[s][0], 3), round(pts[s][1], 3), round(pts[e2][0], 3), round(pts[e2][1], 3)])
-        return out
+        def h(c):
+            return math.hypot(c[0] - goal[0], (c[1] - goal[1]) * coslat)
+
+        best = {start: 0.0}
+        prev = {}
+        pq = [(h(start), 0.0, start)]
+        steps = ((1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (1, -1), (-1, 1), (-1, -1))
+        while pq:
+            _f, cost, c = heapq.heappop(pq)
+            if c == goal:
+                break
+            if cost > best.get(c, 1e18):
+                continue
+            lc = is_land(c)
+            for di, dj in steps:
+                n = (c[0] + di, c[1] + dj)
+                if not (0 <= n[0] < ni and 0 <= n[1] < nj):
+                    continue
+                ln = is_land(n)
+                step = math.hypot(di, dj * coslat)
+                nc = cost + step * (1.0 if (lc and ln) else 3.0)  # water only where it saves a lot (a ferry)
+                if nc < best.get(n, 1e18):
+                    best[n] = nc
+                    prev[n] = c
+                    heapq.heappush(pq, (nc + h(n), nc, n))
+        if goal not in prev and goal != start:
+            return [[0, [round(a[0], 3), round(a[1], 3), round(b[0], 3), round(b[1], 3)]]]
+        path = [goal]
+        while path[-1] != start:
+            path.append(prev[path[-1]])
+        path.reverse()
+        pts = [list(a)] + [list(ctr(*c)) for c in path[1:-1]] + [list(b)]
+        flags = [True] + [is_land(c) for c in path[1:-1]] + [True]
+        # short stretches of "water" between land are coasts, lakes or rivers, not a ferry
+        k = 0
+        while k < len(flags):
+            if not flags[k]:
+                e = k
+                while e < len(flags) and not flags[e]:
+                    e += 1
+                if haversine_km(*pts[max(0, k - 1)], *pts[min(len(pts) - 1, e)]) < 35:
+                    for q in range(k, e):
+                        flags[q] = True
+                k = e
+            else:
+                k += 1
+        # pull the string tight: skip grid corners while the straight way stays on land (no stair steps)
+        def clear(p, q):
+            n = max(2, int(haversine_km(*p, *q) / (g * 40)))
+            return all(self._land_cell(p[0] + (q[0] - p[0]) * t / n, p[1] + (q[1] - p[1]) * t / n) for t in range(1, n))
+        sp, sf, k = [pts[0]], [flags[0]], 0
+        while k < len(pts) - 1:
+            j = k + 1
+            if flags[k]:
+                for m in range(min(len(pts) - 1, k + 40), k + 1, -1):
+                    if all(flags[k:m + 1]) and clear(pts[k], pts[m]):
+                        j = m
+                        break
+            sp.append(pts[j])
+            sf.append(flags[j])
+            k = j
+        pts, flags = sp, sf
+        # smooth the path (Chaikin), keep where land and water change
+        for _ in range(3):
+            if len(pts) < 3:
+                break
+            np_, nf = [pts[0]], [flags[0]]
+            for q in range(len(pts) - 1):
+                p0, p1 = pts[q], pts[q + 1]
+                np_ += [[p0[0] * .75 + p1[0] * .25, p0[1] * .75 + p1[1] * .25], [p0[0] * .25 + p1[0] * .75, p0[1] * .25 + p1[1] * .75]]
+                nf += [flags[q], flags[q + 1]]
+            np_.append(pts[-1])
+            nf.append(flags[-1])
+            pts, flags = np_, nf
+        runs, cur = [], None
+        for pt, fl in zip(pts, flags, strict=True):
+            sea = 0 if fl else 1
+            if cur is None or cur[0] != sea:
+                if cur is not None:
+                    cur[1] += [round(pt[0], 3), round(pt[1], 3)]  # the runs touch
+                cur = [sea, []]
+                runs.append(cur)
+            cur[1] += [round(pt[0], 3), round(pt[1], 3)]
+        return runs
 
     def _reg(self, pts, place_list, tz, p_idx, est_trips=()):
         first: dict = {}
