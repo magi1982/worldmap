@@ -20,3 +20,4 @@ Do not open a public issue. You will get an answer within 7 days.
 
 Location history is personal. It is stored only in the add-on's `/data` folder (included in Home Assistant backups).
 The repository contains invented sample data only.
+- Own AppArmor profile (`worldmap/apparmor.txt`): read-only system and code, writes only to `/data` and temporary files, no mount, no ptrace, no admin capabilities. Together with Ingress this gives the highest security rating Home Assistant hands out (8).

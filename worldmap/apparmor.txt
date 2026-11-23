@@ -1,0 +1,74 @@
+#include <tunables/global>
+
+# AppArmor profile for the Worldmap add-on.
+# The Supervisor renames the profile to the add-on slug when it loads it.
+# What the add-on needs: run s6-overlay/bashio and Python, read its own code, write only /data and temporary files,
+# open TCP/UDP sockets (web UI via Ingress, OwnTracks port, Home Assistant API, map tiles).
+profile worldmap flags=(attach_disconnected,mediate_deleted) {
+  #include <abstractions/base>
+
+  # Capabilities s6-overlay needs to start the service (no admin, no raw network, no ptrace)
+  capability chown,
+  capability dac_override,
+  capability fowner,
+  capability fsetid,
+  capability kill,
+  capability setgid,
+  capability setuid,
+  capability setpcap,
+
+  signal (send,receive) set=(kill,term,int,hup,cont,usr1,usr2,alrm,chld),
+
+  # Network: IPv4/IPv6 TCP and UDP (DNS), local sockets
+  network inet stream,
+  network inet6 stream,
+  network inet dgram,
+  network inet6 dgram,
+  network unix,
+  network netlink raw,
+
+  # S6-Overlay
+  /init ix,
+  /bin/** ix,
+  /sbin/** ix,
+  /usr/bin/** ix,
+  /usr/sbin/** ix,
+  /usr/local/bin/** ix,
+  /run/{s6,s6-rc*,service}/** ix,
+  /package/** ix,
+  /command/** ix,
+  /etc/services.d/** rwix,
+  /etc/cont-init.d/** rwix,
+  /etc/cont-finish.d/** rwix,
+  /etc/s6-overlay/** rwix,
+  /run/{,**} rwk,
+  /var/run/{,**} rwk,
+  /dev/tty rw,
+  /dev/null rw,
+  /dev/urandom r,
+
+  # Bashio and the start script
+  /usr/lib/bashio/** ix,
+  /run.sh ix,
+  /tmp/{,**} rwk,
+
+  # Read-only: system, Python and the add-on code
+  / r,
+  /** r,
+  /usr/** rm,
+  /lib/** rm,
+  /usr/local/lib/** rm,
+  /app/** r,
+  /proc/** r,
+  /sys/** r,
+
+  # The only persistent place the add-on writes to
+  /data/{,**} rwk,
+
+  # Never allowed
+  deny mount,
+  deny umount,
+  deny ptrace,
+  deny /proc/sys/** w,
+  deny /sys/** w,
+}

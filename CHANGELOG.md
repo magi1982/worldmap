@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.5.1 – 2026-11-23
+
+### Security
+- Own AppArmor profile: the add-on may only write to `/data` and temporary files, cannot mount, trace other processes or
+  use admin capabilities. Raises the Home Assistant security rating from 7 to 8 (the maximum).
+
 ## 0.5.0 – 2026-11-23
 
 ### Added
