@@ -44,5 +44,20 @@ def test_new_style_options():
     assert s["map"]["palette"] == "pastel" and s["map"]["basemap"] == "paper" and s["modes"]["road"]["dash"] == "dashdot"
     assert s["map"]["gaps"] == "dotted" and S.validate({"map": {"gaps": "open"}})["map"]["gaps"] == "open"
     assert s["anim"]["on"] is False and s["anim"]["speed"] == 4.0 and s["anim"]["size"] == 1.0
-    assert s["timelapse"] == {"cinema": False, "skip_everyday": True, "glow": True}
+    assert {k: s["timelapse"][k] for k in ("cinema", "skip_everyday", "glow")} == {"cinema": False, "skip_everyday": True, "glow": True}
     assert S.validate({"map": {"palette": "<x>"}})["map"]["palette"] == "neon"
+
+
+def test_every_map_setting_is_validated():
+    s = S.validate({"anim": {"vehicles": False, "min_km_car": 99999, "max_count": "7"},
+                    "places": {"size_max": -5, "names": "<script>", "color_by": "year"},
+                    "regions": {"border_color": "#a0b0c0", "borders": "visited"},
+                    "areas": {"shape": "circles", "outline_color": "red"}, "est": {"dash": "dotted"},
+                    "evil": {"x": 1}})
+    assert s["anim"]["trains"] is False and s["anim"]["cars"] is False and s["anim"]["planes"] is True  # old switch
+    assert s["anim"]["min_km_car"] == 2000 and s["anim"]["max_count"] == 7
+    assert s["places"]["size_max"] == 4 and s["places"]["names"] == "big" and s["places"]["color_by"] == "year"
+    assert s["regions"]["border_color"] == "#A0B0C0" and s["regions"]["borders"] == "visited"
+    assert S.validate({"regions": {"border_color": "url(x)"}})["regions"]["border_color"] == ""
+    assert s["areas"]["shape"] == "circles" and s["areas"]["outline_color"] == "fill" and s["est"]["dash"] == "dotted"
+    assert "evil" not in s and set(s) == set(S.DEFAULT)

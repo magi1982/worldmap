@@ -325,7 +325,7 @@ class Atlas:
                 else:  # unknown place: never pretend the trip was at home
                     lat, lon, nopos = home[0], home[1], 1
             dist = t["max_km"] if t["max_km"] is not None else haversine_km(home[0], home[1], lat, lon)
-            fl = []
+            fl, gr = [], None
             if not k:  # no GPS: estimate the distance there and back
                 k = estimate_km(dist, modes, t["nights"] or 0)
                 if "fly" in modes and not nopos:
@@ -339,6 +339,8 @@ class Atlas:
                     fl = [[ha, da, hc, dc], [da, ha, dc, hc]]
                 if rad and not nopos:
                     est.append([i, lat, lon, rad])
+                if not nopos and "fly" not in modes and dist >= 30:
+                    gr = self.ground_route(home, (lat, lon))
             else:
                 fl = [[f[1], f[2], f[5], f[6]] for f in flights if t["start_date"] <= f[0] <= t["end_date"]]
             name = t["destination"] or "Reise"
@@ -348,6 +350,7 @@ class Atlas:
                 "km": sum(k.values()), "dw": wd(t["start_date"]), "dwb": wd(t["end_date"]), "fl": fl, "k": k,
                 "p": [round(lat, 4), round(lon, 4)], "conf": t["confidence"], "approx": approx, "nopos": nopos,
                 "r": t["radius_km"], "fixed": 1 if (t["source"] == "manual" or t["locked"]) else 0,
+                **({"gr": gr} if gr else {}),
             })
 
         groups = _groups(out_trips, home)
@@ -487,6 +490,43 @@ class Atlas:
             if best is None and bb[0] - 0.02 <= lo <= bb[2] + 0.02 and bb[1] - 0.02 <= la <= bb[3] + 0.02:
                 best = rid  # coastline simplified away: take the region whose box is next to the point
         return best
+
+    def on_land(self, la: float, lo: float) -> bool:
+        return any(bb[0] <= lo <= bb[2] and bb[1] <= la <= bb[3] and _pip(lo, la, poly)
+                   for _rid, poly, bb in self._regions().get((math.floor(lo), math.floor(la)), ()))
+
+    def ground_route(self, a: tuple, b: tuple) -> list:
+        """Estimated way by car or train for a trip without GPS: [[sea 0/1, lat1, lon1, lat2, lon2], ...].
+
+        The straight way home → destination, split where it crosses the sea (a ferry: Corsica, England, islands).
+        Short bits of sea (lakes, simplified coasts) count as land, tiny islands on the way as sea.
+        """
+        d = haversine_km(a[0], a[1], b[0], b[1])
+        n = max(6, min(240, int(d / 8)))
+        pts = [(a[0] + (b[0] - a[0]) * i / n, a[1] + (b[1] - a[1]) * i / n) for i in range(n + 1)]
+        land = [self.on_land(la, lo) for la, lo in pts]
+        land[0] = land[-1] = True  # both ends are where people are
+        step = d / n
+
+        def runs():
+            out, s = [], 0
+            for i in range(1, n + 1):
+                if land[i] != land[s]:
+                    out.append([s, i, land[s]])
+                    s = i
+            out.append([s, n, land[s]])
+            return out
+
+        for want, min_km in ((False, 30), (True, 12)):  # sea < 30 km → land; land < 12 km between seas → sea
+            for s, e, is_land in runs():
+                if is_land == want and (e - s) * step < min_km and s > 0 and e < n:
+                    for i in range(s, e):
+                        land[i] = not want
+        out = []
+        for s, e, is_land in runs():
+            e2 = min(n, e)
+            out.append([0 if is_land else 1, round(pts[s][0], 3), round(pts[s][1], 3), round(pts[e2][0], 3), round(pts[e2][1], 3)])
+        return out
 
     def _reg(self, pts, place_list, tz, p_idx, est_trips=()):
         first: dict = {}

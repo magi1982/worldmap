@@ -15,7 +15,7 @@ auf einer schnellen, schönen Karte mit fünf Ansichten. Alles läuft im Add-on,
 
 | | |
 |---|---|
-| 🗺️ **Fünf Kartenansichten** | **Reisen** (wer war wo und womit, Ziele, Flugbögen, geschätzte Flächen für Reisen ohne GPS), **Spuren** (jeder Weg, gefärbt nach Verkehrsmittel, Jahr oder Person), **Orte & Tage** (wo ihr Zeit verbracht habt, Kalender mit jedem Tag), **Regionen** (Kantone, Bundesländer und Provinzen weltweit) und **Zeitraffer** (eure Geschichte als Film, Stunde für Stunde, mit fliegenden Flugzeugen und Zeitleiste). |
+| 🗺️ **Fünf Kartenansichten** | **Reisen** (wer war wo und womit, Ziele, Flugbögen, Flächen, die zu einer Form verschmelzen, geschätzte Wege mit Fähren für Reisen ohne GPS), **Spuren** (jeder Weg, gefärbt nach Verkehrsmittel, Jahr oder Person), **Orte & Tage** (wo ihr Zeit verbracht habt, Kalender mit jedem Tag), **Regionen** (Kantone, Bundesländer und Provinzen weltweit) und **Reisefilm** (die Kamera fliegt von Reise zu Reise, jede Route zeichnet sich mit Flugzeug, Zug, Auto oder Fähre, Titelkarten, Jahres-Kapitel und Zähler – auch als Video speicherbar). |
 | 🛤️ **Echte Bahn- und Strassenlinien** | Lücken zwischen GPS-Punkten werden auf das echte Bahn- und Strassennetz aus OpenStreetMap gelegt. Das Netz entsteht aus Kartenkacheln, die einmal per Kachelnummer geladen und im Add-on gespeichert werden – es werden nie Positionen gesendet, danach läuft alles offline. Lücken ohne plausiblen Weg werden fein gepunktet verbunden (einstellbar: gepunktet, gerade, offen). Flüge beginnen und enden am echten Flughafen (OurAirports, offline). |
 | ❓ **Kluge Fragen – ohne KI** | Ähnliche Reisen (gleiche Gegend, gleiche Art Tag, gleicher Vorschlag) kommen als **eine** Frage – eine Antwort für alle. Antworten lassen sich als **Regel** merken, dieselbe Frage kommt nie wieder. Antworten: jede Person und Gruppe, „Keine Reise (Alltag)“, „Mit Reise davor zusammenlegen“, „Einzeln fragen“. |
 | 👥 **Personen & Gruppen** | Einzelpersonen und Gruppen (Paar, Familie …) mit Farben. Oben in jeder Karte: alle, eine Person oder eine Gruppe antippen. Zuhause und Arbeit mit Umkreis; die Arbeit erscheint nur auf der Karte, wenn du es einschaltest. |
@@ -26,13 +26,13 @@ auf einer schnellen, schönen Karte mit fünf Ansichten. Alles läuft im Add-on,
 | ✍️ **Reisen von Hand** | Der „+“-Knopf fragt kurz nach (wohin, wann, wie lange, wer, womit, wie gross war die Gegend) – für alte Reisen ohne Daten. |
 | 🔔 **Benachrichtigungen** | Eines deiner Handys wählen (wird automatisch gefunden) oder Hinweis in Home Assistant, wie oft (sofort, täglich, wöchentlich), Test senden. |
 | ✨ **Animierte Karte** | Kleine Flugzeuge in der Farbe der Reise fliegen die Flugbögen ab, Züge und Autos fahren Reisen ins Ausland nach. Ein Schalter auf jeder Karte, flüssige 60 fps. |
-| 🎨 **Kartenstil mit Versionen** | Farbpaletten (Neon, Klassisch, Pastell …), sechs Linientypen, Dicke pro Verkehrsmittel, Flächen, Grundkarte, Animation und Zeitraffer – mit Live-Vorschau. Jedes Speichern ist eine Version, zu der du zurück kannst. |
+| 🎨 **Kartenstil mit Versionen** | Jede Karte hat ihre eigenen Einstellungen (Höhe der Flugbögen, Schriftgrösse, Kreisgrössen, Regionsgrenzen, Form der Flächen, Filmtempo …), dazu Farben, sechs Linientypen und die Animation: welche Fahrzeuge, ab welcher Entfernung, wie viele, wie schnell. Einstellen mit dem 🎨-Knopf direkt auf der Karte oder in den Einstellungen, wo deine eigene Karte die Live-Vorschau ist. Jedes Speichern ist eine Version, zu der du zurück kannst. |
 | 🌙 **Hell & dunkel** | Folgt dem System oder dem ☾/☀-Knopf auf der Karte; Seen, Grenzen und Küsten bleiben auch im Dunkeln sichtbar. |
 | 📊 **Sensoren** | `sensor.worldmap_km_this_year`, `sensor.worldmap_trips`, `sensor.worldmap_countries`, `sensor.worldmap_open_questions`, `sensor.worldmap_last_trip`. |
 
-| Spuren | Orte & Tage | Regionen | Zeitraffer |
+| Spuren | Orte & Tage | Regionen | Reisefilm |
 |---|---|---|---|
-| ![Spuren](docs/images/spuren.jpg) | ![Orte](docs/images/orte.jpg) | ![Regionen](docs/images/regionen.jpg) | ![Zeitraffer](docs/images/zeit.jpg) |
+| ![Spuren](docs/images/spuren.jpg) | ![Orte](docs/images/orte.jpg) | ![Regionen](docs/images/regionen.jpg) | ![Reisefilm](docs/images/zeit.jpg) |
 
 | Personen & Gruppen | Fragen | Reiseliste |
 |---|---|---|

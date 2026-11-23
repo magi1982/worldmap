@@ -45,6 +45,7 @@ STATIC_FILES = {
     "/atlas.js": ("atlas.js", "text/javascript; charset=utf-8"),
     "/atlas.css": ("atlas.css", "text/css; charset=utf-8"),
     "/regions.json": ("regions.json", "application/json"),
+    "/stylespec.js": ("stylespec.js", "text/javascript; charset=utf-8"),
 }
 SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",

@@ -326,121 +326,50 @@ function infoize(root) {
 }
 
 /* ================================================================ MAP STYLE (with versions) */
-const MODE_UI = [['road', '🚗', 'Auto'], ['rail', '🚆', 'Zug & ÖV'], ['fly', '✈️', 'Flug'], ['ferry', '⛴️', 'Schiff'], ['foot', '🚶', 'Zu Fuss']];
-const DASH_UI = [['solid', 'durchgezogen', ''], ['dashed', 'gestrichelt', '7 5'], ['longdash', 'lang gestrichelt', '14 5'], ['dashdot', 'Strich-Punkt', '8 4 0.1 4'], ['dotted', 'gepunktet', '0.1 5'], ['sparse', 'weit gepunktet', '0.1 9']];
-const PALETTE_UI = {neon: ['Neon', ['#0A7CFF', '#FF3D9A', '#8B3DFF', '#00BFB3', '#FF8A00']], classic: ['Klassisch', ['#1F77B4', '#D62728', '#2CA02C', '#FF7F0E', '#9467BD']],
-  pastel: ['Pastell', ['#6FA8DC', '#F28DB2', '#A98FD8', '#6CC3B9', '#F6B96B']], earth: ['Erdtöne', ['#2E5E4E', '#B5562B', '#C9A227', '#5B7DB1', '#8C4A6E']],
-  contrast: ['Kontrast', ['#0057FF', '#FF0055', '#00A86B', '#FFB000', '#7A00FF']], mono: ['Ton in Ton', ['#1B1F3B', '#5C677D', '#9A8C98', '#33415C', '#7A7F9A']]};
-const BASEMAP_UI = [['standard', 'Standard'], ['paper', 'Papier'], ['mono', 'Grau']];
-const PREVIEW = {light: {sea: '#DCE4F6', land: '#FCFBFF', lake: '#C9D8F3', river: '#B6CAEF', prov: '#E4DFF3', text: '#3C3560', halo: 'rgba(252,251,255,.9)'},
-  dark: {sea: '#0B1230', land: '#1A1C33', lake: '#1E3769', river: '#3B63AA', prov: '#2B2D4A', text: '#CFCAEB', halo: 'rgba(17,18,36,.9)'}};
-const PREVIEW_BM = {paper: {sea: '#D7E4EA', land: '#FBF6EC', lake: '#C9DCE4', river: '#AFC7D4', prov: '#EADFCB', text: '#5A4632', halo: 'rgba(251,246,236,.9)'},
-  mono: {sea: '#E1E5EA', land: '#F8F8F8', lake: '#D6DBE1', river: '#C6CDD5', prov: '#EBEBEB', text: '#4A4A55', halo: 'rgba(248,248,248,.9)'}};
-const sty = {data: null, cur: null, saved: ''};
+const sty = {data: null, cur: null, saved: '', tab: 'reisen'};
 const same = () => JSON.stringify(sty.cur) === sty.saved;
+/* Map style: every setting of every map (stylespec.js), with the real map – your own data – as live preview */
 async function loadStyle() {
   const box = $('style');
   try { sty.data = await api('api/style'); } catch (e) { box.innerHTML = `<div class="card">${esc(e.message)}</div>`; return; }
   sty.cur = JSON.parse(JSON.stringify(sty.data.style)); sty.saved = JSON.stringify(sty.cur);
-  const seg = (name, opts, val) => `<div class="seg2" role="radiogroup" data-name="${name}">${opts.map(([v, l]) => `<button type="button" role="radio" aria-checked="${v === val}" class="${v === val ? 'on' : ''}" data-v="${v}">${l}</button>`).join('')}</div>`;
-  const sw = (name, on, label) => `<label class="switch"><input type="checkbox" data-name="${name}" ${on ? 'checked' : ''}><span></span>${label}</label>`;
-  const c = sty.cur;
+  renderStyle();
+}
+function renderStyle() {
+  const box = $('style'), c = sty.cur;
+  const tabs = [['reisen', 'Reisen'], ['spuren', 'Spuren'], ['orte', 'Orte & Tage'], ['regionen', 'Regionen'], ['zeit', 'Reisefilm']];
   box.innerHTML = `<div class="style-grid">
-   <div class="style-main">
-    <div class="card"><h3>🎨 Linien &amp; Farben</h3>
-      <p class="small">Farbe, Linientyp und Dicke pro Verkehrsmittel. Gilt für alle Karten. Personen- und Gruppenfarben stellst du unter „Personen &amp; Gruppen“ ein.</p>
-      <div class="modes">${MODE_UI.map(([m, ico, n]) => `<div class="mode-row" data-m="${m}">
-        <div class="mn"><span aria-hidden="true">${ico}</span>${n}</div>
-        <input type="color" data-name="modes.${m}.color" value="${esc(c.modes[m].color)}" aria-label="Farbe ${n}">
-        ${seg('modes.' + m + '.dash', DASH_UI.map(([v, l, d]) => [v, `<svg width="34" height="10" aria-hidden="true"><path d="M2 5H32" stroke="currentColor" stroke-width="3" stroke-linecap="round" ${d ? `stroke-dasharray="${d}"` : ''}/></svg><span class="sr">${l}</span>`]), c.modes[m].dash)}
-        <label class="rng" title="Dicke"><span>Dicke</span><input type="range" min="0.5" max="3" step="0.1" data-name="modes.${m}.width" value="${c.modes[m].width}" aria-label="Dicke ${n}"><b>${c.modes[m].width.toFixed(1)}×</b></label>
-      </div>`).join('')}</div></div>
-    <div class="card"><h3>🫧 Flächen für viele kurze Wege</h3>
-      <p class="small">Wo du dich oft auf kleinem Raum bewegst (Ferienort, Stadt), zeigt die Reisekarte statt vieler Striche eine weiche Fläche.</p>
-      <div class="opts-col">${sw('areas.show', c.areas.show, 'Flächen anzeigen')}${sw('areas.outline', c.areas.outline, 'Kräftiger Rand')}
-      <label class="rng"><span>Deckkraft</span><input type="range" min="0.1" max="1" step="0.05" data-name="areas.opacity" value="${c.areas.opacity}"><b>${Math.round(c.areas.opacity * 100)} %</b></label>
-      <label class="rng"><span>Grösse</span><input type="range" min="0.5" max="3" step="0.1" data-name="areas.size" value="${c.areas.size}"><b>${c.areas.size.toFixed(1)}×</b></label></div></div>
-    <div class="card"><h3>🗺️ Grundkarte</h3>
-      <div class="opts-col">${sw('map.rivers', c.map.rivers, 'Flüsse')}${sw('map.provinces', c.map.provinces, 'Grenzen von Kantonen und Regionen')}
-      <div class="field">Ortsnamen ${seg('map.labels', [['many', 'viele'], ['normal', 'normal'], ['few', 'wenige'], ['off', 'keine']], c.map.labels)}</div>
-      <div class="field">Erscheinungsbild ${seg('map.theme', [['auto', 'wie das Gerät'], ['light', '☀ hell'], ['dark', '☾ dunkel']], c.map.theme)}</div>
-      <div class="field">Kartenfarben (hell) ${seg('map.basemap', BASEMAP_UI, c.map.basemap)}</div>
-      <div class="field">Lücken ohne bekannte Strecke ${seg('map.gaps', [['dotted', 'fein gepunktet'], ['straight', 'gerade Linie'], ['open', 'offen lassen']], c.map.gaps)}</div></div></div>
-    <div class="card"><h3>🌈 Farben für Personen &amp; Gruppen</h3>
-      <p class="small">Wer keine eigene Farbe hat (unter Personen &amp; Gruppen), bekommt eine aus dieser Palette.</p>
-      <div class="pal" role="radiogroup" data-name="map.palette">${Object.entries(PALETTE_UI).map(([k, [n, cs]]) => `<button type="button" role="radio" aria-checked="${k === c.map.palette}" class="${k === c.map.palette ? 'on' : ''}" data-v="${k}"><span>${cs.map((x) => `<i style="background:${x}"></i>`).join('')}</span>${n}</button>`).join('')}</div></div>
-    <div class="card"><h3>✨ Animation</h3>
-      <p class="small">Auf den Karten Reisen und Spuren fliegen kleine Flugzeuge in der Farbe der Reise hin und her, über Landesgrenzen fahren Züge und Autos. Die Linie unter dem Flugzeug blendet sich aus. Schnell ein- und ausschalten geht auch oben in der Karte („Animation“).</p>
-      <div class="opts-col">${sw('anim.on', c.anim.on, 'Animation einschalten (Standard)')}${sw('anim.planes', c.anim.planes, 'Flugzeuge auf den Flugbögen')}${sw('anim.vehicles', c.anim.vehicles, 'Züge und Autos bei Reisen ins Ausland')}${sw('anim.hide_line', c.anim.hide_line, 'Linie unter dem Fahrzeug ausblenden')}
-      <label class="rng"><span>Tempo</span><input type="range" min="0.25" max="4" step="0.25" data-name="anim.speed" value="${c.anim.speed}"><b>${c.anim.speed.toFixed(1)}×</b></label>
-      <label class="rng"><span>Grösse</span><input type="range" min="0.5" max="2" step="0.1" data-name="anim.size" value="${c.anim.size}"><b>${c.anim.size.toFixed(1)}×</b></label></div></div>
-    <div class="card"><h3>🎬 Zeitraffer</h3>
-      <p class="small">Der Film eurer Reisen. Kino-Look: dunkle Karte, leuchtende Spuren, nur grosse Ortsnamen. Alltag schneller: zu Hause läuft die Zeit bis zu 6× schneller, auf Reisen normal.</p>
-      <div class="opts-col">${sw('timelapse.cinema', c.timelapse.cinema, 'Kino-Look')}${sw('timelapse.glow', c.timelapse.glow, 'Leuchtende Spuren')}${sw('timelapse.skip_everyday', c.timelapse.skip_everyday, 'Alltag schneller abspielen')}</div></div>
+   <div class="style-main" id="stForm">
+    <div class="card">${wmModes(c)}<p class="small">Gilt für alle Karten. Personen- und Gruppenfarben stellst du unter „Personen &amp; Gruppen“ ein.</p></div>
+    ${WM_SPEC.map((x) => `<div class="card">${wmSection(x, c)}</div>`).join('')}
    </div>
    <div class="style-side">
-    <div class="card sticky"><h3>👀 Vorschau <span class="status" id="stState"></span></h3>
-      <canvas id="stPrev" width="560" height="360" aria-label="Vorschau des Kartenstils"></canvas>
+    <div class="card sticky"><h3>👀 Live auf deiner Karte <span class="status" id="stState"></span></h3>
+      <div class="wseg" id="stTabs" role="tablist">${tabs.map(([k, n]) => `<button type="button" class="${k === sty.tab ? 'on' : ''}" data-tab="${k}">${n}</button>`).join('')}</div>
+      <iframe id="stLive" class="stlive" title="Live-Vorschau der Karte" src="./?embed=1#${sty.tab}"></iframe>
+      <p class="small">Jede Änderung siehst du sofort hier – mit deinen eigenen Reisen. Gespeichert wird erst mit „Speichern“.</p>
       <label class="field">Notiz zu dieser Version (optional)<input id="stNote" maxlength="80" placeholder="z. B. Zug gepunktet"></label>
       <div class="opts"><button class="primary" id="stSave">Speichern</button><button class="btn" id="stUndo">Verwerfen</button><button class="btn" id="stDef">Standard</button><a class="btn" href="./">Karte öffnen</a></div></div>
     <div class="card"><h3>🕘 Versionen <span class="status">${sty.data.versions.length}</span></h3>
       <p class="small">Jedes Speichern legt eine Version an (die letzten 20 bleiben). Mit „Zurück“ holst du einen früheren Stil wieder – auch das wird wieder eine Version, nichts geht verloren.</p>
       <div class="vlist">${sty.data.versions.map((v, i) => `<div class="vrow"><div><b>${esc(v.note)}</b><span class="small">${new Date(v.ts * 1000).toLocaleString('de-CH', {dateStyle: 'medium', timeStyle: 'short'})}${i === 0 ? ' · aktuell' : ''}</span></div>${i === 0 ? '' : `<button class="btn" data-restore="${v.id}">Zurück</button>`}</div>`).join('') || '<p class="small keep">Noch keine – nach dem ersten Speichern erscheinen sie hier.</p>'}</div></div>
    </div></div>`;
-  infoize(box);
-  const set = (name, val) => { const ks = name.split('.'); let o = sty.cur; for (let i = 0; i < ks.length - 1; i++) o = o[ks[i]]; o[ks[ks.length - 1]] = val; };
-  box.addEventListener('input', (e) => { const t = e.target; if (!t.dataset.name) return;
-    const v = t.type === 'checkbox' ? t.checked : t.type === 'range' ? +t.value : t.value; set(t.dataset.name, v);
-    if (t.type === 'range') { const b = t.parentElement.querySelector('b'); if (b) b.textContent = t.dataset.name === 'areas.opacity' ? Math.round(v * 100) + ' %' : v.toFixed(1) + '×'; }
-    styleChanged(); });
-  box.querySelectorAll('.pal').forEach((g) => g.addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return;
-    g.querySelectorAll('button').forEach((x) => { x.classList.toggle('on', x === b); x.setAttribute('aria-checked', String(x === b)); }); set(g.dataset.name, b.dataset.v); styleChanged(); }));
-  box.querySelectorAll('.seg2').forEach((g) => g.addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return;
-    g.querySelectorAll('button').forEach((x) => { x.classList.toggle('on', x === b); x.setAttribute('aria-checked', String(x === b)); }); set(g.dataset.name, b.dataset.v); styleChanged(); }));
+  wmBind($('stForm'), c, (k) => { if (k === 'map.theme') themeLocal(c.map.theme); styleChanged(); });
+  $('stTabs').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; sty.tab = b.dataset.tab;
+    $('stTabs').querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
+    try { $('stLive').contentWindow.location.hash = '#' + sty.tab; } catch (err) { $('stLive').src = './?embed=1#' + sty.tab; } });
+  $('stLive').addEventListener('load', () => setTimeout(sendLive, 400));
   $('stSave').onclick = async () => { try { sty.data = await post('api/style', {style: sty.cur, note: $('stNote').value}); themeLocal(sty.cur.map.theme); toast('Gespeichert – neue Version angelegt'); loadStyle(); } catch (e) { toast(e.message, 5000); } };
   $('stUndo').onclick = () => loadStyle();
-  $('stDef').onclick = () => { sty.cur = JSON.parse(JSON.stringify(sty.data.default)); redrawControls(); styleChanged(); };
+  $('stDef').onclick = () => { sty.cur = JSON.parse(JSON.stringify(sty.data.default)); renderStyle(); };
   box.querySelectorAll('[data-restore]').forEach((b) => (b.onclick = async () => { try { sty.data = await post('api/style/versions/' + b.dataset.restore + '/restore'); themeLocal(sty.data.style.map.theme); toast('Früherer Stil wiederhergestellt'); loadStyle(); } catch (e) { toast(e.message, 5000); } }));
   styleChanged();
 }
 function themeLocal(t) { try { if (t === 'auto') localStorage.removeItem('wm-theme'); else localStorage.setItem('wm-theme', t); } catch (e) { /* ignore */ } applyTheme(); }
-function redrawControls() { const box = $('style'); const get = (n) => n.split('.').reduce((o, k) => o[k], sty.cur);
-  box.querySelectorAll('input[data-name]').forEach((t) => { const v = get(t.dataset.name); if (t.type === 'checkbox') t.checked = v; else t.value = v; if (t.type === 'range') t.dispatchEvent(new Event('input', {bubbles: true})); });
-  box.querySelectorAll('.seg2,.pal').forEach((g) => { const v = get(g.dataset.name); g.querySelectorAll('button').forEach((b) => { b.classList.toggle('on', b.dataset.v === v); b.setAttribute('aria-checked', String(b.dataset.v === v)); }); }); }
 let stRaf = 0;
+function sendLive() { const f = $('stLive'); if (f && f.contentWindow) f.contentWindow.postMessage({wm: 'style', style: sty.cur}, location.origin); }
 function styleChanged() { const s = $('stState'); if (s) { const ok = same(); s.textContent = ok ? 'gespeichert' : 'nicht gespeichert'; s.className = 'status ' + (ok ? 'ok' : 'warn'); }
-  if (!stRaf) stRaf = requestAnimationFrame(() => { stRaf = 0; drawPreview(); }); }
-function drawPreview() {
-  const cv = $('stPrev'); if (!cv) return; const st = sty.cur; const dark = st.map.theme === 'dark' || (st.map.theme === 'auto' && document.documentElement.dataset.theme === 'dark');
-  const P = {...PREVIEW[dark ? 'dark' : 'light'], ...(dark ? {} : PREVIEW_BM[st.map.basemap] || {})}, W = cv.width, H = cv.height, g = cv.getContext('2d');
-  g.setLineDash([]); g.fillStyle = P.sea; g.fillRect(0, 0, W, H);
-  g.fillStyle = P.land; g.beginPath(); g.moveTo(0, 0); g.lineTo(W * .78, 0); g.bezierCurveTo(W * .7, H * .3, W * .86, H * .55, W * .72, H); g.lineTo(0, H); g.fill();
-  g.fillStyle = P.lake; g.beginPath(); g.ellipse(W * .3, H * .66, 60, 22, -.4, 0, 7); g.fill();
-  if (st.map.provinces) { g.strokeStyle = P.prov; g.lineWidth = 1.2; g.beginPath(); g.moveTo(W * .45, 0); g.bezierCurveTo(W * .4, H * .4, W * .55, H * .6, W * .5, H); g.stroke(); }
-  if (st.map.rivers) { g.strokeStyle = P.river; g.lineWidth = 2; g.beginPath(); g.moveTo(0, H * .2); g.bezierCurveTo(W * .2, H * .3, W * .25, H * .5, W * .3, H * .63); g.stroke(); }
-  const A = st.areas; if (A.show) { const r = 9 * A.size, c = st.modes.foot.color; g.globalAlpha = A.opacity;
-    const pts = [[.6, .7], [.63, .76], [.57, .75], [.61, .82], [.66, .7]].map(([x, y]) => [x * W, y * H]);
-    if (A.outline) { g.fillStyle = c; g.beginPath(); pts.forEach(([x, y]) => { g.moveTo(x + r + 1.4, y); g.arc(x, y, r + 1.4, 0, 7); }); g.fill(); }
-    g.fillStyle = mixC(c, P.land, .7); g.beginPath(); pts.forEach(([x, y]) => { g.moveTo(x + r, y); g.arc(x, y, r, 0, 7); }); g.fill(); g.globalAlpha = 1; }
-  const line = (m, pts, base) => { const s = st.modes[m]; g.strokeStyle = s.color; g.lineWidth = base * s.width; g.lineCap = 'round'; g.lineJoin = 'round';
-    g.setLineDash(PDASH[s.dash] || []); g.beginPath(); pts.forEach(([x, y], i) => (i ? g.lineTo(x * W, y * H) : g.moveTo(x * W, y * H))); g.stroke(); g.setLineDash([]); };
-  line('road', [[.05, .9], [.18, .78], [.3, .8], [.42, .62], [.6, .7]], 2.6);
-  line('rail', [[.04, .45], [.2, .42], [.35, .35], [.5, .38], [.64, .2]], 2.6);
-  line('foot', [[.6, .7], [.62, .6], [.58, .56], [.63, .5]], 2.2);
-  line('ferry', [[.72, .45], [.82, .5], [.95, .42]], 2.4);
-  { const s = st.modes.fly; g.strokeStyle = s.color; g.lineWidth = 2.4 * s.width; g.setLineDash(PDASH[s.dash] || []);
-    g.beginPath(); g.moveTo(W * .14, H * .3); g.quadraticCurveTo(W * .55, -H * .12, W * .93, H * .2); g.stroke(); g.setLineDash([]);
-    if (st.anim.on && st.anim.planes) { const u = .58, x0 = W * .14, y0 = H * .3, x1 = W * .55, y1 = -H * .12, x2 = W * .93, y2 = H * .2, v = 1 - u;
-      const px = v * v * x0 + 2 * v * u * x1 + u * u * x2, py = v * v * y0 + 2 * v * u * y1 + u * u * y2, dx = 2 * v * (x1 - x0) + 2 * u * (x2 - x1), dy = 2 * v * (y1 - y0) + 2 * u * (y2 - y1);
-      if (st.anim.hide_line) { g.fillStyle = P.land; g.beginPath(); g.arc(px, py, 13 * st.anim.size, 0, 7); g.fill(); }
-      g.save(); g.translate(px, py); g.rotate(Math.atan2(dy, dx)); g.scale(1.3 * st.anim.size, 1.3 * st.anim.size); g.fillStyle = s.color; g.strokeStyle = '#fff'; g.lineWidth = 1.6;
-      g.beginPath(); g.moveTo(9, 0); g.lineTo(2, -1.6); g.lineTo(-2, -7.5); g.lineTo(-4, -7.5); g.lineTo(-1.6, -1.6); g.lineTo(-6, -1.4); g.lineTo(-8, -4); g.lineTo(-9, -4); g.lineTo(-8, 0); g.lineTo(-9, 4); g.lineTo(-8, 4); g.lineTo(-6, 1.4); g.lineTo(-1.6, 1.6); g.lineTo(-4, 7.5); g.lineTo(-2, 7.5); g.lineTo(2, 1.6); g.closePath(); g.stroke(); g.fill(); g.restore(); } }
-  const lab = (t, x, y) => { g.font = '600 13px Inter, system-ui, sans-serif'; g.lineWidth = 4; g.strokeStyle = P.halo; g.strokeText(t, x, y); g.fillStyle = P.text; g.fillText(t, x, y); };
-  if (st.map.labels !== 'off') { lab('Hafenstadt', W * .64, H * .16); if (st.map.labels !== 'few') { lab('Seedorf', W * .2, H * .58); lab('Bergtal', W * .08, H * .38); } if (st.map.labels === 'many') { lab('Feldheim', W * .36, H * .9); lab('Uferweg', W * .66, H * .9); } }
-  g.font = '700 12px Inter, system-ui, sans-serif'; let x = 12; MODE_UI.forEach(([m, , n]) => { g.fillStyle = st.modes[m].color; g.fillRect(x, H - 18, 10, 10); g.fillStyle = P.text; g.fillText(n, x + 14, H - 9); x += g.measureText(n).width + 30; });
-}
-const PDASH = {dashed: [9, 6], dotted: [0.1, 6], longdash: [16, 6], dashdot: [10, 4, 0.1, 4], sparse: [0.1, 10]};
-function mixC(c, base, a) { const h = (s) => [1, 3, 5].map((i) => parseInt(s.slice(i, i + 2), 16)); const [r, gg, b] = h(c), [R, G, B] = h(base); return `rgb(${Math.round(R + (r - R) * (1 - a))},${Math.round(G + (gg - G) * (1 - a))},${Math.round(B + (b - B) * (1 - a))})`; }
+  if (!stRaf) stRaf = requestAnimationFrame(() => { stRaf = 0; sendLive(); }); }
 
 /* ================================================================ CONNECTIONS */
 async function loadConnectors() {

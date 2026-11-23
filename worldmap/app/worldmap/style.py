@@ -25,6 +25,59 @@ BASEMAPS = ("standard", "paper", "mono")
 COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 MAX_VERSIONS = 20
 
+# every setting of every map: (type, default, ...) – the browser can only send what is listed here
+B, N, E, C = "bool", "num", "enum", "color"
+SCHEMA: dict = {
+    "areas": {  # semi-transparent areas around places (Trips map)
+        "show": (B, True), "opacity": (N, 1.0, 0.1, 1.0), "size": (N, 1.0, 0.5, 3.0), "outline": (B, True),
+        "shape": (E, "organic", ("organic", "circles")), "connect": (N, 1.0, 0.0, 3.0), "smooth": (N, 1.0, 0.3, 2.5),
+        "outline_width": (N, 1.4, 0.0, 6.0), "outline_color": (E, "fill", ("fill", "darker", "white", "none")),
+    },
+    "map": {
+        "rivers": (B, True), "provinces": (B, True), "labels": (E, "normal", ("many", "normal", "few", "off")),
+        "theme": (E, "auto", ("auto", "light", "dark")), "palette": (E, "neon", PALETTES),
+        "basemap": (E, "standard", BASEMAPS), "gaps": (E, "dotted", ("dotted", "straight", "open")),
+    },
+    "est": {  # estimated way for trips without GPS (car, train, ferry)
+        "show": (B, True), "dash": (E, "dashed", DASHES), "opacity": (N, 0.8, 0.2, 1.0), "ferry": (B, True),
+        "curve": (N, 1.0, 0.0, 2.5),
+    },
+    "anim": {
+        "on": (B, True), "planes": (B, True), "trains": (B, True), "cars": (B, True), "ferries": (B, True),
+        "hide_line": (B, True), "speed": (N, 1.0, 0.25, 4.0), "size": (N, 1.0, 0.5, 2.0),
+        "plane_speed": (N, 1.0, 0.25, 4.0),
+        "min_km_plane": (N, 0, 0, 5000), "min_km_train": (N, 0, 0, 2000), "min_km_car": (N, 150, 0, 2000),
+        "min_km_ferry": (N, 0, 0, 2000), "max_count": (N, 60, 5, 300),
+    },
+    "trips": {  # Trips map
+        "arc_height": (N, 1.0, 0.3, 2.5), "line_width": (N, 1.0, 0.5, 3.0), "airports": (B, True),
+        "labels": (E, "normal", ("all", "normal", "few", "off")), "dot_size": (N, 1.0, 0.5, 2.5),
+        "label_size": (N, 1.0, 0.7, 1.8),
+    },
+    "tracks": {  # Tracks map
+        "width": (N, 1.0, 0.4, 3.0), "opacity": (N, 1.0, 0.2, 1.0), "everyday_opacity": (N, 0.7, 0.1, 1.0),
+        "glow": (B, False), "airports": (B, True),
+    },
+    "places": {  # Places & days map
+        "size_min": (N, 3.0, 1.0, 12.0), "size_max": (N, 16.0, 4.0, 40.0),
+        "size_by": (E, "days", ("days", "visits", "same")), "style": (E, "filled", ("filled", "ring", "glow")),
+        "color_by": (E, "person", ("person", "year", "days")), "names": (E, "big", ("none", "big", "all")),
+        "name_size": (N, 1.0, 0.6, 2.0), "name_min_days": (N, 2, 0, 60), "collide": (B, True),
+        "opacity": (N, 0.85, 0.2, 1.0),
+    },
+    "regions": {  # Regions map
+        "border_color": (C, ""), "border_width": (N, 1.0, 0.0, 4.0), "border_opacity": (N, 0.6, 0.0, 1.0),
+        "borders": (E, "visited", ("visited", "all", "none")), "country_width": (N, 1.8, 0.0, 5.0),
+        "fill_by": (E, "first", ("first", "days", "stay")), "fill_opacity": (N, 0.8, 0.1, 1.0),
+        "names": (B, True),
+    },
+    "timelapse": {  # the travel film
+        "cinema": (B, True), "skip_everyday": (B, True), "glow": (B, True), "speed": (N, 1.0, 0.25, 4.0),
+        "cards": (B, True), "chapters": (B, True), "counters": (B, True), "min_km": (N, 0, 0, 3000),
+        "pause": (N, 1.0, 0.0, 3.0),
+    },
+}
+
 DEFAULT: dict = {
     "modes": {
         "road": {"color": "#0A7CFF", "dash": "solid", "width": 1.0},
@@ -33,11 +86,7 @@ DEFAULT: dict = {
         "ferry": {"color": "#00BFB3", "dash": "solid", "width": 1.0},
         "foot": {"color": "#FF8A00", "dash": "solid", "width": 1.0},
     },
-    "areas": {"show": True, "opacity": 1.0, "size": 1.0, "outline": True},
-    "map": {"rivers": True, "provinces": True, "labels": "normal", "theme": "auto", "palette": "neon", "basemap": "standard",
-            "gaps": "dotted"},
-    "anim": {"on": True, "planes": True, "vehicles": True, "hide_line": True, "speed": 1.0, "size": 1.0},
-    "timelapse": {"cinema": True, "skip_everyday": True, "glow": True},
+    **{sec: {k: v[1] for k, v in keys.items()} for sec, keys in SCHEMA.items()},
 }
 
 
@@ -55,6 +104,17 @@ def _bool(v, default: bool) -> bool:
     return v if isinstance(v, bool) else default
 
 
+def _value(spec, v):
+    kind, default = spec[0], spec[1]
+    if kind == B:
+        return _bool(v, default)
+    if kind == N:
+        return _clamp(default if v is None else v, spec[2], spec[3], default)
+    if kind == E:
+        return v if v in spec[2] else default
+    return v.upper() if isinstance(v, str) and COLOR_RE.match(v) else default  # colour ("" = automatic)
+
+
 def validate(raw) -> dict:
     """A complete, safe style from whatever the browser sent (missing parts fall back to the defaults)."""
     raw = raw if isinstance(raw, dict) else {}
@@ -68,36 +128,12 @@ def validate(raw) -> dict:
         if src.get("dash") in DASHES:
             d["dash"] = src["dash"]
         d["width"] = _clamp(src.get("width", d["width"]), 0.5, 3.0, d["width"])
-    areas = raw.get("areas") if isinstance(raw.get("areas"), dict) else {}
-    a = out["areas"]
-    a["show"] = _bool(areas.get("show"), a["show"])
-    a["outline"] = _bool(areas.get("outline"), a["outline"])
-    a["opacity"] = _clamp(areas.get("opacity", a["opacity"]), 0.1, 1.0, a["opacity"])
-    a["size"] = _clamp(areas.get("size", a["size"]), 0.5, 3.0, a["size"])
-    mp = raw.get("map") if isinstance(raw.get("map"), dict) else {}
-    b = out["map"]
-    b["rivers"] = _bool(mp.get("rivers"), b["rivers"])
-    b["provinces"] = _bool(mp.get("provinces"), b["provinces"])
-    if mp.get("labels") in ("many", "normal", "few", "off"):
-        b["labels"] = mp["labels"]
-    if mp.get("theme") in ("auto", "light", "dark"):
-        b["theme"] = mp["theme"]
-    if mp.get("palette") in PALETTES:
-        b["palette"] = mp["palette"]
-    if mp.get("basemap") in BASEMAPS:
-        b["basemap"] = mp["basemap"]
-    if mp.get("gaps") in ("dotted", "straight", "open"):
-        b["gaps"] = mp["gaps"]
-    an = raw.get("anim") if isinstance(raw.get("anim"), dict) else {}
-    c = out["anim"]
-    for k in ("on", "planes", "vehicles", "hide_line"):
-        c[k] = _bool(an.get(k), c[k])
-    c["speed"] = _clamp(an.get("speed", c["speed"]), 0.25, 4.0, c["speed"])
-    c["size"] = _clamp(an.get("size", c["size"]), 0.5, 2.0, c["size"])
-    tl = raw.get("timelapse") if isinstance(raw.get("timelapse"), dict) else {}
-    d = out["timelapse"]
-    for k in ("cinema", "skip_everyday", "glow"):
-        d[k] = _bool(tl.get(k), d[k])
+    for sec, keys in SCHEMA.items():
+        src = raw.get(sec) if isinstance(raw.get(sec), dict) else {}
+        if sec == "anim" and src.get("vehicles") is False:  # styles saved before 0.7: one switch for trains and cars
+            src = {"trains": False, "cars": False, **src}
+        for k, spec in keys.items():
+            out[sec][k] = _value(spec, src.get(k))
     return out
 
 

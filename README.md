@@ -15,7 +15,7 @@ fast, good-looking map with five views. Everything runs inside the add-on; no cl
 
 | | |
 |---|---|
-| 🗺️ **Five map views** | **Trips** (who went where and how, destinations, flight arcs, estimated areas for trips without GPS), **Tracks** (every route, coloured by transport, year or person), **Places & days** (where you spent time, a calendar of every day), **Regions** (states, provinces and cantons worldwide) and **Time-lapse** (your history as a film, hour by hour, with animated flights and a timeline). |
+| 🗺️ **Five map views** | **Trips** (who went where and how, destinations, flight arcs, areas that melt together, estimated routes with ferries for trips without GPS), **Tracks** (every route, coloured by transport, year or person), **Places & days** (where you spent time, a calendar of every day), **Regions** (states, provinces and cantons worldwide) and **Travel film** (the camera flies from trip to trip, each route draws itself with its plane, train, car or ferry, title cards, year chapters and counters – can be saved as a video). |
 | 🛤️ **Real rail and road lines** | Gaps between GPS points are map-matched onto the real rail and road network from OpenStreetMap. The network is built from map tiles that are downloaded once by tile number and kept in the add-on – no positions are ever sent, afterwards it works offline. Gaps without a plausible path are joined by a fine dotted line (adjustable: dotted, straight, open). Flights start and end at the real airport (OurAirports, offline). |
 | ❓ **Smart questions – no AI needed** | Similar trips (same area, same kind of day, same suggestion) are asked **once** – one answer for all. Answers can be remembered as **rules**, so the same question never comes again. Answers: every person and group, "no trip (everyday life)", "merge with the trip before", "ask one by one". |
 | 👥 **People & groups** | Single persons and groups (couple, family …) with colours. A bar on top of every map shows everyone, one person or one group. Home and work with radius; the workplace is hidden on the map unless you switch it on. |
@@ -26,13 +26,13 @@ fast, good-looking map with five views. Everything runs inside the add-on; no cl
 | ✍️ **Trips by hand** | The "+" button asks a few questions (where, when, how long, who, how, how big was the area) – for old trips without any data. |
 | 🔔 **Notifications** | Choose one of your phones (found automatically) or a Home Assistant notification, how often (instant, daily, weekly) and send a test. |
 | ✨ **Animated map** | Little planes in the colour of the trip fly the flight arcs, trains and cars travel trips abroad. One switch on every map, smooth 60 fps. |
-| 🎨 **Map style with versions** | Colour palettes (neon, classic, pastel …), six line types, width per transport, areas, base map, animation and time-lapse – with a live preview. Every save is a version you can go back to. |
+| 🎨 **Map style with versions** | Every map has its own settings (arc height, label size, circle sizes, region borders, area shape, film tempo …), plus colours, six line types and the animation: which vehicles, from which distance, how many, how fast. Change them with the 🎨 button right on the map or on the settings page, where your own map is the live preview. Every save is a version you can go back to. |
 | 🌙 **Light & dark mode** | Follows the system or the ☾/☀ button on the map; lakes, borders and coasts stay visible in the dark. |
 | 📊 **Sensors** | `sensor.worldmap_km_this_year`, `sensor.worldmap_trips`, `sensor.worldmap_countries`, `sensor.worldmap_open_questions`, `sensor.worldmap_last_trip`. |
 
-| Tracks | Places & days | Regions | Time-lapse |
+| Tracks | Places & days | Regions | Travel film |
 |---|---|---|---|
-| ![Tracks](docs/images/spuren.jpg) | ![Places](docs/images/orte.jpg) | ![Regions](docs/images/regionen.jpg) | ![Time-lapse](docs/images/zeit.jpg) |
+| ![Tracks](docs/images/spuren.jpg) | ![Places](docs/images/orte.jpg) | ![Regions](docs/images/regionen.jpg) | ![Travel film](docs/images/zeit.jpg) |
 
 | People & groups | Questions | Trip list |
 |---|---|---|

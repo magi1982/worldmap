@@ -216,3 +216,13 @@ def test_trips_without_coordinates_find_their_place():
     assert geocode("Kenia", "", home, 6400)[0] < 5                                # a country
     assert abs(geocode("Sample Town (Marsa Alam)", "", home, 3300)[1] - 34.59) < .1  # town with its own airport
     assert geocode("Neujahr (Gommer See)", "", home, None) is None               # no distance, no exact name: no guess
+
+
+def test_estimated_ground_route_finds_the_ferry():
+    a = A.Atlas.__new__(A.Atlas)
+    home = (47.4, 8.5)                                     # sample home, not a real address
+    corsica = a.ground_route(home, (42.2, 9.1))
+    assert [r[0] for r in corsica] == [0, 1, 0]            # land – sea (ferry) – land
+    assert corsica[0][1:3] == [47.4, 8.5] and corsica[-1][3:] == [42.2, 9.1]
+    assert [r[0] for r in a.ground_route(home, (52.0, -1.0))] == [0, 1, 0]   # across the Channel / North Sea
+    assert [r[0] for r in a.ground_route(home, (48.2, 16.4))] == [0]        # all on land

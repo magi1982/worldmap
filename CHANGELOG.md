@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.7.0 – 2026-11-23
+
+### Added
+- **Settings for every map**, live on the map: a 🎨 button opens a drawer with the settings of the map you are looking at,
+  every change shows at once, "Save" makes a version. The settings page lists all of them and shows your own map as live
+  preview (Trips, Tracks, Places & days, Regions, Travel film).
+  - Trips: arc height, line width, destination dot size, which names and how big, IATA tags.
+  - Tracks: line width, opacity, opacity of everyday life, glowing lines, IATA tags, gaps.
+  - Places & days: circle size by days/visits (min/max), style (filled/ring/glow), colour by person/year/days,
+    which names, from how many days, label size, hide overlapping names.
+  - Regions: colour by first year/days/stay, fill opacity, region borders (visited countries/all/none) with colour,
+    width and opacity, country border width, region names.
+- **Estimated routes** for trips without GPS (old holidays by car or train): a soft line from home to the destination;
+  where it crosses the sea it becomes a dotted ferry (Corsica, England, islands). Settings: on/off, line type,
+  opacity, curve, ferries.
+- **Animation choices**: planes, trains, cars and ferries each on/off, from which distance each appears, how many at the
+  same time, separate tempo. Planes now fly at the **same speed** on short and long routes. Ferries sail on sea legs.
+- **Areas that melt together**: the semi-transparent areas are one organic shape per person instead of circles on
+  circles (shape, size, how strongly they connect, soft edge, opacity, outline width and colour).
+- **Travel film** replaces the time-lapse: the camera flies from trip to trip (zooming out on long jumps), the route
+  draws itself with its vehicle, title card per trip, year chapters with km/trips/countries, counters, cinema look;
+  tempo, stay time and minimum distance are settings; jump to a year; **save as video** (WebM, in the browser).
+
 ## 0.6.3 – 2026-11-23
 
 ### Fixed

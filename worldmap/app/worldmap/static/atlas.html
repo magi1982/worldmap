@@ -6,13 +6,14 @@
 <title>Worldmap · Karte</title>
 <link rel="icon" href="logo.svg" type="image/svg+xml">
 <link rel="stylesheet" href="atlas.css?v=__WMV__">
+<script src="stylespec.js?v=__WMV__" defer></script>
 <script src="atlas.js?v=__WMV__" defer></script>
 </head>
 <body>
 <header class="top">
  <a class="brand" href="./"><img src="logo.svg" alt="" width="26" height="26">Reisen <span id="brandyears"></span></a>
  <nav class="tabs" id="tabs" aria-label="Karten">
-  <button data-t="reisen" class="on"><i>1</i>Reisen</button><button data-t="spuren"><i>2</i>Spuren</button><button data-t="orte"><i>3</i>Orte &amp; Tage</button><button data-t="regionen"><i>4</i>Regionen</button><button data-t="zeit"><i>5</i>Zeitraffer</button>
+  <button data-t="reisen" class="on"><i>1</i>Reisen</button><button data-t="spuren"><i>2</i>Spuren</button><button data-t="orte"><i>3</i>Orte &amp; Tage</button><button data-t="regionen"><i>4</i>Regionen</button><button data-t="zeit"><i>5</i>Reisefilm</button>
  </nav>
  <div class="acts">
   <button class="ico q" id="qbtn" hidden title="Offene Fragen" aria-label="Offene Fragen"><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5c5.2 0 9.5 3.9 9.5 8.7 0 4.8-4.3 8.7-9.5 8.7-1 0-2-.1-2.9-.4L4 21.5l1.3-4.2C3.6 15.7 2.5 13.5 2.5 11.2 2.5 6.4 6.8 2.5 12 2.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9.6 9.1c.2-1.3 1.2-2.1 2.5-2.1 1.4 0 2.5.9 2.5 2.2 0 1.8-2.5 1.9-2.5 3.6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12.1" cy="15.4" r="1.2" fill="currentColor"/></svg><b id="qbadge"></b></button>
@@ -27,13 +28,18 @@
   <canvas id="cva" hidden aria-hidden="true"></canvas>
   <div class="ctrl">
    <button id="zin" aria-label="Hineinzoomen">+</button><button id="zout" aria-label="Herauszoomen">−</button>
-   <button class="txt" id="zhome" aria-label="Zur Heimat">⌂</button><button class="txt" id="zch">CH</button><button class="txt" id="zeu">EU</button><button class="txt" id="ztheme" aria-label="Hell / dunkel" title="Hell / dunkel">◐</button>
+   <button class="txt" id="zhome" aria-label="Zur Heimat">⌂</button><button class="txt" id="zch">CH</button><button class="txt" id="zeu">EU</button><button class="txt" id="ztheme" aria-label="Hell / dunkel" title="Hell / dunkel">◐</button><button id="zstyle" aria-label="Stil dieser Karte einstellen" title="Stil einstellen – live">🎨</button>
   </div>
   <div class="legend" id="legend"></div>
   <div class="scale" id="scale"><span></span><i></i></div>
   <div class="hud" id="hud"><b id="hudd"></b><span id="huds"></span></div>
   <div class="ztitle" id="ztitle" aria-live="polite"></div>
   <div class="detail" id="detail"></div>
+  <aside class="sdrawer" id="sdrawer" hidden aria-label="Stil dieser Karte">
+   <div class="sd-h"><b id="sd-t">🎨 Stil</b><button id="sd-x" aria-label="Schliessen">✕</button></div>
+   <div class="sd-b" id="sd-b"></div>
+   <div class="sd-f"><span class="st" id="sd-st">Jede Änderung siehst du sofort auf der Karte.</span><button class="pri" id="sd-save">Speichern</button><button id="sd-undo">Verwerfen</button><a href="app.html#style">Alle Einstellungen</a></div>
+  </aside>
   <div class="tip" id="tip"></div>
   <div class="load" id="load">Karte wird geladen …</div>
   <div class="empty-map" id="empty" hidden></div>
@@ -104,21 +110,18 @@
    <details class="note"><summary>So liest du die Karte</summary>Grenzen: Natural Earth (gemeinfrei), vereinfacht auf etwa 1 km. Gezählt wird jede Region, in der ein GPS-Punkt liegt.</details>
   </section>
   <section class="panel" id="p-zeit">
-   <div><div class="kicker">KARTE 5 · ZEITRAFFER</div><h1>Eure Jahre als Film</h1><div class="sub">Jeder Tag läuft Stunde für Stunde ab: Züge, Autofahrten und Flüge entstehen so, wie ihr unterwegs wart. Ältere Wege verblassen. Leertaste = Start/Pause, Pfeile = Tag vor/zurück.</div></div>
+   <div><div class="kicker">KARTE 5 · REISEFILM</div><h1>Eure Reisen als Film</h1><div class="sub">Die Kamera fliegt von Reise zu Reise, die Route zeichnet sich mit Flugzeug, Zug, Auto oder Fähre, jedes Jahr ist ein Kapitel. Leertaste = Start/Pause, Pfeile = nächste/vorige Szene.</div></div>
    <div class="sec">Film</div>
    <div class="card">
-    <div class="row"><button class="play" id="z-play" aria-label="Abspielen"><svg width="14" height="14" viewBox="0 0 14 14"><path id="z-pico" d="M3 1.5L12 7L3 12.5Z" fill="#fff"/></svg></button><div style="flex:1"><div class="yrlabel" id="z-date">–</div><div class="note" id="z-what">bereit</div></div></div>
-    <input type="range" id="z-slider" min="0" max="100" value="0" aria-label="Datum" style="margin-top:10px">
-    <div class="zline"><canvas id="z-line" aria-label="Zeitleiste: Kilometer pro Woche und Reisen"></canvas></div>
-    <div class="ct" style="margin-top:12px">TEMPO <div class="seg" id="z-speed"><button data-v="1">1 Tag/s</button><button data-v="7" class="on">1 Woche/s</button><button data-v="30">1 Monat/s</button><button data-v="120">4 Monate/s</button></div></div>
-    <div class="ct" style="margin-top:10px">KAMERA <div class="seg" id="z-cam"><button data-v="follow" class="on">folgt mir</button><button data-v="fixed">fest</button></div></div>
-    <div class="ct" style="margin-top:10px">LOOK <div class="seg" id="z-look"><button data-v="cine" class="on">Kino</button><button data-v="map">Karte</button></div></div>
-    <div class="ct" style="margin-top:10px">SPUR <div class="seg" id="z-trail"><button data-v="all" class="on">alles behalten</button><button data-v="month">nur 30 Tage</button></div></div>
+    <div class="row"><button class="play" id="f-play" aria-label="Abspielen"><svg width="14" height="14" viewBox="0 0 14 14"><path id="f-pico" d="M3 1.5L12 7L3 12.5Z" fill="#fff"/></svg></button><div style="flex:1"><div class="yrlabel" id="f-now">–</div><div class="note" id="f-what">bereit</div></div></div>
+    <input type="range" id="f-slider" min="0" max="1000" value="0" aria-label="Stelle im Film" style="margin-top:10px">
+    <div class="row" style="margin-top:12px;gap:8px;flex-wrap:wrap"><button class="fbtn" id="f-rec">🎥 Als Video speichern</button><button class="fbtn" id="f-style">🎨 Film einstellen</button><a class="fbtn" id="f-dl" hidden>⬇︎ Video herunterladen</a></div>
+    <div class="note" id="f-recmsg" style="margin-top:6px"></div>
    </div>
+   <div class="sec">Kapitel</div>
+   <div class="card"><div class="ct">SPRINGE ZU <small>Jahr antippen</small></div><div class="chips" id="f-years"></div></div>
    <div class="sec">Zahlen</div>
-   <div class="card"><div class="stats" id="z-stats"></div></div>
-   <div class="sec">Springen</div>
-   <div class="card"><div class="ct">SPRINGE ZU</div><div class="chips" id="z-jump"></div></div>
+   <div class="card"><div class="stats" id="f-stats"></div></div>
   </section>
  </aside>
 </div>
