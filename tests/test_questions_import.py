@@ -143,3 +143,13 @@ def test_owntracks_parse_and_auth(engine):
         assert post("alex", "secret-123", b"{broken")[0] == 400
     finally:
         srv.shutdown()
+
+
+def test_trip_list_with_coordinates_is_still_a_trip_list():
+    from worldmap import importers
+    csv = ("Von;Bis;Ziel;Land;Wer;Verkehrsmittel;Breitengrad;Längengrad\n"
+           "2019-08-01;2019-08-10;Sample Bay;Frankreich;Paar;Auto · Schiff;42.15;9.10\n"
+           "2020-02-01;2020-02-02;Somewhere;Schweiz;Alex;Zug;;\n").encode("utf-8-sig")
+    r = importers.detect_and_parse(csv, "list.csv")
+    assert r.format == "trips-csv" and len(r.trips) == 2
+    assert r.trips[0]["lat"] == 42.15 and r.trips[0]["who"] == "Paar"

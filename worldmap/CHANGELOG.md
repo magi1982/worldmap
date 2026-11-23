@@ -6,6 +6,11 @@
 - Own AppArmor profile: the add-on may only write to `/data` and temporary files, cannot mount, trace other processes or
   use admin capabilities. Raises the Home Assistant security rating from 7 to 8 (the maximum).
 
+### Fixed
+- Phone: the "show for" bar no longer sticks over the map while scrolling the side panel.
+- Trip lists that also contain latitude/longitude columns are imported as trips (with these coordinates) instead of failing
+  with "no usable coordinates".
+
 ## 0.5.0 – 2026-11-23
 
 ### Added

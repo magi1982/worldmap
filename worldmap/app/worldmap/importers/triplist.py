@@ -26,7 +26,7 @@ NOTE = ("notiz", "note", "bemerkung", "kommentar", "comment")
 SOURCE = ("quelle", "source")
 KM = ("maxentfernungkm", "entfernungkm", "entfernung", "km", "distancekm", "distance")
 LAT = ("lat", "latitude", "breite", "breitengrad")
-LON = ("lon", "lng", "longitude", "laenge", "lange", "laengengrad")
+LON = ("lon", "lng", "longitude", "laenge", "lange", "laengengrad", "langengrad")
 
 COUNTRY_CC = {v.lower(): k for k, v in places.COUNTRY_DE.items()}
 COUNTRY_CC.update({"grossbritannien": "GB", "vereinigtes königreich": "GB", "uk": "GB", "united kingdom": "GB",
@@ -35,7 +35,10 @@ COUNTRY_CC.update({"grossbritannien": "GB", "vereinigtes königreich": "GB", "uk
 
 def looks_like_trip_list(header: list) -> bool:
     h = ["" if x is None else str(x) for x in header]
-    return _find(h, START, exact=True) is not None and _find(h, DEST) is not None and _find(h, LAT, exact=True) is None
+    if _find(h, START, exact=True) is None or _find(h, DEST) is None:
+        return False
+    # a list with coordinates is still a trip list when it has an end date column (point exports have none)
+    return _find(h, LAT, exact=True) is None or _find(h, END, exact=True) is not None
 
 
 def _date(v) -> str | None:
