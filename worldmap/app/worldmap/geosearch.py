@@ -47,9 +47,15 @@ def _item(name, country, lat, lon, radius, source) -> dict | None:
             "radius_km": radius, "source": source}
 
 
+API_HOSTS = ("nominatim.openstreetmap.org", "places.googleapis.com")
+
+
 def _get(url: str, headers: dict, data: bytes | None = None):
+    u = urllib.parse.urlsplit(url)
+    if u.scheme != "https" or u.hostname not in API_HOSTS:  # only the two search services, never file:// or others
+        raise ValueError("search host not allowed")
     req = urllib.request.Request(url, data=data, headers={"User-Agent": UA, **headers})
-    with urllib.request.urlopen(req, timeout=TIMEOUT) as r:  # noqa: S310 – fixed https hosts only
+    with urllib.request.urlopen(req, timeout=TIMEOUT) as r:  # nosec B310 # noqa: S310 – https + fixed hosts checked above
         return json.loads(r.read(2_000_000))
 
 

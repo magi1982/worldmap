@@ -117,3 +117,9 @@ def test_island_by_car_and_ferry_goes_back_the_same_way(engine, tmp_path):
 
 def test_reverse_of_a_line():
     assert A._rev([1, 2, 3, 4, 5, 6]) == [5, 6, 3, 4, 1, 2]
+
+
+def test_online_search_only_talks_to_its_two_services():
+    for bad in ("file:///etc/passwd", "http://nominatim.openstreetmap.org/search", "https://example.com/x"):
+        with pytest.raises(ValueError):
+            geosearch._get(bad, {})

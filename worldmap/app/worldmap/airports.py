@@ -6,12 +6,14 @@ after landing at the hotel. ``snap`` moves such an end to the airport nearby; la
 from __future__ import annotations
 
 import json
+import logging
 import math
 from functools import lru_cache
 from pathlib import Path
 
 from .geo import haversine_km
 
+log = logging.getLogger(__name__)
 DATA = Path(__file__).parent / "data" / "airports.json"
 LARGE_KM = 60.0
 MEDIUM_KM = 35.0
@@ -133,8 +135,8 @@ def search(query: str, limit: int = 8, near: tuple | None = None) -> list[dict]:
             if hit:
                 near = (hit["lat"], hit["lon"])
                 near_km = max(LARGE_KM, min(float(hit.get("radius_km") or 0), 250.0))
-    except Exception:  # noqa: BLE001 – the search works without the alias list too
-        pass
+    except Exception:  # noqa: BLE001 – the search works without the town list too
+        log.debug("airport search without town names", exc_info=True)
     for rows in _index().values():
         for r in rows:
             if len(q) == 3 and r[0].lower() == q:

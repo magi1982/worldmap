@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.12.3 – 2026-11-23
+
+### Security
+- The online place search refuses any address that is not https to its two services (OpenStreetMap Nominatim,
+  Google Places) before it connects – the automatic security scan (Bandit) had flagged the open call since 0.9.0.
+- The airport search logs a failed town lookup instead of silently ignoring it. The CI checks are green again.
+
 ## 0.12.2 – 2026-11-23
 
 ### Fixed
