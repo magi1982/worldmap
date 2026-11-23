@@ -428,7 +428,10 @@ class Atlas:
         first: dict = {}
         days: dict = defaultdict(set)
         cache: dict = {}
-        for p in pts:
+        air = _airborne(pts)
+        for i, p in enumerate(pts):
+            if i in air:  # over-flown on a plane: not a visit
+                continue
             key = (round(p["lat"] / 0.01), round(p["lon"] / 0.01))
             if key not in cache:
                 cache[key] = self.region_at(p["lat"], p["lon"])
@@ -460,6 +463,28 @@ class Atlas:
             if rid is not None:
                 stayed.add(rid)
         return [[k[0], k[1], first[k], len(days[k]), 1 if k[0] in stayed else 0] for k in sorted(first)]
+
+
+AIR_KMH = 200.0
+
+
+def _airborne(pts) -> set:
+    """Indices of points recorded in a plane (fast to the neighbour point of the same person, or tagged as flying)."""
+    out: set = set()
+    last: dict = {}
+    for i, p in enumerate(pts):
+        if "FLY" in str(p.get("hint") or "").upper():
+            out.add(i)
+        j = last.get(p["person"])
+        if j is not None:
+            q = pts[j]
+            dkm = haversine_km(q["lat"], q["lon"], p["lat"], p["lon"])
+            dt_h = max(1 / 3600, (p["ts"] - q["ts"]) / 3600)
+            if dkm > 5 and dkm / dt_h > AIR_KMH:
+                out.add(i)
+                out.add(j)
+        last[p["person"]] = i
+    return out
 
 
 def _pip(x: float, y: float, poly) -> bool:

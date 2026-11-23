@@ -171,3 +171,13 @@ def test_transport_words_from_the_picker():
     from worldmap.modes import modes_of_transport
     assert modes_of_transport("Auto · Zug · Bus · Flug · Schiff · Wohnmobil · Velo · zu Fuss") == ["road", "rail", "fly", "ferry", "foot"]
     assert modes_of_transport("Bus") == ["road"]
+
+
+def test_overflown_regions_do_not_count():
+    pts = [{"ts": 0, "lat": 47.0, "lon": 8.0, "person": "Alex", "hint": None},
+           {"ts": 1800, "lat": 44.8, "lon": 17.2, "person": "Alex", "hint": None},     # 750 km in 30 min: plane
+           {"ts": 3600, "lat": 42.0, "lon": 21.4, "person": "Alex", "hint": None},
+           {"ts": 90000, "lat": 42.01, "lon": 21.41, "person": "Alex", "hint": None},  # walking around next day
+           {"ts": 90100, "lat": 40.0, "lon": 22.0, "person": "Sam", "hint": "FLYING"}]
+    air = A._airborne(pts)
+    assert {0, 1, 2, 4} <= air and 3 not in air
