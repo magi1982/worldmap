@@ -82,6 +82,16 @@ class Engine:
                 match = next((t for t in existing if not (c.end < t["start_date"] or c.start > t["end_date"])), None)
                 if match and match["locked"]:
                     continue
+                if not match and c.nights == 0 and c.max_km < self.s.min_day_trip_km:
+                    continue  # a short day out is not a trip
+                if match and (match.get("source") or "auto") != "auto":
+                    # entered by hand or imported (e.g. a trip list): the user's data wins, GPS only fills gaps
+                    fill = {k: v for k, v in (("lat", c.lat), ("lon", c.lon), ("max_km", round(c.max_km, 1)))
+                            if match.get(k) in (None, "")}
+                    if fill:
+                        self.db.upsert_trip(fill, match["id"])
+                        updated += 1
+                    continue
                 name, country = places.describe(c.lat, c.lon)
                 city = places.major(c.lat, c.lon, radius_km=15)  # a known city reads better than a suburb
                 if city and c.max_km >= 150 and not name.startswith("bei "):

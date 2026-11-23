@@ -44,6 +44,9 @@ configuration:
   min_trip_km:
     name: Reise ab (km)
     description: Ein Tag zählt als Reise, wenn jemand mindestens so weit weg war.
+  min_day_trip_km:
+    name: Tagesausflug ab (km)
+    description: Ein Tag ohne Übernachtung zählt erst ab dieser Entfernung als Reise. Mit Übernachtung gilt «Reise ab (km)».
   routine_days:
     name: Alltagsorte (Tage)
     description: >-

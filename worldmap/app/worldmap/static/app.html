@@ -46,9 +46,12 @@
   <section id="tab-import" class="tab">
     <div id="drop" class="drop" tabindex="0">
       <b>Dateien hierher ziehen</b> oder <label class="link">auswählen<input id="file" type="file" multiple hidden></label>
-      <p class="small">Reiselisten (CSV/Excel mit Von, Bis, Ziel …), Google-Zeitachse (JSON), iCloud-/exiftool-CSV, GPX, KML – das Format wird automatisch erkannt. Doppelte Daten werden nicht doppelt gespeichert.</p>
+      <p class="small">Worldmap-Paket, Reiselisten (CSV/Excel mit Von, Bis, Ziel …), Google-Zeitachse (JSON), iCloud-/exiftool-CSV, GPX, KML – das Format wird automatisch erkannt. Doppelte Daten werden nicht doppelt gespeichert.</p>
     </div>
     <div id="imports" class="cards"></div>
+    <div class="card wide backup"><h3>💾 Alles in einer Datei</h3>
+      <p class="small keep">Ein <b>Worldmap-Paket</b> enthält alle Reisen mit „Wer war dabei“ und alle GPS-Positionen mit der Person dazu. Zum Sichern, für ein neues Home Assistant oder um es hier wieder einzulesen – einfach oben ablegen.</p>
+      <div class="opts"><a class="btn" href="api/export.worldmap.json.gz" download>Worldmap-Paket herunterladen</a><a class="btn" href="api/export.csv">Nur Reiseliste (CSV / Excel)</a></div></div>
     <h3 class="sub">Bisherige Importe</h3>
     <div id="pastImports" class="cards"></div>
   </section>

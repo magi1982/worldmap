@@ -39,7 +39,7 @@ def settings():
             {"entity": "person.sam", "label": "Sam"},
         ],
         "who_options": ["Paar", "Familie"],
-        "home_lat": HOME[0], "home_lon": HOME[1],
+        "home_lat": HOME[0], "home_lon": HOME[1], "min_day_trip_km": 1,
         "routing": "off",
         "school_holidays": ["2025-07-05..2025-08-10"],
     })

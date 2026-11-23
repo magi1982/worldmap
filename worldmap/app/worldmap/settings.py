@@ -29,6 +29,7 @@ class Settings:
     show_work: bool = False                               # show the workplace on the map
     timezone: str = "Europe/Zurich"
     min_trip_km: float = 30.0
+    min_day_trip_km: float = 100.0                        # a day without a night away counts from this distance
     routine_days: int = 20                                # places visited on this many days are not trips (0 = off)
     poll_interval_min: int = 5
     history_days_on_start: int = 10
@@ -106,6 +107,7 @@ def from_dict(raw: dict) -> Settings:
     ][:10]
     s.school_holidays = [str(x) for x in _list(s.school_holidays)]
     s.min_trip_km = max(1.0, float(s.min_trip_km))
+    s.min_day_trip_km = max(s.min_trip_km, min(2000.0, float(s.min_day_trip_km or 0)))
     s.poll_interval_min = max(1, int(s.poll_interval_min))
     s.routine_days = max(0, min(3650, int(s.routine_days)))
     s.max_upload_mb = min(2000, max(1, int(s.max_upload_mb)))

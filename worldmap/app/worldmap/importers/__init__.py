@@ -5,11 +5,13 @@ from the content (never trusts the file name alone).
 """
 from __future__ import annotations
 
+import gzip
+import io
 import json
 from dataclasses import dataclass, field
 
 from ..geo import valid_coord
-from . import google, gpx, tabular, triplist
+from . import google, gpx, package, tabular, triplist
 
 # (ts, lat, lon, person, source, accuracy, hint)
 Point = tuple
@@ -25,6 +27,8 @@ class ImportResult:
     columns: dict | None = None  # column mapping for tabular data (shown in the preview)
     warnings: list = field(default_factory=list)
     trips: list = field(default_factory=list)  # trip lists: one dict per trip
+    persons: list = field(default_factory=list)  # Worldmap package: persons and groups it was made with
+    groups: list = field(default_factory=list)
 
 
 class UserImportError(ValueError):
@@ -44,7 +48,26 @@ def _clean(points, person: str, result: ImportResult) -> None:
         result.points.append((int(ts), float(lat), float(lon), person, src, acc, hint))
 
 
+MAX_UNZIPPED = 1024 * 1024 * 1024
+
+
+def _gunzip(data: bytes) -> bytes:
+    out = bytearray()
+    d = gzip.GzipFile(fileobj=io.BytesIO(data))
+    while chunk := d.read(1 << 20):
+        out += chunk
+        if len(out) > MAX_UNZIPPED:  # zip bomb guard
+            raise UserImportError("file too large after unpacking")
+    return bytes(out)
+
+
 def detect_and_parse(data: bytes, filename: str = "", person: str = "", tz: str = "Europe/Zurich") -> ImportResult:
+    if data[:2] == b"\x1f\x8b":
+        try:
+            data = _gunzip(data)
+        except (OSError, EOFError) as exc:
+            raise UserImportError(f"invalid gzip file: {exc}") from exc
+        filename = (filename or "").removesuffix(".gz")
     name = (filename or "").lower()
     head = data[:4096].lstrip()
     if data[:2] == b"PK" or name.endswith((".xlsx", ".xlsm")):
@@ -70,6 +93,17 @@ def detect_and_parse(data: bytes, filename: str = "", person: str = "", tz: str 
             obj = json.loads(data.decode("utf-8-sig"))
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
             raise UserImportError(f"invalid JSON: {exc}") from exc
+        if package.is_package(obj):
+            pts, trips, persons, groups, problems = package.parse(obj)
+            res = ImportResult(format="worldmap", trips=trips, persons=persons, groups=groups, warnings=problems)
+            for ts, lat, lon, src, acc, hint, who in pts:
+                if valid_coord(lat, lon) and len(res.points) < MAX_POINTS:
+                    res.points.append((ts, lat, lon, who, src, acc, hint))
+                else:
+                    res.skipped += 1
+            if not res.points and not res.trips:
+                raise UserImportError("the Worldmap package is empty")
+            return res
         kind, pts = google.parse(obj, tz)
         if kind is None:
             raise UserImportError("JSON format not recognised (expected a Google Timeline export)")

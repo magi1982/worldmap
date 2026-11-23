@@ -24,7 +24,7 @@ from .atlas import Atlas
 from .db import CONFIDENCE
 from .engine import Engine
 from .ha import Supervisor, list_trackers
-from .importers import UserImportError, detect_and_parse, triplist
+from .importers import UserImportError, detect_and_parse, package, triplist
 from .settings import COLOR_RE, ENTITY_RE, LABEL_RE, SERVICE_RE, USER_RE, from_dict
 from .style import StyleStore
 
@@ -55,7 +55,7 @@ _STATIC_CACHE: dict = {}
 FILENAME_RE = re.compile(r"[^\w.\-]+")
 MAX_JSON = 256 * 1024
 CONNECTOR_KEYS = ("persons", "groups", "owntracks", "notify_service", "notify_mode", "who_options", "school_holidays",
-                  "routing", "min_trip_km", "ask_below", "hint_keywords", "routine_days", "home_lat", "home_lon",
+                  "routing", "min_trip_km", "min_day_trip_km", "ask_below", "hint_keywords", "routine_days", "home_lat", "home_lon",
                   "home_radius_m", "work_lat", "work_lon", "work_radius_m", "show_work")
 TEXT_LIMITS = {"destination": 120, "country": 60, "who": 60, "transport": 80, "reason": 300, "note": 1000, "source": 80}
 
@@ -238,8 +238,8 @@ def validate_connectors(data: dict) -> dict:
             out[k] = max(0 if k == "home_radius_m" else 50, min(5000, int(v)))
         elif k == "show_work":
             out[k] = bool(v)
-        elif k == "min_trip_km":
-            out[k] = max(1.0, min(1000.0, float(v)))
+        elif k in ("min_trip_km", "min_day_trip_km"):
+            out[k] = max(1.0, min(2000.0, float(v)))
         elif k == "routine_days":
             out[k] = max(0, min(3650, int(v)))
         elif k in ("who_options", "school_holidays", "hint_keywords"):
@@ -300,7 +300,7 @@ def make_handler(app: App):
             "segments": {r["mode"]: r["n"] for r in eng.db.query("SELECT mode, COUNT(*) AS n FROM segments GROUP BY mode")},
             "notify_service": eng.s.notify_service, "notify_mode": eng.s.notify_mode,
             "who_options": eng.s.who_options, "groups": eng.s.groups, "school_holidays": eng.s.school_holidays,
-            "routing": eng.s.routing, "min_trip_km": eng.s.min_trip_km, "ask_below": eng.s.ask_below,
+            "routing": eng.s.routing, "min_trip_km": eng.s.min_trip_km, "min_day_trip_km": eng.s.min_day_trip_km, "ask_below": eng.s.ask_below,
             "routine_days": eng.s.routine_days,
             "home": {"zone": eng.s.home_zone, "lat": eng.s.home_lat, "lon": eng.s.home_lon, "radius_m": eng.s.home_radius_m,
                      "resolved": eng.resolve_home(), "radius_used_m": round(eng.home_radius_km() * 1000)},
@@ -434,6 +434,17 @@ def make_handler(app: App):
                 except ValueError:
                     tol = 0.002
                 return self._send(HTTPStatus.OK, eng.tracks(min(0.5, max(0.00002, tol))))
+            if path == "/api/export.worldmap.json.gz":
+                persons = eng.s.labels
+                pidx = {p: i for i, p in enumerate(persons)}
+                pkg = {"worldmap": 1, "persons": persons,
+                       "groups": [{"name": g["name"], "members": g["members"], "extra": g["extra"]} for g in eng.s.groups],
+                       "trips": [{k: t[k] for k in package.TRIP_KEYS if t.get(k) not in (None, "")} for t in eng.db.trips()],
+                       "points": [[r["ts"], round(r["lat"], 6), round(r["lon"], 6), pidx.get(r["person"], -1), r["source"], r["hint"]]
+                                  for r in eng.db.query("SELECT ts, lat, lon, person, source, hint FROM points ORDER BY ts")]}
+                body = gzip.compress(json.dumps(pkg, ensure_ascii=False, separators=(",", ":")).encode(), 6)
+                return self._send(HTTPStatus.OK, body, "application/gzip",
+                                  {"Content-Disposition": 'attachment; filename="worldmap-backup.worldmap.json.gz"'})
             if path == "/api/export.csv":
                 buf = io.StringIO()
                 w = csv.writer(buf, delimiter=";")
@@ -597,6 +608,43 @@ def make_handler(app: App):
             app.changed()
             return self._send(HTTPStatus.OK, summary)
 
+        def _import_package(self, res, filename, dry):
+            ok_trips, bad = [], 0  # check every trip before anything is written
+            for t in res.trips:
+                try:
+                    validate_trip(t, partial=False)
+                    ok_trips.append(t)
+                except ValueError:
+                    bad += 1
+            res.trips = ok_trips
+            if bad:
+                res.warnings.append(f"{bad} trips could not be read and were left out")
+            known = set(eng.s.labels) | {g["name"] for g in eng.s.groups}
+            needed = sorted({p[3] for p in res.points if p[3]} | {t.get("who") for t in res.trips if t.get("who")})
+            missing = [n for n in needed if n not in known]
+            summary = {"format": "worldmap", "kind": "package", "points": len(res.points), "trips": len(res.trips),
+                       "skipped": res.skipped, "warnings": res.warnings, "persons": res.persons,
+                       "groups": [g["name"] for g in res.groups], "missing": missing,
+                       "first": min([p[0] for p in res.points] or [0]), "last": max([p[0] for p in res.points] or [0]),
+                       "sample": [t["destination"] for t in res.trips[:5]]}
+            if missing:
+                summary["warnings"] = [*res.warnings, "not set up yet under People & groups: " + ", ".join(missing)]
+            if dry:
+                return self._send(HTTPStatus.OK, summary)
+            summary["new_points"] = eng.import_points(res.points) if res.points else 0
+            if res.trips:
+                summary.update(upsert_trips(eng.db, res.trips))
+            with eng.db.tx() as c:
+                c.execute("INSERT INTO imports (filename, format, points) VALUES (?, ?, ?)",
+                          (filename, "worldmap", summary["new_points"] + len(res.trips)))
+            if app.busy.acquire(blocking=False):
+                try:
+                    summary["rebuild"] = eng.rebuild()
+                finally:
+                    app.busy.release()
+            app.changed()
+            return self._send(HTTPStatus.OK, summary)
+
         def _import(self, q):
             if "application/octet-stream" not in (self.headers.get("Content-Type") or ""):
                 raise ValueError("Content-Type must be application/octet-stream")
@@ -610,6 +658,8 @@ def make_handler(app: App):
                 res = detect_and_parse(data, filename, person, eng.s.timezone)
             except UserImportError as exc:
                 return self._send(HTTPStatus.UNPROCESSABLE_ENTITY, {"error": str(exc)})
+            if res.format == "worldmap":
+                return self._import_package(res, filename, dry)
             if res.trips:
                 return self._import_trips(res, filename, dry)
             if not person:  # photos: the camera tells whose they are

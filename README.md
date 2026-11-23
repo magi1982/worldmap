@@ -20,6 +20,7 @@ fast, good-looking map with five views. Everything runs inside the add-on; no cl
 | ❓ **Smart questions – no AI needed** | Similar trips (same area, same kind of day, same suggestion) are asked **once** – one answer for all. Answers can be remembered as **rules**, so the same question never comes again. Answers: every person and group, "no trip (everyday life)", "merge with the trip before", "ask one by one". |
 | 👥 **People & groups** | Single persons and groups (couple, family …) with colours. A bar on top of every map shows everyone, one person or one group. Home and work with radius; the workplace is hidden on the map unless you switch it on. |
 | 📋 **Excel-style trip list** | In the settings: filter per column, sort, edit cells in place, delete rows, paste rows straight from Excel or Google Sheets (Ctrl+V). Duplicates are detected. |
+| 💾 **Everything in one file** | The *Worldmap package* holds all trips with who was there and all GPS points with their person – download it as a backup and import it anywhere. |
 | 📥 **Import anything** | Trip lists (CSV/Excel with From, To, Destination …) – destinations are placed on the map automatically – Google Timeline (Takeout and the on-device export for Android and iPhone), iCloud/exiftool photo CSV, any CSV/Excel with coordinates, GPX, KML. A preview shows what was found before anything is saved; data that is already there is not stored twice. |
 | 📡 **Live without cloud** | Positions from `person.*` / `device_tracker.*` entities and a built-in **OwnTracks** endpoint: the phone buffers positions while you are away and sends them when it is back in your home network – no Nabu Casa, no port opened to the internet. |
 | ✍️ **Trips by hand** | The "+" button asks a few questions (where, when, how long, who, how, how big was the area) – for old trips without any data. |
@@ -69,7 +70,8 @@ Everything can be set in the app (⚙️ **Settings**) or in the add-on configur
 | `home_radius_m` | 0 | home radius in metres; 0 = radius of the home zone |
 | `work_lat` / `work_lon` / `work_radius_m` | – / – / 300 | workplace; empty = detected automatically |
 | `show_work` | false | show the workplace on the map |
-| `min_trip_km` | 30 | a day counts as a trip from this distance |
+| `min_trip_km` | 30 | with a night away, a trip starts at this distance |
+| `min_day_trip_km` | 100 | a day out without a night away counts as a trip from this distance |
 | `routine_days` | 20 | places visited on this many days (work, school) never start a trip; 0 = off |
 | `ask_below` | `hoch` | ask when the confidence is below this level |
 | `school_holidays` | – | ranges like `2026-07-04..2026-08-09` – suggests "family" |

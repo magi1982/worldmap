@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.5.2 – 2026-11-23
+
+### Added
+- **Worldmap package** (`*.worldmap.json.gz`): one file with all trips (who was there, transport, notes) and all GPS points
+  (with the person they belong to). Import it under Import; download your own under Import › "Worldmap package" – for
+  backups or moving to another Home Assistant. Gzip is unpacked with a size limit; every trip is checked before anything is stored.
+- New setting `min_day_trip_km` (default 100 km): a day out without a night away counts as a trip only from this distance.
+
+### Changed
+- Trips that were imported or entered by hand are never overwritten by GPS detection any more – GPS only fills in missing
+  coordinates and distances.
+
 ## 0.5.1 – 2026-11-23
 
 ### Security

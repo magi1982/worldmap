@@ -138,3 +138,31 @@ def test_notify_open_sends_once(engine):
     assert engine.notify_open() == 1
     assert sent[0][0] == "notify.mobile_app_test" and sent[0][2] == engine.ingress_url
     assert engine.notify_open() == 0  # already notified
+
+
+def test_short_day_outings_and_imported_trips(engine):
+    """Day trips below min_day_trip_km are no trips; imported trips keep who was there when GPS data comes in."""
+    from datetime import datetime
+    from zoneinfo import ZoneInfo
+
+    from conftest import HOME
+    tz = ZoneInfo("Europe/Zurich")
+
+    def ts(s):
+        return int(datetime.fromisoformat(s).replace(tzinfo=tz).timestamp())
+
+    engine.s.min_day_trip_km = 100
+    near = (HOME[0] + 0.5, HOME[1])          # ~55 km, back in the evening
+    far = (HOME[0] + 1.5, HOME[1])           # ~165 km
+    pts = []
+    for day, dest in (("2025-03-01", near), ("2025-03-08", far)):
+        pts += [(ts(f"{day}T08:00:00"), *HOME, "Alex", "t", None, None), (ts(f"{day}T12:00:00"), *dest, "Alex", "t", None, None),
+                (ts(f"{day}T20:00:00"), *HOME, "Alex", "t", None, None)]
+    engine.db.upsert_trip({"start_date": "2025-03-08", "end_date": "2025-03-08", "destination": "Listed", "who": "Familie",
+                           "confidence": "bestätigt", "source": "Reiseliste"})
+    engine.import_points(pts)
+    engine.rebuild()
+    trips = engine.db.trips()
+    assert not any(t["start_date"] == "2025-03-01" for t in trips)
+    listed = next(t for t in trips if t["start_date"] == "2025-03-08")
+    assert listed["who"] == "Familie" and listed["destination"] == "Listed" and listed["max_km"] and listed["lat"]

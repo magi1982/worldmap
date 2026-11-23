@@ -205,7 +205,12 @@ async function preview(file) {
     const r = await upload(file, '', true);
     const cols = r.columns ? Object.entries(r.columns).map(([k, v]) => `${esc(k)} → ${esc(v)}`).join(', ') : '';
     const warn = (r.warnings || []).map((w) => `<p class="small warn">${esc(w)}</p>`).join('');
-    if (r.kind === 'trips') {
+    if (r.kind === 'package') {
+      const range = r.points ? `${new Date(r.first * 1000).toLocaleDateString('de-CH')} – ${new Date(r.last * 1000).toLocaleDateString('de-CH')}` : '';
+      set(`<h3>${esc(file.name)} <span class="status ok">Worldmap-Paket</span></h3><p><b>${r.trips.toLocaleString('de-CH')}</b> Reisen mit „Wer war dabei“ · <b>${r.points.toLocaleString('de-CH')}</b> GPS-Positionen${range ? ' · ' + esc(range) : ''}</p>
+      <p class="small">Personen: ${r.persons.map(esc).join(', ') || '–'} · Gruppen: ${r.groups.map(esc).join(', ') || '–'}</p>${r.missing.length ? `<p class="small warn">Lege zuerst unter <a href="#people">Personen &amp; Gruppen</a> an: <b>${r.missing.map(esc).join(', ')}</b> – sonst fehlen Farben und Zuordnung.</p>` : ''}${(r.warnings || []).filter((w) => !w.startsWith('not set up')).map((w) => `<p class="small warn">${esc(w)}</p>`).join('')}
+      <div class="opts"><button class="primary go">Importieren</button></div>`);
+    } else if (r.kind === 'trips') {
       set(`<h3>${esc(file.name)} <span class="status ok">Reiseliste</span></h3><p><b>${r.trips}</b> Reisen · ${fmtD(r.first)} – ${fmtD(r.last)} · <b>${r.located}</b> auf der Karte gefunden</p>${cols ? `<p class="small">Spalten: ${cols}</p>` : ''}${warn}
       <div class="opts"><button class="primary go">Importieren</button></div>`);
     } else {
@@ -218,13 +223,15 @@ async function preview(file) {
       const go = card.querySelector('.go'); go.disabled = true; go.textContent = 'importiere …';
       try {
         const x = await upload(file, card.querySelector('.who')?.value || '', false);
-        card.querySelector('.opts').innerHTML = x.kind === 'trips'
+        card.querySelector('.opts').innerHTML = x.kind === 'package'
+          ? `<span class="status ok">${x.trips_created || 0} Reisen neu, ${x.trips_updated || 0} aktualisiert</span> <span class="status ok">${x.new_points.toLocaleString('de-CH')} neue Positionen</span>`
+          : x.kind === 'trips'
           ? `<span class="status ok">${x.trips_created} neu, ${x.trips_updated} aktualisiert${x.duplicates_in_file ? `, ${x.duplicates_in_file} doppelt in der Datei` : ''}</span>`
           : `<span class="status ok">${x.new_points.toLocaleString('de-CH')} neue Positionen</span> <span class="status">${(x.points - x.new_points).toLocaleString('de-CH')} schon vorhanden</span> ${x.rebuild ? `<span class="status">${x.rebuild.trips_created ?? 0} neue Reisen, ${x.rebuild.questions ?? 0} Fragen</span>` : ''}`;
         refresh(); loadImports();
       } catch (e) { card.querySelector('.opts').innerHTML = `<span class="status warn">${esc(e.message)}</span>`; }
     };
-  } catch (e) { set(`<h3>${esc(file.name)}</h3><p><span class="status warn">${esc(e.message)}</span></p><p class="small">Erwartet wird eine Reiseliste (Spalten Von, Bis, Ziel …) oder GPS-Daten (Datum/Zeit + Breite/Länge).</p>`); }
+  } catch (e) { set(`<h3>${esc(file.name)}</h3><p><span class="status warn">${esc(e.message)}</span></p><p class="small">Erwartet wird ein Worldmap-Paket, eine Reiseliste (Spalten Von, Bis, Ziel …) oder GPS-Daten (Datum/Zeit + Breite/Länge).</p>`); }
 }
 async function loadImports() {
   try {
@@ -487,8 +494,9 @@ async function loadRules() {
     <li>Vorschläge kommen aus: wer gleichzeitig weg war, Wochenende, Schulferien, Wörter in Ordnernamen und gelernten Regeln.</li></ul><p class="small">Eine Regel sagt: „An diesem Ort, an solchen Tagen ist es immer …“. Sie entsteht, wenn du beim Beantworten einer Frage „merken“ anhakst. Mit ✕ löschst du sie wieder.</p>
     ${rules.length ? `<table class="mini"><thead><tr><th>Ort</th><th>Tage</th><th>Dann</th><th>Umkreis</th><th>angewendet</th><th></th></tr></thead><tbody>${rules.map((r) => `<tr data-id="${r.id}"><td>${esc(r.label)}</td><td>${DAYS[r.days] || esc(r.days)}</td><td>${r.action === 'ignore' ? 'keine Reise' : '<span class="pill" data-c="' + colorOf(r.value) + '">' + esc(r.value) + '</span>'}</td><td>${r.radius_km} km</td><td>${r.hits}×</td><td><button class="btn rm" aria-label="Regel löschen">✕</button></td></tr>`).join('')}</tbody></table>` : '<p class="small keep">Noch keine – sie entstehen beim Beantworten der Fragen, wenn du „merken“ anhakst.</p>'}</div>
   <div class="card" id="cTrip"><h3>🧭 Wann ist es eine Reise?</h3>
-    <p class="small">Ein Tag zählt als Reise, wenn jemand weiter weg war als diese Entfernung. Orte, die du sehr oft besuchst (Arbeit, Schule, Familie), zählen nie als Reise – so wird der Arbeitsweg nicht zur Reise.</p>
-    <label class="rng"><span>Ab</span><input type="range" id="minkm" min="5" max="300" step="5" value="${Math.min(300, c.min_trip_km)}"><b id="minkmV">${Math.round(c.min_trip_km)} km</b></label>
+    <p class="small">Mit Übernachtung zählt es als Reise, wenn jemand weiter weg war als die erste Entfernung; ein Tagesausflug ohne Übernachtung erst ab der zweiten. Orte, die du sehr oft besuchst (Arbeit, Schule, Familie), zählen nie als Reise – so wird der Arbeitsweg nicht zur Reise.</p>
+    <label class="rng"><span>mit Übernachtung ab</span><input type="range" id="minkm" min="5" max="300" step="5" value="${Math.min(300, c.min_trip_km)}"><b id="minkmV">${Math.round(c.min_trip_km)} km</b></label>
+    <label class="rng"><span>Tagesausflug ab</span><input type="range" id="minday" min="10" max="400" step="10" value="${Math.min(400, c.min_day_trip_km || 100)}"><b id="mindayV">${Math.round(c.min_day_trip_km || 100)} km</b></label>
     <label class="switch" style="margin-top:10px"><input type="checkbox" id="routOn" ${c.routine_days ? 'checked' : ''}><span></span>Oft besuchte Orte nie als Reise zählen</label>
     <label class="rng" id="routRow" style="margin-top:6px"><span>ab</span><input type="range" id="routd" min="5" max="120" step="5" value="${c.routine_days || 20}"><b id="routV" class="wide-b">${c.routine_days || 20} Tagen</b></label></div>
   <div class="card" id="cAsk"><h3>💬 Wann soll ich nachfragen?</h3>
@@ -511,6 +519,7 @@ async function loadRules() {
   $('kwAdd').onclick = () => $('kwList').insertAdjacentHTML('beforeend', kwRow());
   box.querySelectorAll('.rowlist').forEach((l) => l.addEventListener('click', (e) => { if (e.target.closest('.rm')) e.target.closest('.lrow').remove(); }));
   $('minkm').oninput = (e) => { $('minkmV').textContent = e.target.value + ' km'; };
+  $('minday').oninput = (e) => { $('mindayV').textContent = e.target.value + ' km'; };
   $('routd').oninput = (e) => { $('routV').textContent = e.target.value + ' Tagen'; };
   const routVis = () => { $('routRow').style.opacity = $('routOn').checked ? 1 : 0.4; $('routd').disabled = !$('routOn').checked; }; $('routOn').onchange = routVis; routVis();
   let ask = c.ask_below; $('askb').onclick = (e) => { const b = e.target.closest('button'); if (!b) return; ask = b.dataset.v; $('askb').querySelectorAll('button').forEach((x) => { x.classList.toggle('on', x === b); x.setAttribute('aria-checked', String(x === b)); }); };
@@ -518,7 +527,7 @@ async function loadRules() {
     const hol = [...box.querySelectorAll('#holList .lrow')].map((r) => [r.querySelector('.h1').value, r.querySelector('.h2').value]).filter(([a, b]) => a && b);
     if (hol.some(([a, b]) => b < a)) return toast('Bei den Ferien liegt „bis“ vor „von“');
     const kw = [...box.querySelectorAll('#kwList .lrow')].map((r) => [r.querySelector('.k1').value.trim(), r.querySelector('.k2').value]).filter(([a, b]) => a && b);
-    save({hint_keywords: kw.map(([a, b]) => `${a}=${b}`), school_holidays: hol.map(([a, b]) => `${a}..${b}`), min_trip_km: +$('minkm').value,
+    save({hint_keywords: kw.map(([a, b]) => `${a}=${b}`), school_holidays: hol.map(([a, b]) => `${a}..${b}`), min_trip_km: +$('minkm').value, min_day_trip_km: +$('minday').value,
       routine_days: $('routOn').checked ? +$('routd').value : 0, ask_below: ask}, loadRules);
   };
   syncButtons(box);

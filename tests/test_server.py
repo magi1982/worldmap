@@ -204,3 +204,35 @@ def test_validate_groups_home_work():
                 {"persons": [{"label": "Alex"}], "groups": [{"name": "Alex"}]}):
         with pytest.raises(ValueError):
             validate_connectors(bad)
+
+
+def test_worldmap_package_roundtrip(server, tmp_path, monkeypatch):
+    url, eng = server
+    pkg = {"worldmap": 1, "persons": ["Alex", "Sam"], "groups": [{"name": "Grossfamilie", "members": ["Alex", "Nobody"], "extra": 2}],
+           "trips": [{"start_date": "2024-07-13", "end_date": "2024-07-20", "destination": "Sample Bay", "who": "Grossfamilie",
+                      "country": "Kroatien", "transport": "Flug · Auto", "lat": 42.6, "lon": 18.1},
+                     {"start_date": "2024-07-13", "end_date": "2024-07-20", "destination": "Sample Bay", "who": "Grossfamilie"},
+                     {"destination": "no date"}],
+           "points": [[1720850000, 47.0, 8.0, 0, "google", "IN_TRAIN"], [1720853600, 47.1, 8.1, 1, "google", None],
+                      [1720857200, 999, 8.1, 0], ["bad"], [1720860000, 47.2, 8.2, 7]]}
+    body = gzip.compress(json.dumps(pkg).encode())
+    st, raw, _ = call(url + "/api/import?dry_run=1", "POST", body, "application/octet-stream", {"X-Filename": "x.worldmap.json.gz"})
+    r = js(raw)
+    assert st == 200 and r["kind"] == "package" and r["trips"] == 2 and r["points"] == 3 and r["skipped"] == 1
+    assert "Grossfamilie" in r["missing"] and any("could not be read" in w for w in r["warnings"])
+    st, raw, _ = call(url + "/api/import", "POST", body, "application/octet-stream", {"X-Filename": "x.worldmap.json.gz"})
+    r = js(raw)
+    assert st == 200 and r["new_points"] == 3 and r["trips_created"] == 1 and r["duplicates_in_file"] == 1
+    people = {p["person"] for p in eng.db.points()}
+    assert people == {"Alex", "Sam", ""}
+    st, raw, hdr = call(url + "/api/export.worldmap.json.gz")
+    back = json.loads(gzip.decompress(raw) if raw[:2] == b"\x1f\x8b" else raw)
+    assert st == 200 and back["worldmap"] == 1 and len(back["points"]) == 3
+    assert any(t["destination"] == "Sample Bay" and t["who"] == "Grossfamilie" for t in back["trips"])
+
+
+def test_gzip_bomb_is_refused(monkeypatch):
+    from worldmap import importers
+    monkeypatch.setattr(importers, "MAX_UNZIPPED", 1000)
+    with pytest.raises(importers.UserImportError):
+        importers.detect_and_parse(gzip.compress(b" " * 5000), "x.gz")

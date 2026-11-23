@@ -20,6 +20,7 @@ auf einer schnellen, schönen Karte mit fünf Ansichten. Alles läuft im Add-on,
 | ❓ **Kluge Fragen – ohne KI** | Ähnliche Reisen (gleiche Gegend, gleiche Art Tag, gleicher Vorschlag) kommen als **eine** Frage – eine Antwort für alle. Antworten lassen sich als **Regel** merken, dieselbe Frage kommt nie wieder. Antworten: jede Person und Gruppe, „Keine Reise (Alltag)“, „Mit Reise davor zusammenlegen“, „Einzeln fragen“. |
 | 👥 **Personen & Gruppen** | Einzelpersonen und Gruppen (Paar, Familie …) mit Farben. Oben in jeder Karte: alle, eine Person oder eine Gruppe antippen. Zuhause und Arbeit mit Umkreis; die Arbeit erscheint nur auf der Karte, wenn du es einschaltest. |
 | 📋 **Reiseliste wie in Excel** | In den Einstellungen: Filter pro Spalte, sortieren, Zellen direkt bearbeiten, Zeilen löschen, Zeilen direkt aus Excel oder Google Sheets einfügen (Strg+V). Doppelte werden erkannt. |
+| 💾 **Alles in einer Datei** | Das *Worldmap-Paket* enthält alle Reisen mit „Wer war dabei“ und alle GPS-Positionen mit Person – als Sicherung herunterladen und überall wieder importieren. |
 | 📥 **Alles importieren** | Reiselisten (CSV/Excel mit Von, Bis, Ziel …) – die Ziele landen automatisch auf der Karte –, Google-Zeitachse (Takeout und Export vom Handy, Android und iPhone), iCloud-/exiftool-Foto-CSV, jede CSV/Excel mit Koordinaten, GPX, KML. Eine Vorschau zeigt, was gefunden wurde; Vorhandenes wird nicht doppelt gespeichert. |
 | 📡 **Live ohne Cloud** | Positionen aus `person.*`- / `device_tracker.*`-Entitäten und ein eingebauter **OwnTracks**-Empfang: das Handy sammelt unterwegs und schickt alles, sobald es wieder im Heimnetz ist – ohne Nabu Casa, ohne offenen Port ins Internet. |
 | ✍️ **Reisen von Hand** | Der „+“-Knopf fragt kurz nach (wohin, wann, wie lange, wer, womit, wie gross war die Gegend) – für alte Reisen ohne Daten. |
@@ -69,7 +70,8 @@ Alles lässt sich in der App (⚙️ **Einstellungen**) oder in der Add-on-Konfi
 | `home_radius_m` | 0 | Umkreis Zuhause in Metern; 0 = Radius der Zone |
 | `work_lat` / `work_lon` / `work_radius_m` | – / – / 300 | Arbeit; leer = automatisch erkannt |
 | `show_work` | false | Arbeit auf der Karte zeigen |
-| `min_trip_km` | 30 | ab dieser Entfernung zählt ein Tag als Reise |
+| `min_trip_km` | 30 | mit Übernachtung zählt es ab dieser Entfernung als Reise |
+| `min_day_trip_km` | 100 | ein Tagesausflug ohne Übernachtung zählt ab dieser Entfernung als Reise |
 | `routine_days` | 20 | Orte, an denen man an so vielen Tagen war (Arbeit, Schule), starten keine Reise; 0 = aus |
 | `ask_below` | `hoch` | fragen, wenn die Sicherheit tiefer ist |
 | `school_holidays` | – | Zeiträume wie `2026-07-04..2026-08-09` – schlägt „Familie“ vor |

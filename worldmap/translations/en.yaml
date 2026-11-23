@@ -44,6 +44,9 @@ configuration:
   min_trip_km:
     name: Trip distance (km)
     description: A day counts as a trip when someone was at least this far from home.
+  min_day_trip_km:
+    name: Day trip distance (km)
+    description: A day out without a night away counts as a trip only from this distance. Trips with a night away use "Trip distance".
   routine_days:
     name: Routine places (days)
     description: >-
