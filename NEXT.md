@@ -57,7 +57,13 @@ Ideen werden zuerst hier gesammelt. Code entsteht erst nach einem ausdrückliche
 - Settings for every map with a live 🎨 drawer and live preview on the settings page, estimated routes with ferries,
   animation choices (vehicles, distance, count, constant plane speed), areas that melt together, travel film with video export.
 
-## Next update (0.8) – waiting for "mach es" / Nächstes Update – wartet auf „mach es“
+## Next update – waiting for "mach es" / Nächstes Update – wartet auf „mach es“
+
+### Base map (idea, to decide)
+- [ ] Optional **detailed base map with MapLibre GL + OpenFreeMap vector tiles**, styled with a style JSON
+      (editable in Maputnik): real roads, towns, terrain, 3D buildings when zoomed in. Trade-offs: needs internet
+      for the map tiles (the tile servers see which areas you look at), ~800 KB library, the current offline
+      Natural Earth map stays as fallback. Our trips, areas and animation would be drawn on top.
 
 ### A. Settings you can feel / Einstellungen, die man sieht
 - [x] **Style drawer on the map**: a 🎨 button opens a panel right on the real map; every slider changes the map live

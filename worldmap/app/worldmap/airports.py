@@ -60,8 +60,11 @@ def snap(lat: float, lon: float, max_large: float = LARGE_KM, max_medium: float 
     """-> (IATA, name, lat, lon) of the airport this flight end belongs to, or None."""
     best, score = None, 1e9
     grid = _index()
-    for dy in (-1, 0, 1):
-        for dx in (-1, 0, 1):
+    reach = max(max_large, max_medium)
+    ny = int(reach / 111) + 1
+    nx = int(reach / (111 * max(0.05, math.cos(math.radians(lat))))) + 1
+    for dy in range(-ny, ny + 1):
+        for dx in range(-min(nx, 180), min(nx, 180) + 1):
             for r in grid.get((math.floor(lat) + dy, math.floor(lon) + dx), ()):
                 d = haversine_km(lat, lon, r[3], r[4])
                 limit = max_large if r[5] == 2 else max_medium

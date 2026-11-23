@@ -61,6 +61,12 @@ configuration:
   history_days_on_start:
     name: History on start (days)
     description: Positions read from the Home Assistant recorder when the add-on starts.
+  place_search:
+    name: Place search when adding a trip
+    description: offline = only the built-in list (Europe in detail, big cities and countries worldwide). osm = also OpenStreetMap (free, the search word is sent to nominatim.openstreetmap.org). google = Google Maps (needs your own API key with the Places API enabled; the search word is sent to Google).
+  google_maps_api_key:
+    name: Google Maps API key (optional)
+    description: Only for place search "google". Create it in the Google Cloud console with the "Places API (New)". It stays in the add-on and is never shown in the app.
   routing:
     name: Rail and road network
     description: >-

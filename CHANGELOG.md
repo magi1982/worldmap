@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.9.0 – 2026-11-23
+
+### Added
+- **Trips with several stops**: add stops in order and how you got to each one, e.g. plane to Tenerife, ship to
+  La Gomera – or plane to Sydney, camper to Canberra, train to Melbourne. Each leg is drawn its own way: planes as
+  arcs between the big airports, cars along motorways and main roads, trains along railways, ships over the water,
+  from the airport to the place by road, and a round trip by car gets its way back home. Stops show on the map and the
+  travel film follows them in order. Works in the "add a trip" wizard and in the trip list (new column "Stops").
+- **Online place search** when adding a trip (new options `place_search` and `google_maps_api_key`):
+  OpenStreetMap (free, no key) or Google Maps (your own Places API key). Only the search word is sent; the built-in
+  offline list always answers first.
+- **Google Maps links**: paste a link from Google Maps into the search – the place and its coordinates are taken
+  from the link (short links are followed, only to Google hosts).
+- **Vague trips** (no place, only a country, no coordinates) are marked in colour in the trip list and can be
+  filtered with "only vague".
+- Style panel: denser (two switches per row, slider, value and label on one line) with ⓘ explanations.
+
+### Changed
+- Airports near any place on earth are found (the search radius grows with the distance asked for).
+
 ## 0.8.0 – 2026-11-23
 
 ### Added

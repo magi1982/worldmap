@@ -23,7 +23,7 @@ auf einer schnellen, schönen Karte mit fünf Ansichten. Alles läuft im Add-on,
 | 💾 **Alles in einer Datei** | Das *Worldmap-Paket* enthält alle Reisen mit „Wer war dabei“ und alle GPS-Positionen mit Person – als Sicherung herunterladen und überall wieder importieren. |
 | 📥 **Alles importieren** | Reiselisten (CSV/Excel mit Von, Bis, Ziel …) – die Ziele landen automatisch auf der Karte –, Google-Zeitachse (Takeout und Export vom Handy, Android und iPhone), iCloud-/exiftool-Foto-CSV, jede CSV/Excel mit Koordinaten, GPX, KML. Eine Vorschau zeigt, was gefunden wurde; Vorhandenes wird nicht doppelt gespeichert. |
 | 📡 **Live ohne Cloud** | Positionen aus `person.*`- / `device_tracker.*`-Entitäten und ein eingebauter **OwnTracks**-Empfang: das Handy sammelt unterwegs und schickt alles, sobald es wieder im Heimnetz ist – ohne Nabu Casa, ohne offenen Port ins Internet. |
-| ✍️ **Reisen von Hand** | Der „+“-Knopf fragt kurz nach (wohin, wann, wie lange, wer, womit, wie gross war die Gegend) – für alte Reisen ohne Daten. |
+| ✍️ **Reisen von Hand** | Der „+“-Knopf fragt kurz nach (wohin, wann, wie lange, wer, womit, wie gross war die Gegend) – für alte Reisen ohne Daten, überall auf der Welt. Mehrere Stationen mit eigenem Verkehrsmittel (Flug nach Teneriffa, Schiff nach La Gomera); Orte aus der eingebauten Liste, aus OpenStreetMap, Google Maps oder einem eingefügten Google-Maps-Link. Autos folgen Autobahnen, Züge Bahnlinien, Schiffe dem Meer. Ungenaue Reisen (nur ein Land) sind in der Reiseliste markiert. |
 | 🔔 **Benachrichtigungen** | Eines deiner Handys wählen (wird automatisch gefunden) oder Hinweis in Home Assistant, wie oft (sofort, täglich, wöchentlich), Test senden. |
 | ✨ **Animierte Karte** | Kleine Flugzeuge in der Farbe der Reise fliegen die Flugbögen ab, Züge und Autos fahren Reisen ins Ausland nach. Ein Schalter auf jeder Karte, flüssige 60 fps. |
 | 🎨 **Kartenstil mit Versionen** | Jede Karte hat ihre eigenen Einstellungen (Höhe der Flugbögen, Schriftgrösse, Kreisgrössen, Regionsgrenzen, Form der Flächen, Filmtempo …), dazu Farben, sechs Linientypen und die Animation: welche Fahrzeuge, ab welcher Entfernung, wie viele, wie schnell. Einstellen mit dem 🎨-Knopf direkt auf der Karte oder in den Einstellungen, wo deine eigene Karte die Live-Vorschau ist. Jedes Speichern ist eine Version, zu der du zurück kannst. |
@@ -71,6 +71,8 @@ Alles lässt sich in der App (⚙️ **Einstellungen**) oder in der Add-on-Konfi
 | `home_radius_m` | 0 | Umkreis Zuhause in Metern; 0 = Radius der Zone |
 | `work_lat` / `work_lon` / `work_radius_m` | – / – / 300 | Arbeit; leer = automatisch erkannt |
 | `show_work` | false | Arbeit auf der Karte zeigen |
+| `place_search` | osm | Ortssuche beim Erfassen: `offline`, `osm` (OpenStreetMap, gratis) oder `google` (braucht `google_maps_api_key`) – gesendet wird nur das Suchwort |
+| `google_maps_api_key` | "" | eigener Schlüssel für die Google Places API (New), nur für `place_search: google` |
 | `home_airport` | "" | IATA-Code des Heimatflughafens (z. B. ZRH); leer = der Flughafen, von dem die meisten aufgezeichneten Flüge starten |
 | `min_trip_km` | 30 | mit Übernachtung zählt es ab dieser Entfernung als Reise |
 | `min_day_trip_km` | 100 | ein Tagesausflug ohne Übernachtung zählt ab dieser Entfernung als Reise |

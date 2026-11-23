@@ -35,6 +35,8 @@ class Settings:
     poll_interval_min: int = 5
     history_days_on_start: int = 10
     routing: str = "tiles"                                # tiles | off
+    place_search: str = "osm"                             # offline | osm | google – where "add a trip" looks up places
+    google_maps_api_key: str = ""                         # only for place_search: google
     owntracks: list = field(default_factory=list)         # [{user, password, label}] – local live source
     notify_service: str = ""
     notify_mode: str = "weekly"                           # off | instant | daily | weekly
@@ -129,6 +131,9 @@ def from_dict(raw: dict) -> Settings:
         s.home_lat = s.home_lon = None
     if s.work_lat is None or s.work_lon is None or not (-90 <= s.work_lat <= 90 and -180 <= s.work_lon <= 180):
         s.work_lat = s.work_lon = None
+    if s.place_search not in ("offline", "osm", "google"):
+        s.place_search = "osm"
+    s.google_maps_api_key = str(s.google_maps_api_key or "").strip()[:200]
     if s.routing not in ("tiles", "off"):
         s.routing = "tiles"
     if s.notify_mode not in ("off", "instant", "daily", "weekly"):

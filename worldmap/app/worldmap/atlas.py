@@ -41,6 +41,18 @@ def _code_version() -> str:
     return h.hexdigest()[:12]
 
 
+def _legs(raw) -> list:
+    """Stops of a trip (JSON text from the database) → list of dicts; broken data → []."""
+    if not raw:
+        return []
+    try:
+        legs = json.loads(raw) if isinstance(raw, str) else raw
+        return [x for x in legs if isinstance(x, dict) and isinstance(x.get("lat"), (int, float))
+                and isinstance(x.get("lon"), (int, float))][:20]
+    except (ValueError, TypeError):
+        return []
+
+
 @lru_cache(maxsize=4096)
 def _net_route(kind: str, la1: float, lo1: float, la2: float, lo2: float):
     from . import roadnet
@@ -371,7 +383,14 @@ class Atlas:
             for m in modes_of_transport(t["transport"]):
                 if m not in modes:
                     modes.append(m)
+            legs = _legs(t["legs"])
+            for lg_ in legs:
+                for m in modes_of_transport(lg_["transport"]):
+                    if m not in modes:
+                        modes.append(m)
             lat, lon, nopos, approx, rad = t["lat"], t["lon"], 0, t["approx"], t["radius_km"]
+            if (lat is None or lon is None) and legs:
+                lat, lon = legs[0]["lat"], legs[0]["lon"]
             if lat is None or lon is None:  # trips without coordinates: find the place by its name (offline)
                 hit = _geocode(t["destination"] or "", t["country"] or "", (round(home[0], 2), round(home[1], 2)),
                                t["max_km"])
@@ -380,8 +399,12 @@ class Atlas:
                 else:  # unknown place: never pretend the trip was at home
                     lat, lon, nopos = home[0], home[1], 1
             dist = t["max_km"] if t["max_km"] is not None else haversine_km(home[0], home[1], lat, lon)
-            fl, gr = [], None
-            if not k:  # no GPS: estimate the distance there and back
+            fl, gr, lg = [], None, None
+            if not k and len(legs) > 1:  # no GPS, several stops: every leg its own way (plane, road, rail, ship)
+                fl, gr, lg, k = self._leg_ways(home, h_ap, t, legs, used_ap)
+                if rad and rad <= 250:
+                    est.append([i, lat, lon, rad])
+            elif not k:  # no GPS: estimate the distance there and back
                 k = estimate_km(dist, modes, t["nights"] or 0)
                 if "fly" in modes and not nopos:
                     d_ap = (airports.by_iata(t["ap_to"] or "")
@@ -408,6 +431,8 @@ class Atlas:
                 "p": [round(lat, 4), round(lon, 4)], "conf": t["confidence"], "approx": approx, "nopos": nopos,
                 "r": t["radius_km"], "fixed": 1 if (t["source"] == "manual" or t["locked"]) else 0,
                 **({"gr": gr} if gr else {}),
+                **({"lg": lg} if lg else {}),
+                **({"st": [[x["lat"], x["lon"], x["name"]] for x in legs]} if len(legs) > 1 else {}),
             })
 
         groups = _groups(out_trips, home)
@@ -552,6 +577,68 @@ class Atlas:
         return any(bb[0] <= lo <= bb[2] and bb[1] <= la <= bb[3] and _pip(lo, la, poly)
                    for _rid, poly, bb in self._regions().get((math.floor(lo), math.floor(la)), ()))
 
+    def _leg_ways(self, home, h_ap, t, legs, used_ap):
+        """Ways of a trip with several stops and no GPS, e.g. home ✈ Tenerife ⛴ La Gomera.
+
+        Returns (flight arcs, ground runs, ordered legs for the film, estimated km by mode).
+        Flights use the big airport near a stop (or the airports set by hand), ships the ferry lines of the
+        network (else a straight line over the water), cars and trains the main roads / railways.
+        """
+        fl, gr, lg, km = [], [], [], defaultdict(float)
+        prev, prev_home = (home[0], home[1]), True
+        fly_idx = [n for n, x in enumerate(legs) if "fly" in modes_of_transport(x["transport"])]
+        for n, leg in enumerate(legs):
+            ms = modes_of_transport(leg["transport"]) or ["road"]
+            here = (leg["lat"], leg["lon"])
+            d = haversine_km(*prev, *here)
+            if "fly" in ms:
+                a_ap = (airports.by_iata(t["ap_from"] or "") if n == fly_idx[0] else None) or \
+                    (h_ap if prev_home else airports.snap(prev[0], prev[1], 60, 0))
+                b_ap = (airports.by_iata(t["ap_to"] or "") if n == fly_idx[-1] else None) or \
+                    airports.snap(here[0], here[1], 60, 0)
+                a = [a_ap[2], a_ap[3]] if a_ap else list(prev)
+                b = [b_ap[2], b_ap[3]] if b_ap else list(here)
+                ca, cb = (a_ap[0] if a_ap else ""), (b_ap[0] if b_ap else "")
+                for ap in (a_ap, b_ap):
+                    if ap:
+                        used_ap[ap[0]] = [ap[2], ap[3], ap[1]]
+                fl += [[a, b, ca, cb], [b, a, cb, ca]]
+                lg.append(["fly", [round(a[0], 4), round(a[1], 4), round(b[0], 4), round(b[1], 4)], [ca, cb]])
+                km["fly"] += d
+                if haversine_km(b[0], b[1], *here) > 8:  # from the airport to the place by road
+                    runs = [[r[0], r[1], "ferry" if r[0] else "road"] for r in self.ground_route((b[0], b[1]), here, "road")]
+                    gr += runs
+                    lg.append(["road", runs])
+            else:
+                mode = "ferry" if "ferry" in ms else "rail" if "rail" in ms and "road" not in ms else "road"
+                if mode == "ferry":
+                    runs = self._sea_way(prev, here)
+                else:
+                    runs = self.ground_route(prev, here, mode) if d >= 2 else []
+                runs = [[r[0], r[1], "ferry" if r[0] else mode] for r in runs]
+                gr += runs
+                lg.append([mode, runs])
+                km[mode] += d
+            prev, prev_home = here, False
+        if not fly_idx and haversine_km(*prev, home[0], home[1]) > 30:  # round trip by land: the way back home
+            first = modes_of_transport(legs[0]["transport"]) or ["road"]
+            back = [[r[0], r[1], "ferry" if r[0] else ("rail" if "rail" in first else "road")]
+                    for r in self.ground_route(prev, (home[0], home[1]), "rail" if "rail" in first else "road")]
+            gr += back
+            lg.append(["back", back])
+            km["road"] += haversine_km(*prev, home[0], home[1]) / 2
+        return fl, gr, lg, {m: round(v * 2) for m, v in km.items() if v >= 1}
+
+    def _sea_way(self, a, b) -> list:
+        """Ship between two ports: over the water (around coasts), else straight."""
+        grid = self._grid_route(a, b, by_ship=True) if haversine_km(*a, *b) < 1500 else None
+        if grid and any(r[0] for r in grid):  # around the coasts, over the water: all of it is the ship
+            pts: list = []
+            for r in grid:
+                pts += r[1][2:] if pts else r[1]
+            return [[1, pts]]
+        return [[1, [round(a[0], 3), round(a[1], 3), round(b[0], 3), round(b[1], 3)]]]
+
     def _land_cell(self, la: float, lo: float) -> bool:
         cache = Atlas.__dict__.get("_LANDC")
         if cache is None:
@@ -578,7 +665,7 @@ class Atlas:
             via = None
         return via or self._grid_route(a, b)
 
-    def _grid_route(self, a: tuple, b: tuple) -> list:
+    def _grid_route(self, a: tuple, b: tuple, by_ship: bool = False) -> list:
         """Way over a coarse land grid: [[sea 0/1, [lat, lon, ...]], ...].
 
         A shortest path over a coarse land grid (offline, from the region polygons): it goes around bays and seas
@@ -628,7 +715,10 @@ class Atlas:
                     continue
                 ln = is_land(n)
                 step = math.hypot(di, dj * coslat)
-                nc = cost + step * (1.0 if (lc and ln) else 3.0)  # water only where it saves a lot (a ferry)
+                if by_ship:  # a ship: over the water, land only to reach the port
+                    nc = cost + step * (1.0 if not (lc and ln) else 2.5)
+                else:
+                    nc = cost + step * (1.0 if (lc and ln) else 3.0)  # water only where it saves a lot (a ferry)
                 if nc < best.get(n, 1e18):
                     best[n] = nc
                     prev[n] = c
@@ -648,22 +738,23 @@ class Atlas:
                 e = k
                 while e < len(flags) and not flags[e]:
                     e += 1
-                if haversine_km(*pts[max(0, k - 1)], *pts[min(len(pts) - 1, e)]) < 35:
+                if not by_ship and haversine_km(*pts[max(0, k - 1)], *pts[min(len(pts) - 1, e)]) < 35:
                     for q in range(k, e):
                         flags[q] = True
                 k = e
             else:
                 k += 1
         # pull the string tight: skip grid corners while the straight way stays on land (no stair steps)
-        def clear(p, q):
+        def clear(p, q, land_wanted):
             n = max(2, int(haversine_km(*p, *q) / (g * 40)))
-            return all(self._land_cell(p[0] + (q[0] - p[0]) * t / n, p[1] + (q[1] - p[1]) * t / n) for t in range(1, n))
+            return all(self._land_cell(p[0] + (q[0] - p[0]) * t / n, p[1] + (q[1] - p[1]) * t / n) == land_wanted
+                       for t in range(1, n))
         sp, sf, k = [pts[0]], [flags[0]], 0
         while k < len(pts) - 1:
             j = k + 1
-            if flags[k]:
+            if flags[k] or by_ship:
                 for m in range(min(len(pts) - 1, k + 40), k + 1, -1):
-                    if all(flags[k:m + 1]) and clear(pts[k], pts[m]):
+                    if all(f == flags[k] for f in flags[k:m + 1]) and clear(pts[k], pts[m], flags[k]):
                         j = m
                         break
             sp.append(pts[j])

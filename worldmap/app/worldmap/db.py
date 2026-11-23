@@ -103,12 +103,13 @@ MIGRATIONS = (
     ("questions", "trip_ids", "TEXT"),
     ("trips", "ap_from", "TEXT"),   # IATA code set by hand: airport the flights start from (home side)
     ("trips", "ap_to", "TEXT"),     # … and the airport at the destination
+    ("trips", "legs", "TEXT"),      # JSON: stops of a trip in order [{name, country, lat, lon, transport}]
 )
 
 TRIP_FIELDS = (
     "start_date", "end_date", "destination", "country", "who", "confidence", "nights",
     "max_km", "lat", "lon", "transport", "reason", "note", "source", "locked", "radius_km", "approx", "status",
-    "ap_from", "ap_to",
+    "ap_from", "ap_to", "legs",
 )
 CONFIDENCE = ("tief", "mittel", "hoch", "bestätigt")
 

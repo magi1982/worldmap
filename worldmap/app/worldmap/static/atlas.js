@@ -208,7 +208,7 @@ function buildR(){
  for(const [ti,la,lo,rk] of D.est){const t=tripById[ti];if(!t||!onIds.has(t.id))continue;est.push([la,lo,rk,R.color=='w'?WCOL[t.w]:MCOL[t.m[0]]])}
  // flights
  const pairs=new Map();if(R.m.has('fly'))for(const t of on){for(const [x,y,ia,ib] of t.fl){const A=ia?'ap:'+ia:ptGroup(x,t),Bg=ib?'ap:'+ib:ptGroup(y,t);if(!A||!Bg||A==Bg)continue;const hm=q=>q=='home'||(q.startsWith('ap:')&&D.airports[q.slice(3)]&&km2(D.airports[q.slice(3)][0],D.airports[q.slice(3)][1],HOME[0],HOME[1])<150);const k=[A,Bg].sort((p,q)=>hm(q)-hm(p)||p.localeCompare(q)).join('>');let e=pairs.get(k);if(!e){e={k,ws:new Set(),g:new Set()};pairs.set(k,e)}e.ws.add(t.w);if(t.g&&!t.gps)e.g.add(t.g)}}
- const gr=[];for(const t of on){if(!t.gr||!t.g)continue;/* only trips far away: short day trips stay dots */const m=t.m.find(x=>x=='rail'||x=='road')||'road';if(!R.m.has(m))continue;gr.push({t,m,col:R.color=='w'?WCOL[t.w]:MCOL[m]})}
+ const gr=[];for(const t of on){if(!t.gr||!(t.g||t.st))continue;/* only trips far away: short day trips stay dots */const m=t.m.find(x=>x=='rail'||x=='road')||'road';gr.push({t,m,col:R.color=='w'?WCOL[t.w]:MCOL[m]})}
  RC={own:out,far,est,near,gr,pairs:[...pairs.values()],on,onIds,st:{},ver:(RC?RC.ver:0)+1};
 }
 /* airports at the ends of flight arcs: a small tag with the IATA code */
@@ -221,10 +221,10 @@ function gpos(g){if(g=='home')return [MX(HOME[1]),MY(HOME[0])];if(g.startsWith('
 /* estimated way of a trip without GPS (from the server: straight runs over land / sea), gently curved, in world units */
 function estRoute(t){if(!t.gr)return null;if(t._er)return t._er;
  /* the server sends the way over land (and ferries where needed) as runs of lat/lon pairs */
- t._er=t.gr.map(([sea,a])=>{const pts=[];for(let i=0;i+1<a.length;i+=2)pts.push([MX(a[i+1]),MY(a[i])]);return {sea:!!sea,pts}});return t._er}
+ t._er=t.gr.map(([sea,a,m])=>{const pts=[];for(let i=0;i+1<a.length;i+=2)pts.push([MX(a[i+1]),MY(a[i])]);return {sea:!!sea,pts,m:m||null}});return t._er}
 function drawEst(list,lwBase){const E=ST('est');if(E.show===false||!list||!list.length)return;const S=V.S;ctx.save();ctx.lineCap='round';ctx.lineJoin='round';ctx.globalAlpha=(E.opacity??.8)*(S>60000?.45:S>25000?.7:1);
- for(const g of list){const rs=estRoute(g.t);if(!rs)continue;for(const r of rs){if(r.sea&&E.ferry===false)continue;ctx.beginPath();r.pts.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));
-  if(r.sea){ctx.strokeStyle=MCOL.ferry;ctx.lineWidth=lwBase*1.1;ctx.setLineDash([.01/S,5.5/S])}else{ctx.strokeStyle=g.col;ctx.lineWidth=lwBase;ctx.setLineDash(dashFor(E.dash||'dashed',S))}ctx.stroke()}}
+ for(const g of list){const rs=estRoute(g.t);if(!rs)continue;for(const r of rs){if(r.sea&&E.ferry===false)continue;const m=r.sea?'ferry':(r.m||g.m);if(!r.sea&&!R.m.has(m))continue;ctx.beginPath();r.pts.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));
+  if(r.sea){ctx.strokeStyle=R.color=='w'?g.col:MCOL.ferry;ctx.lineWidth=lwBase*1.1;ctx.setLineDash([.01/S,5.5/S])}else{ctx.strokeStyle=R.color=='w'?g.col:MCOL[m]||g.col;ctx.lineWidth=lwBase;ctx.setLineDash(dashFor(E.dash||'solid',S))}ctx.stroke()}}
  ctx.setLineDash([]);ctx.restore()}
 /* areas that melt together: every place is a soft blob, where blobs overlap they grow into one shape (metaballs) */
 let MB=null;
@@ -277,6 +277,7 @@ function drawR(){
  drawEst(RC.gr,2.2/S*LWm);
  if(!(AN.on&&ST('anim').planes))for(const e of RC.pairs){const [A,Bg]=e.k.split('>');const [x1,y1]=gpos(A),[x2,y2]=gpos(Bg);const a=arcPts(x1,y1,x2,y2,(A=='home'?.2:.18)*AH);strokeArc(a,R.color=='w'?WHO.filter(w=>e.ws.has(w)).map(w=>WCOL[w]):[MCOL.fly],2.4*LWm,8,6)}
  endWorld();placed.length=0;usedNames.clear();
+ for(const t of RC.on){if(!t.st)continue;t.st.forEach(([la,lo,nm],k)=>{const [x,y]=toS(MX(lo),MY(la));if(x<-20||y<-20||x>V.W+20||y>V.H+20)return;const c=WCOL[t.w]||MC.strong;ctx.beginPath();ctx.arc(x,y,3.6,0,7);ctx.fillStyle=MC.ring;ctx.fill();ctx.beginPath();ctx.arc(x,y,2.6,0,7);ctx.fillStyle=c;ctx.fill();if(k>0&&V.S>12000)lbl(nm,x+6,y+4,11,600,MC.text)})}
  homeMark();if(TP.airports!==false)apMarks(RC.pairs.flatMap(e=>e.k.split(">")));const DS=TP.dot_size??1,LS=TP.label_size??1,LM=TP.labels||'normal';
  // destinations
  RC.mbox=null;let off=null;
@@ -506,7 +507,8 @@ function plen(pts){let L=0;for(let i=1;i<pts.length;i++)L+=Math.hypot(pts[i][0]-
 function tripPath(t){if(t._fp&&t._fpv===STV)return t._fp;const out=[];
  const arc=(A,Bp)=>{const a=arcPts(MX(A[1]),MY(A[0]),MX(Bp[1]),MY(Bp[0]),.2*(ST('trips').arc_height??1));return {k:'arc',m:'fly',a,L:Math.hypot(a[4]-a[0],a[5]-a[1])*1.15}};
  const poly=(pts,m)=>({k:'poly',m,pts,L:plen(pts)});
- if(t.gr){for(const r of estRoute(t)||[])out.push(poly(r.pts,r.sea?'ferry':(t.m.find(x=>x=='rail'||x=='road')||'road')))}
+ if(t.lg){for(const it of t.lg){if(it[0]=='fly'){const c=it[1];out.push(arc([c[0],c[1]],[c[2],c[3]]))}else for(const r of it[1]){const pts=[];for(let i=0;i+1<r[1].length;i+=2)pts.push([MX(r[1][i+1]),MY(r[1][i])]);out.push(poly(pts,r[0]?'ferry':(r[2]||'road')))}}}
+ else if(t.gr){for(const r of estRoute(t)||[])out.push(poly(r.pts,r.sea?'ferry':(r.m||t.m.find(x=>x=='rail'||x=='road')||'road')))}
  else{const items=[],d0=dayIdx(t.a),d1=dayIdx(t.b);
   if(TR)for(let d=d0;d<=d1;d++)for(const i of byDay[d]||[]){const a=TR[i].p;if(a.length<4)continue;const pts=[];for(let j=0;j<a.length;j+=2)pts.push([a[j],a[j+1]]);items.push({tk:d+trackT(i)[0],...poly(pts,TCLS[TR[i].c])})}
   for(const f of D.flights||[]){if(f[0]<t.a||f[0]>t.b||!flightSel(f))continue;items.push({tk:dayIdx(f[0])+(f[3]??.4),...arc(f[1],f[2])})}

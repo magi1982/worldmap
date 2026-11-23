@@ -22,7 +22,7 @@ WEIGHTS = {
     "rail": {"a": 1.0, "t": 0.9, "f": 1.7, "0": 2.6, "1": 3.0, "2": 3.4},
 }
 STITCH_KM = 2.5      # loose ends closer than this are joined (simplified data, borders)
-SNAP_KM = 60.0       # start / destination may be this far from the network
+SNAP_KM = 25.0       # start / destination may be this far from the network (else: the land grid decides)
 _lock = threading.Lock()
 
 

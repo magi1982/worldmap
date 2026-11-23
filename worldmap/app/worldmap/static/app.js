@@ -53,7 +53,7 @@ const COLS = [
   {k: 'destination', n: 'Ziel', w: 220}, {k: 'country', n: 'Land', w: 120},
   {k: 'who', n: 'Wer', t: 'who', w: 130}, {k: 'confidence', n: 'Sicherheit', t: 'conf', w: 110},
   {k: 'nights', n: 'Nächte', t: 'num', w: 70}, {k: 'max_km', n: 'km', t: 'num', w: 80},
-  {k: 'transport', n: 'Verkehrsmittel', t: 'tr', w: 170}, {k: 'ap_from', n: 'Flughäfen', t: 'ap', w: 130}, {k: 'note', n: 'Notiz', w: 200}, {k: 'source', n: 'Quelle', w: 110},
+  {k: 'transport', n: 'Verkehrsmittel', t: 'tr', w: 170}, {k: 'legs', n: 'Stationen', t: 'legs', w: 130}, {k: 'ap_from', n: 'Flughäfen', t: 'ap', w: 130}, {k: 'note', n: 'Notiz', w: 200}, {k: 'source', n: 'Quelle', w: 110},
 ];
 function gridHead() {
   $('grid').tHead.innerHTML = `<tr><th class="sel"><input type="checkbox" id="selAll" aria-label="Alle auswählen"></th>${COLS.map((c) => `<th data-k="${c.k}" style="min-width:${c.w}px" class="${st.sort[0] === c.k ? (st.sort[1] > 0 ? 'asc' : 'desc') : ''}">${c.n}</th>`).join('')}</tr>
@@ -65,17 +65,26 @@ function gridHead() {
   $('selAll').onchange = (e) => { st.sel = e.target.checked ? new Set(visibleRows().map((t) => t.id)) : new Set(); gridBody(); };
 }
 function cellText(t, c) { const v = t[c.k]; if (c.t === 'date') return fmtD(v); if (c.k === 'max_km' && v != null) return String(Math.round(v)); return v ?? ''; }
+/* a trip without real details: no place, only a whole country, or no coordinates – worth completing */
+function vague(t) {
+  const d = (t.destination || '').trim().toLowerCase(), c = (t.country || '').trim().toLowerCase();
+  if (!d || t.lat == null || t.lon == null) return 'kein Ort';
+  if ((t.radius_km || 0) >= 250 || (c && d === c)) return 'nur Land';
+  return '';
+}
 function visibleRows() {
   const f = Object.entries(st.filter).filter(([, v]) => v && v.trim());
-  const rows = st.trips.filter((t) => f.every(([k, v]) => { const c = COLS.find((x) => x.k === k); return String(cellText(t, c)).toLowerCase().includes(v.trim().toLowerCase()); }));
+  const onlyVague = $('gridVague') && $('gridVague').checked;
+  const rows = st.trips.filter((t) => (!onlyVague || vague(t)) && f.every(([k, v]) => { const c = COLS.find((x) => x.k === k); return String(cellText(t, c)).toLowerCase().includes(v.trim().toLowerCase()); }));
   const [k, dir] = st.sort;
   return rows.sort((a, b) => { const x = a[k] ?? '', y = b[k] ?? ''; return (typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y), 'de')) * dir; });
 }
 function gridBody() {
   const rows = visibleRows();
   const whoOpts = [...new Set(['', ...whoList(), ...st.trips.map((t) => t.who)])];
-  $('grid').tBodies[0].innerHTML = rows.map((t) => `<tr data-id="${t.id}" class="${t.status === 'ignored' ? 'ign' : ''}"><td class="sel"><input type="checkbox" ${st.sel.has(t.id) ? 'checked' : ''} aria-label="Zeile auswählen"></td>${COLS.map((c) => {
+  $('grid').tBodies[0].innerHTML = rows.map((t) => `<tr data-id="${t.id}" class="${t.status === 'ignored' ? 'ign' : ''} ${vague(t) ? 'vague' : ''}" ${vague(t) ? `title="Ungenau: ${vague(t)} – Ort, Stationen oder Daten ergänzen"` : ''}><td class="sel"><input type="checkbox" ${st.sel.has(t.id) ? 'checked' : ''} aria-label="Zeile auswählen"></td>${COLS.map((c) => {
     if (c.t === 'who') return `<td><select data-k="who" data-c="${colorOf(t.who)}" class="who">${whoOpts.map((w) => `<option ${w === t.who ? 'selected' : ''} value="${esc(w)}">${esc(w || '– offen –')}</option>`).join('')}</select></td>`;
+    if (c.t === 'legs') { const L = legsOf(t); return `<td class="trc"><button type="button" class="lgbtn" aria-label="Stationen bearbeiten">${L.length > 1 ? `🧭 ${L.length} Stationen` : `<span class="small">${vague(t) ? '⚠︎ Ort ergänzen' : '+ Station'}</span>`}</button></td>`; }
     if (c.t === 'ap') { const fl = /flug/i.test(t.transport || ''); return `<td class="trc"><button type="button" class="apbtn" data-k="ap_from" aria-label="Flughäfen wählen" ${fl || t.ap_from || t.ap_to ? '' : 'data-dim="1"'}>${t.ap_from || t.ap_to ? `✈︎ ${esc(t.ap_from || 'auto')} → ${esc(t.ap_to || 'auto')}` : `<span class="small">${fl ? 'automatisch' : '–'}</span>`}</button></td>`; }
     if (c.t === 'tr') { const sel = trList(t.transport); return `<td class="trc"><button type="button" class="trbtn" data-k="transport" aria-label="Verkehrsmittel wählen">${sel.length ? sel.map((x) => `<span class="tpill">${TICON[x] || ''} ${esc(x)}</span>`).join('') : '<span class="small">wählen …</span>'}</button></td>`; }
     if (c.t === 'conf') return `<td><select data-k="confidence" class="conf-${esc(t.confidence)}">${CONF.map((x) => `<option ${x === t.confidence ? 'selected' : ''}>${x}</option>`).join('')}</select></td>`;
@@ -132,7 +141,49 @@ function trPicker(btn) {
   pop.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
   setTimeout(() => document.addEventListener('mousedown', outside, true), 0); pop.querySelector('.tchip').focus();
 }
-$('grid').addEventListener('click', (e) => { const b = e.target.closest('.trbtn'); if (b) trPicker(b); const a = e.target.closest('.apbtn'); if (a) apPicker(a); });
+$('grid').addEventListener('click', (e) => { const b = e.target.closest('.trbtn'); if (b) trPicker(b); const a = e.target.closest('.apbtn'); if (a) apPicker(a); const l = e.target.closest('.lgbtn'); if (l) legsPopup(l); });
+$('gridVague').onchange = () => gridBody();
+const legsOf = (t) => { try { return t.legs ? JSON.parse(t.legs) : []; } catch (e) { return []; } };
+/* stops of a trip: search a place (offline list, online search, Google Maps link) and how you got there */
+function stopsEditor(box, stops, onChange) {
+  const ONLINE = st.cfg && st.cfg.place_search && st.cfg.place_search !== 'offline';
+  const draw = () => {
+    box.innerHTML = `<ol class="stops">${stops.map((x, i) => `<li>${i ? `<select data-leg="${i}" aria-label="Wie nach ${esc(x.name)}">${TRANSPORT.map((tr) => `<option ${tr === x.transport ? 'selected' : ''}>${tr}</option>`).join('')}</select><span class="arr">→</span>` : '<span class="small first">Ziel</span>'}<b>${esc(x.name)}</b><span class="small">${esc(x.country || '')}</span><button type="button" class="rm" data-rm="${i}" aria-label="${esc(x.name)} entfernen">✕</button></li>`).join('')}</ol>
+     <input class="sq" placeholder="${stops.length ? 'Weitere Station, z. B. La Gomera' : 'Ort, Insel, Land – oder Google-Maps-Link'}" autocomplete="off" aria-label="Ort suchen"><div class="sugg"></div>
+     <p class="small">${stops.length ? 'Mehrere Stationen werden der Reihe nach verbunden – mit Flugzeug, Auto, Zug oder Schiff, wie du es wählst.' : 'Suche einen Ort oder füge einen Link aus Google Maps ein.'}${ONLINE ? ` Online-Suche: ${st.cfg.place_search === 'google' ? 'Google Maps' : 'OpenStreetMap'}.` : ''}</p>`;
+    const q = box.querySelector('.sq'), sg = box.querySelector('.sugg'); let tm, res = [], seq = 0;
+    const show = () => { sg.innerHTML = res.map((p, i) => `<button type="button" data-i="${i}">${p.kind === 'country' ? '🏳️' : p.kind === 'region' ? '🗺️' : p.kind === 'online' ? '🌐' : '📍'} ${esc(p.name)} <span class="small">${esc(p.country || '')}${p.source ? ' · ' + esc(p.source) : ''}</span></button>`).join('') || (q.value.trim().length > 2 ? '<p class="small">Nichts gefunden – anders schreiben oder einen Google-Maps-Link einfügen.</p>' : ''); };
+    q.oninput = () => { clearTimeout(tm); const v = q.value.trim(); const my = ++seq; if (v.length < 2) { res = []; show(); return; }
+      tm = setTimeout(async () => { try { res = await api('api/places?q=' + encodeURIComponent(v)); if (my !== seq) return; show();
+        if (ONLINE && v.length > 2 && !/^https?:/i.test(v)) { const more = await api('api/places?online=1&q=' + encodeURIComponent(v)); if (my !== seq) return; const seen = new Set(res.map((p) => p.name.toLowerCase() + p.country)); res = res.concat(more.filter((p) => p.kind === 'online' && !seen.has(p.name.toLowerCase() + p.country))); show(); } } catch (e) { /* offline */ } }, 220); };
+    sg.onclick = (e) => { const b = e.target.closest('button'); if (!b) return; const p = res[+b.dataset.i];
+      stops.push({name: p.name, country: p.country || '', lat: p.lat, lon: p.lon, radius_km: p.radius_km || null, transport: stops.length ? (p.kind === 'online' || p.kind === 'place' ? 'Auto' : 'Auto') : ''}); onChange(); draw(); box.querySelector('.sq').focus(); };
+    box.querySelectorAll('[data-rm]').forEach((b) => (b.onclick = () => { stops.splice(+b.dataset.rm, 1); onChange(); draw(); }));
+    box.querySelectorAll('[data-leg]').forEach((sel) => (sel.onchange = () => { stops[+sel.dataset.leg].transport = sel.value; onChange(); }));
+  };
+  draw();
+}
+function legsPopup(btn) {
+  document.querySelectorAll('.trpop').forEach((x) => x.remove());
+  const t = st.trips.find((x) => x.id === +btn.closest('tr').dataset.id);
+  const L = legsOf(t); const stops = L.length ? L.map((x) => ({...x})) : (t.lat != null ? [{name: t.destination || 'Ziel', country: t.country || '', lat: t.lat, lon: t.lon, transport: ''}] : []);
+  const pop = document.createElement('div'); pop.className = 'trpop lgpop'; pop.setAttribute('role', 'dialog'); pop.setAttribute('aria-label', 'Stationen');
+  pop.innerHTML = `<h4>🧭 Stationen von „${esc(t.destination || 'Reise')}“</h4><div class="se"></div><div class="foot"><button type="button" class="btn" id="lgX">Abbrechen</button><button type="button" class="primary" id="lgOk">Speichern</button></div>`;
+  document.body.appendChild(pop);
+  const place = () => { const r = btn.getBoundingClientRect(); pop.style.left = Math.max(8, Math.min(window.innerWidth - pop.offsetWidth - 8, r.left - 120)) + 'px'; pop.style.top = Math.max(8, Math.min(window.innerHeight - pop.offsetHeight - 8, r.bottom + 4)) + 'px'; };
+  stopsEditor(pop.querySelector('.se'), stops, place); place();
+  $('lgX').onclick = () => pop.remove();
+  $('lgOk').onclick = async () => {
+    const first = stops[0]; const tr = trList(t.transport);
+    const legs = stops.length > 1 ? stops.map((x, i) => ({name: x.name, country: x.country, lat: x.lat, lon: x.lon, transport: i ? x.transport : (tr.includes('Flug') ? 'Flug' : tr[0] || 'Auto')})) : [];
+    const body = {legs};
+    if (first) Object.assign(body, {lat: first.lat, lon: first.lon, destination: stops.length > 1 ? stops.map((x) => x.name).join(' – ').slice(0, 200) : (t.destination && t.lat != null ? t.destination : first.name), country: t.country || first.country});
+    if (first && first.radius_km && (t.radius_km == null || t.radius_km >= 250)) body.radius_km = Math.min(first.radius_km, 150);
+    const add = [...new Set([...tr, ...legs.slice(1).map((x) => x.transport)])]; if (add.length) body.transport = add.join(' · ');
+    try { Object.assign(t, await post('api/trips/' + t.id, body, 'PATCH')); pop.remove(); toast('Stationen gespeichert – die Karte rechnet neu'); gridBody(); } catch (e) { toast(e.message, 5000); }
+  };
+  pop.addEventListener('keydown', (e) => { if (e.key === 'Escape') pop.remove(); });
+}
 /* airports of a trip: the ones of your own flights to pick, or any international IATA code */
 let AIRPORTS = null;
 async function apPicker(btn) {
@@ -520,7 +571,7 @@ async function loadRules() {
 /* ================================================================ WIZARD: trip by hand */
 const TRANSPORT = ['Auto', 'Zug', 'Bus', 'Flug', 'Schiff', 'Wohnmobil', 'Velo', 'zu Fuss'];
 function wizard() {
-  const d = $('wizard'); const w = {step: 0, place: null, year: new Date().getFullYear() - 1, month: '', start: '', end: '', nights: 7, who: '', transport: [], area: null, note: ''};
+  const d = $('wizard'); const w = {step: 0, place: null, stops: [], year: new Date().getFullYear() - 1, month: '', start: '', end: '', nights: 7, who: '', transport: [], area: null, note: ''};
   const steps = ['Wohin?', 'Wann?', 'Wie lange?', 'Wer war dabei?', 'Wie seid ihr gereist?', 'Wie gross war die Gegend?', 'Passt das so?'];
   const months = ['', 'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
   const dates = () => {
@@ -530,14 +581,14 @@ function wizard() {
   };
   const body = () => {
     switch (w.step) {
-      case 0: return `<input id="wq" placeholder="Ort, Insel oder Region, z. B. Korsika" autocomplete="off" value="${esc(w.place?.name || '')}"><div id="ws" class="sugg"></div>${w.place ? `<p class="small">✓ ${esc(w.place.name)}, ${esc(w.place.country)}</p>` : ''}`;
+      case 0: return `<div id="wse"></div>`;
       case 1: return `<div class="prow"><label class="field">Jahr<input id="wy" type="number" min="1950" max="2100" value="${w.year}"></label><label class="field">Monat (falls bekannt)<select id="wm">${months.map((m, i) => `<option value="${i || ''}" ${String(i || '') === String(w.month) ? 'selected' : ''}>${m || 'weiss nicht'}</option>`).join('')}</select></label></div>
         <p class="small">Genaue Daten bekannt?</p><div class="prow"><label class="field">Von<input id="wst" type="date" value="${w.start}"></label><label class="field">Bis<input id="wen" type="date" value="${w.end}"></label></div>`;
       case 2: return `<div class="choice">${[[0, 'Tagesausflug'], [2, 'Wochenende'], [7, '1 Woche'], [14, '2 Wochen'], [21, '3 Wochen']].map(([n, l]) => `<button data-n="${n}" class="${w.nights === n ? 'on' : ''}">${l}</button>`).join('')}</div><label class="field">Nächte<input id="wn" type="number" min="0" max="365" value="${w.nights}"></label>${w.start ? '<p class="small">Aus den Daten berechnet.</p>' : ''}`;
       case 3: return `<div class="choice">${whoList().map((o) => `<button data-who="${esc(o)}" class="${o === w.who ? 'on' : ''}">${esc(o)}</button>`).join('')}</div><input id="wwho" placeholder="oder eigene Angabe" value="${esc(whoList().includes(w.who) ? '' : w.who)}" maxlength="60">`;
-      case 4: return `<div class="choice">${TRANSPORT.map((t) => `<button data-t="${t}" class="${w.transport.includes(t) ? 'on' : ''}">${t}</button>`).join('')}</div><p class="small">Mehrfachauswahl möglich. Bei Flug zeichnet die Karte einen Bogen ab zu Hause.</p>`;
+      case 4: return `<div class="choice">${TRANSPORT.map((t) => `<button data-t="${t}" class="${w.transport.includes(t) ? 'on' : ''}">${t}</button>`).join('')}</div><p class="small">${w.stops.length > 1 ? `Wie seid ihr nach <b>${esc(w.stops[0].name)}</b> gekommen? (Die weiteren Stationen hast du schon gewählt.) ` : ''}Mehrfachauswahl möglich. Flug = Bogen ab zu Hause, Auto und Zug folgen Autobahnen und Bahnlinien.</p>`;
       case 5: { const reg = w.place?.radius_km; return `<div class="choice">${[[3, 'Ein Ort'], [15, 'Umgebung'], [reg || 50, reg ? `ganz ${esc(w.place.name)}` : 'Region'], [150, 'Rundreise']].map(([r, l]) => `<button data-r="${r}" class="${w.area === r ? 'on' : ''}">${l} · ${r} km</button>`).join('')}</div><p class="small">Ohne GPS-Daten zeigt die Karte eine gestrichelte Fläche – lieber zu klein als zu gross.</p>`; }
-      default: { const [s, e, n, ap] = dates(); return `<p><b>${esc(w.place?.name || '?')}</b>, ${esc(w.place?.country || '')}</p><p>${fmtD(s)} – ${fmtD(e)} · ${n} Nächte${ap ? ' · <span class="status">Datum geschätzt</span>' : ''}</p><p>${esc(w.who || 'wer offen')} · ${esc(w.transport.join(' · ') || '–')} · Fläche ${w.area ?? 0} km</p><label class="field">Notiz<textarea id="wnote" rows="2" maxlength="1000">${esc(w.note)}</textarea></label>`; }
+      default: { const [s, e, n, ap] = dates(); return `<p><b>${esc(w.stops.map((x) => x.name).join(' → ') || '?')}</b>, ${esc(w.place?.country || '')}</p><p>${fmtD(s)} – ${fmtD(e)} · ${n} Nächte${ap ? ' · <span class="status">Datum geschätzt</span>' : ''}</p><p>${esc(w.who || 'wer offen')} · ${esc(w.transport.join(' · ') || '–')} · Fläche ${w.area ?? 0} km</p><label class="field">Notiz<textarea id="wnote" rows="2" maxlength="1000">${esc(w.note)}</textarea></label>`; }
     }
   };
   const render = () => {
@@ -555,20 +606,21 @@ function wizard() {
     $('wback').onclick = () => { if (!w.step) return d.close(); collect(); w.step--; render(); };
     $('wnext').onclick = async () => {
       collect();
-      if (w.step === 0 && !w.place) return toast('Bitte einen Ort aus der Liste wählen');
+      if (w.step === 0) { w.place = w.stops[0] || null; if (!w.place) return toast('Bitte einen Ort aus der Liste wählen'); }
       if (w.step < steps.length - 1) { w.step++; if (w.step === 2 && w.start) w.nights = dates()[2]; if (w.step === 5 && w.area == null) w.area = w.place?.radius_km || 15; return render(); }
       const [s, e, n, ap] = dates(); const home = st.cfg?.home;
       const km = home ? haversine(home[0], home[1], w.place.lat, w.place.lon) : null;
       try {
-        await post('api/trips', {start_date: s, end_date: e, nights: n, destination: w.place.name, country: w.place.country, who: w.who, confidence: w.who ? 'bestätigt' : 'tief', lat: w.place.lat, lon: w.place.lon, radius_km: w.area, approx: ap, transport: w.transport.join(' · '), note: w.note, source: 'manual', reason: 'von Hand erfasst', max_km: km});
+        const multi = w.stops.length > 1, first = w.transport.includes('Flug') ? 'Flug' : w.transport[0] || 'Auto';
+        const legs = multi ? w.stops.map((x, i) => ({name: x.name, country: x.country, lat: x.lat, lon: x.lon, transport: i ? x.transport : first})) : [];
+        const far = home ? Math.max(...w.stops.map((x) => haversine(home[0], home[1], x.lat, x.lon))) : null;
+        const tr = [...new Set([...w.transport, ...legs.slice(1).map((x) => x.transport)])];
+        await post('api/trips', {start_date: s, end_date: e, nights: n, destination: multi ? w.stops.map((x) => x.name).join(' – ').slice(0, 200) : w.place.name, country: w.place.country, who: w.who, confidence: w.who ? 'bestätigt' : 'tief', lat: w.place.lat, lon: w.place.lon, radius_km: w.area, approx: ap, transport: tr.join(' · '), note: w.note, source: 'manual', reason: 'von Hand erfasst', max_km: far ?? km, legs});
         saved = true; d.close(); toast('Reise gespeichert'); notifyParent('changed'); refresh();
       } catch (err) { toast(err.message, 4000); }
     };
     const wb = $('wb');
-    if (w.step === 0) {
-      let tm; $('wq').focus();
-      $('wq').oninput = () => { clearTimeout(tm); tm = setTimeout(async () => { const r = await api('api/places?q=' + encodeURIComponent($('wq').value)); $('ws').innerHTML = r.map((p, i) => `<button data-i="${i}">${p.kind === 'region' ? '🗺️' : '📍'} ${esc(p.name)} <span class="small">${esc(p.country)}</span></button>`).join(''); $('ws').onclick = (e) => { const b = e.target.closest('button'); if (!b) return; w.place = r[+b.dataset.i]; w.area = null; render(); }; }, 160); };
-    }
+    if (w.step === 0) { stopsEditor($('wse'), w.stops, () => { w.place = w.stops[0] || null; w.area = null; }); $('wse').querySelector('.sq').focus(); }
     wb.querySelectorAll('[data-n]').forEach((b) => (b.onclick = () => { w.nights = +b.dataset.n; render(); }));
     wb.querySelectorAll('[data-who]').forEach((b) => (b.onclick = () => { w.who = b.dataset.who; render(); }));
     wb.querySelectorAll('[data-t]').forEach((b) => (b.onclick = () => { const t = b.dataset.t; w.transport = w.transport.includes(t) ? w.transport.filter((x) => x !== t) : [...w.transport, t]; render(); }));

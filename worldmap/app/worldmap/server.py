@@ -21,7 +21,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from . import airports, asking, places
+from . import airports, asking, geosearch, places
 from .atlas import Atlas
 from .db import CONFIDENCE
 from .engine import Engine
@@ -81,6 +81,41 @@ def csv_safe(v) -> str:
     return "'" + s if s[:1] in ("=", "+", "-", "@", "\t", "\r") else s
 
 
+LEG_TRANSPORT = ("Auto", "Zug", "Bus", "Flug", "Schiff", "Wohnmobil", "Velo", "zu Fuss")
+
+
+def validate_legs(raw) -> str:
+    """Stops of a trip in order, e.g. Tenerife (by plane) → La Gomera (by ship). Stored as JSON text."""
+    if raw in (None, "", []):
+        return ""
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw)
+        except ValueError as e:
+            raise ValueError("legs must be a list") from e
+    if not isinstance(raw, list) or len(raw) > 20:
+        raise ValueError("legs must be a list of at most 20 stops")
+    out = []
+    for leg in raw:
+        if not isinstance(leg, dict):
+            raise ValueError("every stop must be an object")
+        try:
+            la, lo = float(leg["lat"]), float(leg["lon"])
+        except (KeyError, TypeError, ValueError) as e:
+            raise ValueError("every stop needs lat and lon") from e
+        if not (-90 <= la <= 90 and -180 <= lo <= 180):
+            raise ValueError("stop coordinates out of range")
+        name = str(leg.get("name") or "").strip()[:80]
+        if not name:
+            raise ValueError("every stop needs a name")
+        tr = str(leg.get("transport") or "Auto")
+        if tr not in LEG_TRANSPORT:
+            raise ValueError(f"unknown transport: {tr[:20]}")
+        out.append({"name": name, "country": str(leg.get("country") or "").strip()[:60],
+                    "lat": round(la, 5), "lon": round(lo, 5), "transport": tr})
+    return json.dumps(out, ensure_ascii=False)
+
+
 def validate_trip(data: dict, partial: bool) -> dict:
     if not isinstance(data, dict):
         raise ValueError("body must be a JSON object")
@@ -98,6 +133,8 @@ def validate_trip(data: dict, partial: bool) -> dict:
             if len(v) > limit:
                 raise ValueError(f"{k} is too long (max {limit})")
             out[k] = v
+    if "legs" in data:
+        out["legs"] = validate_legs(data["legs"])
     for k in ("ap_from", "ap_to"):
         if k in data:
             code = str(data[k] or "").strip().upper()
@@ -443,6 +480,7 @@ def make_handler(app: App):
                 return self._send(HTTPStatus.OK, {
                     "persons": eng.s.labels, "who_options": eng.s.who_options, "colors": eng.s.colors(),
                     "home": eng.home, "routing": eng.s.routing, "max_upload_mb": eng.s.max_upload_mb,
+                    "place_search": eng.s.place_search if eng.s.place_search != "google" or eng.s.google_maps_api_key else "offline",
                 })
             m = re.fullmatch(r"/api/atlas/(core|tracks|labels|reg)", path)
             if m:
@@ -465,7 +503,13 @@ def make_handler(app: App):
                 return self._send(HTTPStatus.OK, sorted(({"code": c, "name": v[2]} for c, v in used.items()),
                                                         key=lambda x: x["code"]))
             if path == "/api/places":
-                return self._send(HTTPStatus.OK, places.search(q.get("q", [""])[0]))
+                text = q.get("q", [""])[0][:2000]
+                if geosearch.is_gmaps(text):  # a Google Maps link pasted into the search
+                    hit = geosearch.resolve_gmaps(text)
+                    return self._send(HTTPStatus.OK, [hit] if hit else [])
+                local = places.search(text)
+                online = geosearch.search(text, eng.s.place_search, eng.s.google_maps_api_key) if q.get("online") else []
+                return self._send(HTTPStatus.OK, local + online)
             if path == "/api/connectors":
                 return self._send(HTTPStatus.OK, connectors_status())
             if path == "/api/tracks":

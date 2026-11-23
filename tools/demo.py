@@ -130,6 +130,31 @@ def main(out: str) -> None:
     db.upsert_trip({"start_date": "2012-06-20", "end_date": "2012-07-04", "destination": "Kreta", "country": "Griechenland",
                     "who": "Paar", "confidence": "bestätigt", "nights": 14, "lat": 35.24, "lon": 24.90, "radius_km": 40,
                     "approx": 1, "transport": "Flug", "source": "manual", "reason": "von Hand erfasst", "locked": 1})
+    # trips with several stops and no GPS – invented, all over the world
+    import json as _json
+
+    def legs(*stops):
+        return _json.dumps([{"name": n, "country": c, "lat": la, "lon": lo, "transport": t} for n, c, la, lo, t in stops])
+    db.upsert_trip({"start_date": "2015-04-02", "end_date": "2015-04-16", "destination": "Teneriffa – La Gomera",
+                    "country": "Spanien", "who": "Familie", "confidence": "bestätigt", "nights": 14, "lat": 28.29,
+                    "lon": -16.62, "radius_km": 30, "approx": 0, "transport": "Flug · Schiff · Auto", "source": "manual",
+                    "reason": "von Hand erfasst", "locked": 1,
+                    "legs": legs(("Teneriffa", "Spanien", 28.29, -16.62, "Flug"), ("La Gomera", "Spanien", 28.10, -17.11, "Schiff"))})
+    db.upsert_trip({"start_date": "2017-02-05", "end_date": "2017-02-26", "destination": "Sydney – Canberra – Melbourne",
+                    "country": "Australien", "who": "Paar", "confidence": "bestätigt", "nights": 21, "lat": -33.87,
+                    "lon": 151.21, "radius_km": 25, "approx": 0, "transport": "Flug · Wohnmobil · Zug", "source": "manual",
+                    "reason": "von Hand erfasst", "locked": 1,
+                    "legs": legs(("Sydney", "Australien", -33.87, 151.21, "Flug"), ("Canberra", "Australien", -35.28, 149.13, "Wohnmobil"),
+                                 ("Melbourne", "Australien", -37.81, 144.96, "Zug"))})
+    db.upsert_trip({"start_date": "2019-09-10", "end_date": "2019-09-22", "destination": "Norwegen-Rundreise",
+                    "country": "Norwegen", "who": "Familie", "confidence": "bestätigt", "nights": 12, "lat": 59.91,
+                    "lon": 10.75, "radius_km": 40, "approx": 0, "transport": "Auto · Schiff", "source": "manual",
+                    "reason": "von Hand erfasst", "locked": 1,
+                    "legs": legs(("Kiel", "Deutschland", 54.32, 10.14, "Auto"), ("Oslo", "Norwegen", 59.91, 10.75, "Schiff"),
+                                 ("Bergen", "Norwegen", 60.39, 5.32, "Auto"))})
+    db.upsert_trip({"start_date": "2008-08-01", "end_date": "2008-08-20", "destination": "Kenia",
+                    "country": "Kenia", "who": "Sam", "confidence": "mittel", "nights": 19, "transport": "Flug",
+                    "source": "manual", "reason": "von Hand erfasst", "locked": 1})  # only a country: shows up as "ungenau"
     eng = Engine(db, from_dict(opts), ha=type("NoHA", (), {"available": False})())
     print(len(rows), "points", eng.rebuild())
 
