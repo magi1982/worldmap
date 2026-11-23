@@ -64,17 +64,17 @@ Ideen werden zuerst hier gesammelt. Code entsteht erst nach einem ausdrückliche
 
 ## Next update – waiting for "mach es" / Nächstes Update – wartet auf „mach es“
 
-### Stations with airports – one picker for everything / Stationen mit Flughäfen – eine Auswahl für alles
-- [ ] One search per station finds **places and airports** by city, airport name or code: "Dubai" shows
+### Stations with airports – one picker for everything (done in 0.11.0)
+- [x] One search per station finds **places and airports** by city, airport name or code: "Dubai" shows
       "Dubai (city)", "✈ Dubai International (DXB)", "✈ Al Maktoum (DWC)". Nobody has to know the codes.
-- [ ] A station is either a place or an airport. An airport station is exactly where the plane lands; the next
+- [x] A station is either a place or an airport. An airport station is exactly where the plane lands; the next
       station starts from there (✈ DXB → 🚗 Dubai Marina, or ✈ DXB → ✈ Bangkok BKK).
-- [ ] Choosing "Flug" for a station offers that city's airports first; if none is chosen the big airport nearby
+- [x] Choosing "Flug" for a station offers that city's airports first; if none is chosen the big airport nearby
       is taken automatically (as now).
-- [ ] "Abflug ab" above the list: automatic (your home airport) or search one by name (e.g. Basel, Milano Malpensa).
-- [ ] Same picker in the "+" wizard and in the trip list (button "Stationen"). The separate column "Flughäfen" goes
+- [x] "Abflug ab" above the list: automatic (your home airport) or search one by name (e.g. Basel, Milano Malpensa).
+- [x] Same picker in the "+" wizard and in the trip list (button "Stationen"). The separate column "Flughäfen" goes
       away; airports already set there are shown as departure and as airport station (nothing is lost).
-- [ ] Map, travel film and dashboard postcard use the airport stations. Airport search works offline (OurAirports,
+- [x] Map, travel film and dashboard postcard use the airport stations. Airport search works offline (OurAirports,
       large and medium airports worldwide). Tests for search, saving and the drawn route.
 
 ### Base map (idea, to decide)

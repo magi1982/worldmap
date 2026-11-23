@@ -111,6 +111,12 @@ def validate_legs(raw) -> str:
     for leg in raw:
         if not isinstance(leg, dict):
             raise ValueError("every stop must be an object")
+        code = str(leg.get("ap") or "").strip().upper()
+        ap = None
+        if code:  # an airport as stop: the plane lands exactly there
+            if not re.fullmatch(r"[A-Z]{3}", code) or not (ap := airports.by_iata(code)):
+                raise ValueError(f"unknown airport code: {code[:8]}")
+            leg = {**leg, "lat": ap[2], "lon": ap[3], "name": leg.get("name") or ap[1]}
         try:
             la, lo = float(leg["lat"]), float(leg["lon"])
         except (KeyError, TypeError, ValueError) as e:
@@ -120,11 +126,14 @@ def validate_legs(raw) -> str:
         name = str(leg.get("name") or "").strip()[:80]
         if not name:
             raise ValueError("every stop needs a name")
-        tr = str(leg.get("transport") or "Auto")
+        tr = str(leg.get("transport") or ("Flug" if ap else "Auto"))
         if tr not in LEG_TRANSPORT:
             raise ValueError(f"unknown transport: {tr[:20]}")
-        out.append({"name": name, "country": str(leg.get("country") or "").strip()[:60],
-                    "lat": round(la, 5), "lon": round(lo, 5), "transport": tr})
+        stop = {"name": name, "country": str(leg.get("country") or "").strip()[:60],
+                "lat": round(la, 5), "lon": round(lo, 5), "transport": tr}
+        if ap:
+            stop["ap"] = ap[0]
+        out.append(stop)
     return json.dumps(out, ensure_ascii=False)
 
 
@@ -505,6 +514,9 @@ def make_handler(app: App):
                 return self._send(HTTPStatus.OK, notify_services(eng.ha))
             if path == "/api/airports":  # airports of your own flights first, any IATA code on request
                 code = q.get("code", [""])[0].strip().upper()[:3]
+                text = q.get("q", [""])[0].strip()[:80]
+                if text:  # search by town, airport name or code – nobody has to know the codes
+                    return self._send(HTTPStatus.OK, airports.search(text))
                 if code:
                     ap = airports.by_iata(code)
                     return self._send(HTTPStatus.OK, {"code": ap[0], "name": ap[1]} if ap else {})

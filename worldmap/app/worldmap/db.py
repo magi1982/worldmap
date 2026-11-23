@@ -126,6 +126,57 @@ class Database:
             cols = {r[1] for r in self._conn.execute(f"PRAGMA table_info({table})")}  # nosec B608 - constant names
             if col not in cols:
                 self._conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {decl}")  # nosec B608 - constant names
+        self._migrate_airport_stations()
+
+    def _migrate_airport_stations(self) -> None:
+        """0.11.0: the airport at the destination (``ap_to``) becomes an airport stop in ``legs``.
+
+        "✈ HER, then 🚗 to the hotel" instead of a separate airport field. Runs once; nothing is lost: a trip without
+        stops gets [airport, destination], a trip with stops gets the airport before its last flight's stop.
+        The departure airport (``ap_from``) stays as it is ("Abflug ab").
+        """
+        with self._lock:
+            done = self._conn.execute("SELECT value FROM meta WHERE key='airport_stations'").fetchone()
+            if done:
+                return
+            from . import airports
+            from .geo import haversine_km
+            rows = self._conn.execute(
+                "SELECT id, destination, country, lat, lon, transport, legs, ap_to FROM trips "
+                "WHERE ap_to IS NOT NULL AND ap_to != ''").fetchall()
+            self._conn.execute("BEGIN")
+            try:
+                for r in rows:
+                    ap = airports.by_iata(r["ap_to"])
+                    if not ap:
+                        continue  # unknown code: leave it as it is
+                    stop = {"name": ap[1], "country": "", "lat": ap[2], "lon": ap[3], "transport": "Flug", "ap": ap[0]}
+                    try:
+                        legs = json.loads(r["legs"]) if r["legs"] else []
+                    except ValueError:
+                        legs = []
+                    if legs:
+                        fly = [i for i, x in enumerate(legs) if "Flug" in str(x.get("transport") or "")]
+                        if fly and not legs[fly[-1]].get("ap"):
+                            i = fly[-1]
+                            if haversine_km(legs[i]["lat"], legs[i]["lon"], ap[2], ap[3]) < 8:
+                                legs[i]["ap"], legs[i]["lat"], legs[i]["lon"] = ap[0], ap[2], ap[3]
+                            else:
+                                legs[i] = {**legs[i], "transport": "Auto"}
+                                legs.insert(i, stop)
+                    else:
+                        legs = [stop]
+                        if r["lat"] is not None and r["lon"] is not None \
+                                and haversine_km(r["lat"], r["lon"], ap[2], ap[3]) >= 8:
+                            legs.append({"name": (r["destination"] or "Ziel")[:80], "country": r["country"] or "",
+                                         "lat": r["lat"], "lon": r["lon"], "transport": "Auto"})
+                    self._conn.execute("UPDATE trips SET legs=?, ap_to=NULL WHERE id=?",
+                                       (json.dumps(legs[:20], ensure_ascii=False), r["id"]))
+                self._conn.execute("INSERT OR REPLACE INTO meta(key, value) VALUES('airport_stations', '1')")
+            except BaseException:
+                self._conn.execute("ROLLBACK")
+                raise
+            self._conn.execute("COMMIT")
 
     def close(self) -> None:
         with self._lock:

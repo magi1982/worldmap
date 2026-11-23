@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.11.0 – 2026-11-23
+
+### Added
+- **Airports as stops**: one search per stop finds places *and* airports – by town, airport name or code
+  ("Dubai" shows the town, ✈ DXB and ✈ DWC; "Mailand" finds MXP, LIN, BGY). Nobody has to know the codes.
+  An airport stop is exactly where the plane lands; the next stop starts from there (✈ DXB → 🚗 Abu Dhabi).
+  Every stop, also the first one, has its own transport. "Departure from" above the stops picks another airport
+  than your home airport (searchable by name too). Same in the "+" wizard and in the trip list (button "Stations").
+- Airport stops are labelled ✈ code on the map and on the dashboard postcard.
+
+### Changed
+- The separate "Airports" column in the trip list is gone – it is part of the stops now.
+- **Migration** (runs once when the add-on starts): an airport set at the destination becomes an airport stop
+  (trip without stops: [✈ airport, 🚗 destination]; trip with stops: the airport before its last flight's stop).
+  The departure airport stays. Unknown codes are left as they are. GPS flights use the airport stop like before.
+
+### Fixed
+- 0.10.2 is included: a trip with a ferry comes home the same way.
+
 ## 0.10.2 – 2026-11-23
 
 ### Fixed

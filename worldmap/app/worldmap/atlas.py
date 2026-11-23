@@ -473,7 +473,9 @@ class Atlas:
             if tid < 0:
                 continue
             t = trip_rows[tid]
-            fa, ta = airports.by_iata(t["ap_from"] or ""), airports.by_iata(t["ap_to"] or "")
+            fa = airports.by_iata(t["ap_from"] or "")
+            ta = airports.by_iata(t["ap_to"] or "") or next(  # the airport stop of the trip ("✈ HER, then 🚗")
+                (airports.by_iata(x["ap"]) for x in _legs(t["legs"]) if x.get("ap")), None)
             if not (fa or ta):
                 continue
             near_a = haversine_km(home[0], home[1], *f[1]) <= haversine_km(home[0], home[1], *f[2])
@@ -529,7 +531,7 @@ class Atlas:
                 lat, lon, nopos = home[0], home[1], 2  # imported before 0.7.2: the middle of the country was stored
             dist = t["max_km"] if t["max_km"] is not None else haversine_km(home[0], home[1], lat, lon)
             fl, gr, lg = [], None, None
-            if not k and len(legs) > 1:  # no GPS, several stops: every leg its own way (plane, road, rail, ship)
+            if not k and (len(legs) > 1 or any(x.get("ap") for x in legs)):  # no GPS, several stops or an airport: every leg its own way (plane, road, rail, ship)
                 fl, gr, lg, k = self._leg_ways(home, h_ap, t, legs, used_ap)
                 if rad and rad <= 250:
                     est.append([i, lat, lon, rad])
@@ -567,7 +569,8 @@ class Atlas:
                 "r": t["radius_km"], "fixed": 1 if fixed else 0,
                 **({"gr": gr} if gr else {}),
                 **({"lg": lg} if lg else {}),
-                **({"st": [[x["lat"], x["lon"], x["name"]] for x in legs]} if len(legs) > 1 else {}),
+                **({"st": [[x["lat"], x["lon"], x["name"]] + ([x["ap"]] if x.get("ap") else []) for x in legs]}
+                   if len(legs) > 1 or any(x.get("ap") for x in legs) else {}),
             })
 
         groups = _groups(out_trips, home)
@@ -720,16 +723,17 @@ class Atlas:
         network (else a straight line over the water), cars and trains the main roads / railways.
         """
         fl, gr, lg, km = [], [], [], defaultdict(float)
-        prev, prev_home = (home[0], home[1]), True
+        prev, prev_home, prev_ap = (home[0], home[1]), True, None
         fly_idx = [n for n, x in enumerate(legs) if "fly" in modes_of_transport(x["transport"])]
         for n, leg in enumerate(legs):
             ms = modes_of_transport(leg["transport"]) or ["road"]
             here = (leg["lat"], leg["lon"])
             d = haversine_km(*prev, *here)
             if "fly" in ms:
-                a_ap = (airports.by_iata(t["ap_from"] or "") if n == fly_idx[0] else None) or \
+                a_ap = prev_ap or (airports.by_iata(t["ap_from"] or "") if n == fly_idx[0] else None) or \
                     (h_ap if prev_home else airports.snap(prev[0], prev[1], 60, 0))
-                b_ap = (airports.by_iata(t["ap_to"] or "") if n == fly_idx[-1] else None) or \
+                b_ap = airports.by_iata(leg.get("ap") or "") or \
+                    (airports.by_iata(t["ap_to"] or "") if n == fly_idx[-1] else None) or \
                     airports.snap(here[0], here[1], 60, 0)
                 a = [a_ap[2], a_ap[3]] if a_ap else list(prev)
                 b = [b_ap[2], b_ap[3]] if b_ap else list(here)
@@ -754,7 +758,7 @@ class Atlas:
                 gr += runs
                 lg.append([mode, runs])
                 km[mode] += d
-            prev, prev_home = here, False
+            prev, prev_home, prev_ap = here, False, airports.by_iata(leg.get("ap") or "")
         if not fly_idx and haversine_km(*prev, home[0], home[1]) > 30:  # round trip by land: the way back home
             first = modes_of_transport(legs[0]["transport"]) or ["road"]
             kind = "rail" if "rail" in first else "road"

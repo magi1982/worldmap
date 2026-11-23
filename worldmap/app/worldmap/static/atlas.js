@@ -277,7 +277,7 @@ function drawR(){
  drawEst(RC.gr,2.2/S*LWm);
  /* lines always stay on the map; the animation only moves the vehicles */for(const e of RC.pairs){const [A,Bg]=e.k.split('>');const [x1,y1]=gpos(A),[x2,y2]=gpos(Bg);const a=arcPts(x1,y1,x2,y2,(A=='home'?.2:.18)*AH);strokeArc(a,R.color=='w'?WHO.filter(w=>e.ws.has(w)).map(w=>WCOL[w]):[MCOL.fly],2.4*LWm,8,6)}
  endWorld();placed.length=0;usedNames.clear();
- for(const t of RC.on){if(!t.st)continue;t.st.forEach(([la,lo,nm],k)=>{const [x,y]=toS(MX(lo),MY(la));if(x<-20||y<-20||x>V.W+20||y>V.H+20)return;const c=WCOL[t.w]||MC.strong;ctx.beginPath();ctx.arc(x,y,3.6,0,7);ctx.fillStyle=MC.ring;ctx.fill();ctx.beginPath();ctx.arc(x,y,2.6,0,7);ctx.fillStyle=c;ctx.fill();if(k>0&&V.S>12000)lbl(nm,x+6,y+4,11,600,MC.text)})}
+ for(const t of RC.on){if(!t.st)continue;t.st.forEach(([la,lo,nm,ap],k)=>{const [x,y]=toS(MX(lo),MY(la));if(x<-20||y<-20||x>V.W+20||y>V.H+20)return;const c=WCOL[t.w]||MC.strong;ctx.beginPath();ctx.arc(x,y,3.6,0,7);ctx.fillStyle=MC.ring;ctx.fill();ctx.beginPath();ctx.arc(x,y,2.6,0,7);ctx.fillStyle=c;ctx.fill();if((k>0||ap)&&V.S>12000)lbl(ap?'✈ '+ap:nm,x+6,y+4,11,600,MC.text)})}
  homeMark();if(TP.airports!==false)apMarks(RC.pairs.flatMap(e=>e.k.split(">")));const DS=TP.dot_size??1,LS=TP.label_size??1,LM=TP.labels||'normal';
  // destinations
  RC.mbox=null;let off=null;
@@ -869,7 +869,7 @@ function tPassport(T){const first={},cnt={};for(const t of T)for(const c of dCou
 
 function tPostcard(T){if(!T.length)return '<div class="empty">Noch keine Reisen.</div>';
  const t=T.find(x=>x.id==DASH.pc)||T[T.length-1];DASH.pc=t.id;
- const pts=[[HOME[0],HOME[1],'Zuhause']].concat(t.st&&t.st.length?t.st:t.nopos?[]:[[t.p[0],t.p[1],t.name]]);
+ const pts=[[HOME[0],HOME[1],'Zuhause']].concat(t.st&&t.st.length?t.st.map(x=>[x[0],x[1],x[3]?'✈ '+x[3]:x[2]]):t.nopos?[]:[[t.p[0],t.p[1],t.name]]);
  let la0=90,la1=-90,lo0=180,lo1=-180;for(const [a,b] of pts){la0=Math.min(la0,a);la1=Math.max(la1,a);lo0=Math.min(lo0,b);lo1=Math.max(lo1,b)}
  const W=260,H=170,pad=22,kx=Math.cos((la0+la1)/2*Math.PI/180),sw=Math.max((lo1-lo0)*kx,.2),sh=Math.max(la1-la0,.2),s=Math.min((W-2*pad)/sw,(H-2*pad)/sh);
  const X=b=>W/2+((b-(lo0+lo1)/2)*kx)*s,Y=a=>H/2-(a-(la0+la1)/2)*s;
@@ -884,7 +884,7 @@ function tPostcard(T){if(!T.length)return '<div class="empty">Noch keine Reisen.
  <div class="dpc-t"><h4>${esc(t.name)}</h4><p>${dRange(t)} · ${t.n||0} ${t.n==1?'Nacht':'Nächte'}</p>
   <p>${esc(dCountries(t).join(', ')||'Land offen')}</p><p>${(t.m||[]).map(m=>`<span class="dpill" style="--c:${MCOL[m]}">${MNAME[m]}</span>`).join(' ')}</p>
   <p><span class="dpill" style="--c:${dCol(t.w)}">${esc(t.w)}</span> · ${fmt(t.km||0)} km${t.approx||t.nopos?' · <span class="dmute">ungenau</span>':''}</p>
-  ${t.st&&t.st.length>1?`<p class="dmute">Stationen: ${t.st.map(x=>esc(x[2])).join(' → ')}</p>`:''}</div></div>`}
+  ${t.st&&(t.st.length>1||t.st.some(x=>x[3]))?`<p class="dmute">Stationen: ${t.st.map(x=>esc(x[3]?'✈ '+x[3]:x[2])).join(' → ')}</p>`:''}</div></div>`}
 
 function tCalendar(T){const ys=[...new Set(T.map(t=>t.y))].sort();if(!ys.length)return '<div class="empty">Noch keine Reisen.</div>';
  if(!ys.includes(DASH.year))DASH.year=ys[ys.length-1];const Y=DASH.year,day={};

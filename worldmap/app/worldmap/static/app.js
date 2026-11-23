@@ -53,7 +53,7 @@ const COLS = [
   {k: 'destination', n: 'Ziel', w: 220}, {k: 'country', n: 'Land', w: 120},
   {k: 'who', n: 'Wer', t: 'who', w: 130}, {k: 'confidence', n: 'Sicherheit', t: 'conf', w: 110},
   {k: 'nights', n: 'Nächte', t: 'num', w: 70}, {k: 'max_km', n: 'km', t: 'num', w: 80},
-  {k: 'transport', n: 'Verkehrsmittel', t: 'tr', w: 170}, {k: 'legs', n: 'Stationen', t: 'legs', w: 130}, {k: 'ap_from', n: 'Flughäfen', t: 'ap', w: 130}, {k: 'note', n: 'Notiz', w: 200}, {k: 'source', n: 'Quelle', w: 110},
+  {k: 'transport', n: 'Verkehrsmittel', t: 'tr', w: 170}, {k: 'legs', n: 'Stationen', t: 'legs', w: 130}, {k: 'note', n: 'Notiz', w: 200}, {k: 'source', n: 'Quelle', w: 110},
 ];
 function gridHead() {
   $('grid').tHead.innerHTML = `<tr><th class="sel"><input type="checkbox" id="selAll" aria-label="Alle auswählen"></th>${COLS.map((c) => `<th data-k="${c.k}" style="min-width:${c.w}px" class="${st.sort[0] === c.k ? (st.sort[1] > 0 ? 'asc' : 'desc') : ''}">${c.n}</th>`).join('')}</tr>
@@ -84,8 +84,7 @@ function gridBody() {
   const whoOpts = [...new Set(['', ...whoList(), ...st.trips.map((t) => t.who)])];
   $('grid').tBodies[0].innerHTML = rows.map((t) => `<tr data-id="${t.id}" class="${t.status === 'ignored' ? 'ign' : ''} ${vague(t) ? 'vague' : ''}" ${vague(t) ? `title="Ungenau: ${vague(t)} – Ort, Stationen oder Daten ergänzen"` : ''}><td class="sel"><input type="checkbox" ${st.sel.has(t.id) ? 'checked' : ''} aria-label="Zeile auswählen"></td>${COLS.map((c) => {
     if (c.t === 'who') return `<td><select data-k="who" data-c="${colorOf(t.who)}" class="who">${whoOpts.map((w) => `<option ${w === t.who ? 'selected' : ''} value="${esc(w)}">${esc(w || '– offen –')}</option>`).join('')}</select></td>`;
-    if (c.t === 'legs') { const L = legsOf(t); return `<td class="trc"><button type="button" class="lgbtn" aria-label="Stationen bearbeiten">${L.length > 1 ? `🧭 ${L.length} Stationen` : `<span class="small">${vague(t) ? '⚠︎ Ort ergänzen' : '+ Station'}</span>`}</button></td>`; }
-    if (c.t === 'ap') { const fl = /flug/i.test(t.transport || ''); return `<td class="trc"><button type="button" class="apbtn" data-k="ap_from" aria-label="Flughäfen wählen" ${fl || t.ap_from || t.ap_to ? '' : 'data-dim="1"'}>${t.ap_from || t.ap_to ? `✈︎ ${esc(t.ap_from || 'auto')} → ${esc(t.ap_to || 'auto')}` : `<span class="small">${fl ? 'automatisch' : '–'}</span>`}</button></td>`; }
+    if (c.t === 'legs') { const L = legsOf(t); return `<td class="trc"><button type="button" class="lgbtn" aria-label="Stationen bearbeiten">${L.length > 1 || L.some((x) => x.ap) ? `🧭 ${L.length} ${L.length === 1 ? 'Station' : 'Stationen'}${L.some((x) => x.ap) ? ' · ✈︎ ' + esc(L.filter((x) => x.ap).map((x) => x.ap).join(' ')) : ''}` : t.ap_from ? `✈︎ ab ${esc(t.ap_from)}` : `<span class="small">${vague(t) ? '⚠︎ Ort ergänzen' : '+ Station'}</span>`}</button></td>`; }
     if (c.t === 'tr') { const sel = trList(t.transport); return `<td class="trc"><button type="button" class="trbtn" data-k="transport" aria-label="Verkehrsmittel wählen">${sel.length ? sel.map((x) => `<span class="tpill">${TICON[x] || ''} ${esc(x)}</span>`).join('') : '<span class="small">wählen …</span>'}</button></td>`; }
     if (c.t === 'conf') return `<td><select data-k="confidence" class="conf-${esc(t.confidence)}">${CONF.map((x) => `<option ${x === t.confidence ? 'selected' : ''}>${x}</option>`).join('')}</select></td>`;
     return `<td contenteditable="true" spellcheck="false" data-k="${c.k}" class="${c.t === 'num' ? 'num' : ''}">${esc(cellText(t, c))}</td>`;
@@ -141,73 +140,80 @@ function trPicker(btn) {
   pop.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
   setTimeout(() => document.addEventListener('mousedown', outside, true), 0); pop.querySelector('.tchip').focus();
 }
-$('grid').addEventListener('click', (e) => { const b = e.target.closest('.trbtn'); if (b) trPicker(b); const a = e.target.closest('.apbtn'); if (a) apPicker(a); const l = e.target.closest('.lgbtn'); if (l) legsPopup(l); });
+$('grid').addEventListener('click', (e) => { const b = e.target.closest('.trbtn'); if (b) trPicker(b); const l = e.target.closest('.lgbtn'); if (l) legsPopup(l); });
 $('gridVague').onchange = () => gridBody();
 const legsOf = (t) => { try { return t.legs ? JSON.parse(t.legs) : []; } catch (e) { return []; } };
 /* stops of a trip: search a place (offline list, online search, Google Maps link) and how you got there */
-function stopsEditor(box, stops, onChange) {
+/* stops of a trip: places and airports in one search ("Dubai" → the town, ✈ DXB, ✈ DWC) – nobody has to know codes */
+const stopLabel = (x) => (x.ap ? `✈︎ ${esc(x.ap)} · ${esc(x.name)}` : esc(x.name));
+function apSearchBox(input, list, onPick) {
+  let tm, seq = 0, res = [];
+  input.oninput = () => { clearTimeout(tm); const v = input.value.trim(); const my = ++seq; if (v.length < 2) { list.innerHTML = ''; return; }
+    tm = setTimeout(async () => { try { res = await api('api/airports?q=' + encodeURIComponent(v)); } catch (e) { res = []; } if (my !== seq) return;
+      list.innerHTML = res.map((a, i) => `<button type="button" data-i="${i}">✈︎ <b>${esc(a.code)}</b> ${esc(a.name)} <span class="small">${esc(a.city)}</span></button>`).join('') || '<p class="small">Kein Flughafen gefunden.</p>'; }, 200); };
+  list.onclick = (e) => { const b = e.target.closest('button'); if (b) { onPick(res[+b.dataset.i]); list.innerHTML = ''; input.value = ''; } };
+}
+function stopsEditor(box, stops, onChange, opts = {}) {
   const ONLINE = st.cfg && st.cfg.place_search && st.cfg.place_search !== 'offline';
   const draw = () => {
-    box.innerHTML = `<ol class="stops">${stops.map((x, i) => `<li>${i ? `<select data-leg="${i}" aria-label="Wie nach ${esc(x.name)}">${TRANSPORT.map((tr) => `<option ${tr === x.transport ? 'selected' : ''}>${tr}</option>`).join('')}</select><span class="arr">→</span>` : '<span class="small first">Ziel</span>'}<b>${esc(x.name)}</b><span class="small">${esc(x.country || '')}</span><button type="button" class="rm" data-rm="${i}" aria-label="${esc(x.name)} entfernen">✕</button></li>`).join('')}</ol>
-     <input class="sq" placeholder="${stops.length ? 'Weitere Station, z. B. La Gomera' : 'Ort, Insel, Land – oder Google-Maps-Link'}" autocomplete="off" aria-label="Ort suchen"><div class="sugg"></div>
-     <p class="small">${stops.length ? 'Mehrere Stationen werden der Reihe nach verbunden – mit Flugzeug, Auto, Zug oder Schiff, wie du es wählst.' : 'Suche einen Ort oder füge einen Link aus Google Maps ein.'}${ONLINE ? ` Online-Suche: ${st.cfg.place_search === 'google' ? 'Google Maps' : 'OpenStreetMap'}.` : ''}</p>`;
-    const q = box.querySelector('.sq'), sg = box.querySelector('.sugg'); let tm, res = [], seq = 0;
-    const show = () => { sg.innerHTML = res.map((p, i) => `<button type="button" data-i="${i}">${p.kind === 'country' ? '🏳️' : p.kind === 'region' ? '🗺️' : p.kind === 'online' ? '🌐' : '📍'} ${esc(p.name)} <span class="small">${esc(p.country || '')}${p.source ? ' · ' + esc(p.source) : ''}</span></button>`).join('') || (q.value.trim().length > 2 ? '<p class="small">Nichts gefunden – anders schreiben oder einen Google-Maps-Link einfügen.</p>' : ''); };
+    const flies = stops.some((x) => x.transport === 'Flug' || x.ap);
+    box.innerHTML = `${opts.onDep && flies ? `<div class="dep"><span class="small">Abflug ab</span><b>${opts.dep ? `✈︎ ${esc(opts.dep)}${opts.depName ? ' · ' + esc(opts.depName) : ''}` : 'automatisch (dein Flughafen)'}</b>${opts.dep ? '<button type="button" class="rm" data-dep="0" aria-label="Abflug automatisch">✕</button>' : ''}
+        <input class="dq" placeholder="anderer Abflug, z. B. Basel" autocomplete="off" aria-label="Abflughafen suchen"><div class="sugg dsg"></div></div>` : ''}
+     <ol class="stops">${stops.map((x, i) => `<li class="${x.ap ? 'ap' : ''}"><select data-leg="${i}" aria-label="Wie nach ${esc(x.name)}">${TRANSPORT.map((tr) => `<option ${tr === (x.transport || (x.ap ? 'Flug' : 'Auto')) ? 'selected' : ''}>${tr}</option>`).join('')}</select><span class="arr">→</span><b>${stopLabel(x)}</b><span class="small">${esc(x.country || '')}</span><button type="button" class="rm" data-rm="${i}" aria-label="${esc(x.name)} entfernen">✕</button></li>`).join('')}</ol>
+     <input class="sq" placeholder="${stops.length ? 'Nächste Station – Ort oder Flughafen' : 'Ort, Insel, Flughafen – oder Google-Maps-Link'}" autocomplete="off" aria-label="Ort oder Flughafen suchen"><div class="sugg ssg"></div>
+     <p class="small">${stops.length ? 'Pro Station: wie ihr dorthin gekommen seid. Ein Flughafen als Station heisst: genau dort gelandet – die nächste Station startet von dort.' : 'Suche einen Ort oder Flughafen (Stadt, Name oder Code) – oder füge einen Link aus Google Maps ein.'}${ONLINE ? ` Online-Suche: ${st.cfg.place_search === 'google' ? 'Google Maps' : 'OpenStreetMap'}.` : ''}</p>`;
+    const q = box.querySelector('.sq'), sg = box.querySelector('.ssg'); let tm, res = [], seq = 0;
+    const icon = (p) => (p.kind === 'airport' ? '✈︎' : p.kind === 'country' ? '🏳️' : p.kind === 'region' ? '🗺️' : p.kind === 'online' ? '🌐' : '📍');
+    const show = () => { sg.innerHTML = res.map((p, i) => `<button type="button" data-i="${i}" class="${p.kind === 'airport' ? 'isap' : ''}">${icon(p)} ${p.kind === 'airport' ? `<b>${esc(p.code)}</b> ` : ''}${esc(p.name)} <span class="small">${esc(p.kind === 'airport' ? p.city : p.country || '')}${p.source ? ' · ' + esc(p.source) : ''}</span></button>`).join('') || (q.value.trim().length > 2 ? '<p class="small">Nichts gefunden – anders schreiben oder einen Google-Maps-Link einfügen.</p>' : ''); };
     q.oninput = () => { clearTimeout(tm); const v = q.value.trim(); const my = ++seq; if (v.length < 2) { res = []; show(); return; }
-      tm = setTimeout(async () => { try { res = await api('api/places?q=' + encodeURIComponent(v)); if (my !== seq) return; show();
-        if (ONLINE && v.length > 2 && !/^https?:/i.test(v)) { const more = await api('api/places?online=1&q=' + encodeURIComponent(v)); if (my !== seq) return; const seen = new Set(res.map((p) => p.name.toLowerCase() + p.country)); res = res.concat(more.filter((p) => p.kind === 'online' && !seen.has(p.name.toLowerCase() + p.country))); show(); } } catch (e) { /* offline */ } }, 220); };
+      tm = setTimeout(async () => { try {
+        const isLink = /^https?:/i.test(v);
+        const [pl, ap] = await Promise.all([api('api/places?q=' + encodeURIComponent(v)), isLink ? [] : api('api/airports?q=' + encodeURIComponent(v)).catch(() => [])]);
+        if (my !== seq) return;
+        const aps = ap.slice(0, 5).map((a) => ({...a, kind: 'airport'}));
+        res = /^[a-z]{3}$/i.test(v) && aps.some((a) => a.code === v.toUpperCase()) ? aps.concat(pl.slice(0, 5)) : pl.slice(0, 6).concat(aps); show();
+        if (ONLINE && v.length > 2 && !isLink) { const more = await api('api/places?online=1&q=' + encodeURIComponent(v)); if (my !== seq) return; const seen = new Set(res.map((p) => p.name.toLowerCase() + (p.country || ''))); res = res.concat(more.filter((p) => p.kind === 'online' && !seen.has(p.name.toLowerCase() + p.country))); show(); } } catch (e) { /* offline */ } }, 220); };
     sg.onclick = (e) => { const b = e.target.closest('button'); if (!b) return; const p = res[+b.dataset.i];
-      stops.push({name: p.name, country: p.country || '', lat: p.lat, lon: p.lon, radius_km: p.radius_km || null, transport: stops.length ? (p.kind === 'online' || p.kind === 'place' ? 'Auto' : 'Auto') : ''}); onChange(); draw(); box.querySelector('.sq').focus(); };
+      if (p.kind === 'airport') stops.push({name: p.name, country: '', lat: p.lat, lon: p.lon, ap: p.code, transport: 'Flug'});
+      else stops.push({name: p.name, country: p.country || '', lat: p.lat, lon: p.lon, radius_km: p.radius_km || null, transport: stops.length && stops[stops.length - 1].ap ? 'Auto' : (stops.length ? 'Auto' : opts.firstTransport || 'Auto')});
+      onChange(); draw(); box.querySelector('.sq').focus(); };
     box.querySelectorAll('[data-rm]').forEach((b) => (b.onclick = () => { stops.splice(+b.dataset.rm, 1); onChange(); draw(); }));
-    box.querySelectorAll('[data-leg]').forEach((sel) => (sel.onchange = () => { stops[+sel.dataset.leg].transport = sel.value; onChange(); }));
+    box.querySelectorAll('[data-leg]').forEach((sel) => (sel.onchange = () => { stops[+sel.dataset.leg].transport = sel.value; onChange(); draw(); }));
+    const dq = box.querySelector('.dq');
+    if (dq) { apSearchBox(dq, box.querySelector('.dsg'), (a) => { opts.dep = a.code; opts.depName = a.name; opts.onDep(a.code); onChange(); draw(); });
+      const x = box.querySelector('[data-dep]'); if (x) x.onclick = () => { opts.dep = ''; opts.depName = ''; opts.onDep(''); onChange(); draw(); }; }
   };
   draw();
+  if (opts.dep && !opts.depName) api('api/airports?code=' + encodeURIComponent(opts.dep)).then((a) => { if (a && a.name) { opts.depName = a.name; draw(); } }).catch(() => {});
+}
+/* stops → what is stored: the stops (with airports) and the trip's main place, name and transport */
+function stopsToTrip(stops) {
+  const legs = stops.map((x) => ({name: x.name, country: x.country || '', lat: x.lat, lon: x.lon, transport: x.transport || (x.ap ? 'Flug' : 'Auto'), ...(x.ap ? {ap: x.ap} : {})}));
+  const places = stops.filter((x) => !x.ap), main = places[0] || stops[0];
+  const keep = legs.length > 1 || legs.some((x) => x.ap);
+  return {legs: keep ? legs : [], main, destination: (places.length ? places : stops).map((x) => x.name).join(' – ').slice(0, 200),
+    transport: [...new Set(legs.map((x) => x.transport))]};
 }
 function legsPopup(btn) {
   document.querySelectorAll('.trpop').forEach((x) => x.remove());
   const t = st.trips.find((x) => x.id === +btn.closest('tr').dataset.id);
-  const L = legsOf(t); const stops = L.length ? L.map((x) => ({...x})) : (t.lat != null ? [{name: t.destination || 'Ziel', country: t.country || '', lat: t.lat, lon: t.lon, transport: ''}] : []);
+  const tr0 = trList(t.transport), first = tr0.includes('Flug') ? 'Flug' : tr0[0] || 'Auto';
+  const L = legsOf(t); const stops = L.length ? L.map((x, i) => ({...x, transport: x.transport || (i ? 'Auto' : first)})) : (t.lat != null ? [{name: t.destination || 'Ziel', country: t.country || '', lat: t.lat, lon: t.lon, transport: first}] : []);
+  const dep = {v: t.ap_from || ''};
   const pop = document.createElement('div'); pop.className = 'trpop lgpop'; pop.setAttribute('role', 'dialog'); pop.setAttribute('aria-label', 'Stationen');
   pop.innerHTML = `<h4>🧭 Stationen von „${esc(t.destination || 'Reise')}“</h4><div class="se"></div><div class="foot"><button type="button" class="btn" id="lgX">Abbrechen</button><button type="button" class="primary" id="lgOk">Speichern</button></div>`;
   document.body.appendChild(pop);
   const place = () => { const r = btn.getBoundingClientRect(); pop.style.left = Math.max(8, Math.min(window.innerWidth - pop.offsetWidth - 8, r.left - 120)) + 'px'; pop.style.top = Math.max(8, Math.min(window.innerHeight - pop.offsetHeight - 8, r.bottom + 4)) + 'px'; };
-  stopsEditor(pop.querySelector('.se'), stops, place); place();
+  stopsEditor(pop.querySelector('.se'), stops, place, {dep: dep.v, onDep: (c) => { dep.v = c; }, firstTransport: first}); place();
   $('lgX').onclick = () => pop.remove();
   $('lgOk').onclick = async () => {
-    const first = stops[0]; const tr = trList(t.transport);
-    const legs = stops.length > 1 ? stops.map((x, i) => ({name: x.name, country: x.country, lat: x.lat, lon: x.lon, transport: i ? x.transport : (tr.includes('Flug') ? 'Flug' : tr[0] || 'Auto')})) : [];
-    const body = {legs};
-    if (first) Object.assign(body, {lat: first.lat, lon: first.lon, destination: stops.length > 1 ? stops.map((x) => x.name).join(' – ').slice(0, 200) : (t.destination && t.lat != null ? t.destination : first.name), country: t.country || first.country});
-    if (first && first.radius_km && (t.radius_km == null || t.radius_km >= 250)) body.radius_km = Math.min(first.radius_km, 150);
-    const add = [...new Set([...tr, ...legs.slice(1).map((x) => x.transport)])]; if (add.length) body.transport = add.join(' · ');
+    const r = stopsToTrip(stops); const body = {legs: r.legs, ap_from: dep.v};
+    if (r.main) Object.assign(body, {lat: r.main.lat, lon: r.main.lon, destination: stops.length > 1 || r.legs.length ? r.destination : (t.destination && t.lat != null ? t.destination : r.main.name), country: t.country || r.main.country});
+    if (r.main && r.main.radius_km && (t.radius_km == null || t.radius_km >= 250)) body.radius_km = Math.min(r.main.radius_km, 150);
+    if (r.transport.length) body.transport = r.transport.join(' · ');
     try { Object.assign(t, await post('api/trips/' + t.id, body, 'PATCH')); pop.remove(); toast('Stationen gespeichert – die Karte rechnet neu'); gridBody(); } catch (e) { toast(e.message, 5000); }
   };
   pop.addEventListener('keydown', (e) => { if (e.key === 'Escape') pop.remove(); });
-}
-/* airports of a trip: the ones of your own flights to pick, or any international IATA code */
-let AIRPORTS = null;
-async function apPicker(btn) {
-  document.querySelectorAll('.trpop').forEach((x) => x.remove());
-  const tr = btn.closest('tr'), t = st.trips.find((x) => x.id === +tr.dataset.id);
-  if (!AIRPORTS) { try { AIRPORTS = await api('api/airports'); } catch (e) { AIRPORTS = []; } }
-  const pop = document.createElement('div'); pop.className = 'trpop appop'; pop.setAttribute('role', 'dialog'); pop.setAttribute('aria-label', 'Flughäfen');
-  const opts = AIRPORTS.map((a) => `<option value="${esc(a.code)}">${esc(a.code)} – ${esc(a.name)}</option>`).join('');
-  pop.innerHTML = `<datalist id="apList">${opts}</datalist>
-   <label class="field">Abflug (bei dir)<input id="apF" list="apList" maxlength="3" autocapitalize="characters" placeholder="automatisch, z. B. ZRH" value="${esc(t.ap_from || '')}"></label><div class="small" id="apFn"></div>
-   <label class="field">Ankunft (am Ziel)<input id="apT" list="apList" maxlength="3" autocapitalize="characters" placeholder="automatisch, z. B. NBO" value="${esc(t.ap_to || '')}"></label><div class="small" id="apTn"></div>
-   <p class="small">Gilt für Hin- und Rückflug dieser Reise. Leer = automatisch erkannt. Jeder internationale 3-Buchstaben-Code (IATA) geht.</p>
-   <div class="foot"><button type="button" class="btn" id="apClr">Automatisch</button><button type="button" class="primary" id="apOk">Speichern</button></div>`;
-  document.body.appendChild(pop); const r = btn.getBoundingClientRect(); pop.style.left = Math.max(8, Math.min(window.innerWidth - pop.offsetWidth - 8, r.left)) + 'px'; pop.style.top = Math.max(8, Math.min(window.innerHeight - pop.offsetHeight - 8, r.bottom + 4)) + 'px';
-  const look = async (inp, out) => { const v = inp.value.trim().toUpperCase(); inp.value = v; if (v.length !== 3) { out.textContent = ''; return; }
-    const k = AIRPORTS.find((a) => a.code === v); if (k) { out.textContent = k.name; return; }
-    try { const a = await api('api/airports?code=' + encodeURIComponent(v)); out.textContent = a.name || 'Unbekannter Code'; } catch (e) { out.textContent = ''; } };
-  $('apF').oninput = () => look($('apF'), $('apFn')); $('apT').oninput = () => look($('apT'), $('apTn')); look($('apF'), $('apFn')); look($('apT'), $('apTn'));
-  const done = async (f, to) => { try { Object.assign(t, await post('api/trips/' + t.id, {ap_from: f, ap_to: to}, 'PATCH')); pop.remove(); toast('Flughäfen gespeichert – die Karte rechnet neu'); gridBody(); } catch (e) { toast(e.message, 5000); } };
-  $('apOk').onclick = () => done($('apF').value.trim().toUpperCase(), $('apT').value.trim().toUpperCase());
-  $('apClr').onclick = () => done('', '');
-  pop.addEventListener('keydown', (e) => { if (e.key === 'Escape') pop.remove(); });
-  const outside = (e) => { if (!pop.contains(e.target) && e.target !== btn) { pop.remove(); document.removeEventListener('mousedown', outside, true); } };
-  setTimeout(() => document.addEventListener('mousedown', outside, true), 0); $('apF').focus();
 }
 /* paste rows straight from Excel / Google Sheets */
 function tsvRows(text) { return text.replace(/\r/g, '').split('\n').filter((l) => l.trim()).map((l) => l.split('\t')); }
@@ -579,7 +585,7 @@ async function loadRules() {
 /* ================================================================ WIZARD: trip by hand */
 const TRANSPORT = ['Auto', 'Zug', 'Bus', 'Flug', 'Schiff', 'Wohnmobil', 'Velo', 'zu Fuss'];
 function wizard() {
-  const d = $('wizard'); const w = {step: 0, place: null, stops: [], year: new Date().getFullYear() - 1, month: '', start: '', end: '', nights: 7, who: '', transport: [], area: null, note: ''};
+  const d = $('wizard'); const w = {step: 0, place: null, stops: [], year: new Date().getFullYear() - 1, month: '', start: '', end: '', nights: 7, who: '', transport: [], area: null, note: '', ap_from: ''};
   const steps = ['Wohin?', 'Wann?', 'Wie lange?', 'Wer war dabei?', 'Wie seid ihr gereist?', 'Wie gross war die Gegend?', 'Passt das so?'];
   const months = ['', 'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
   const dates = () => {
@@ -594,9 +600,9 @@ function wizard() {
         <p class="small">Genaue Daten bekannt?</p><div class="prow"><label class="field">Von<input id="wst" type="date" value="${w.start}"></label><label class="field">Bis<input id="wen" type="date" value="${w.end}"></label></div>`;
       case 2: return `<div class="choice">${[[0, 'Tagesausflug'], [2, 'Wochenende'], [7, '1 Woche'], [14, '2 Wochen'], [21, '3 Wochen']].map(([n, l]) => `<button data-n="${n}" class="${w.nights === n ? 'on' : ''}">${l}</button>`).join('')}</div><label class="field">Nächte<input id="wn" type="number" min="0" max="365" value="${w.nights}"></label>${w.start ? '<p class="small">Aus den Daten berechnet.</p>' : ''}`;
       case 3: return `<div class="choice">${whoList().map((o) => `<button data-who="${esc(o)}" class="${o === w.who ? 'on' : ''}">${esc(o)}</button>`).join('')}</div><input id="wwho" placeholder="oder eigene Angabe" value="${esc(whoList().includes(w.who) ? '' : w.who)}" maxlength="60">`;
-      case 4: return `<div class="choice">${TRANSPORT.map((t) => `<button data-t="${t}" class="${w.transport.includes(t) ? 'on' : ''}">${t}</button>`).join('')}</div><p class="small">${w.stops.length > 1 ? `Wie seid ihr nach <b>${esc(w.stops[0].name)}</b> gekommen? (Die weiteren Stationen hast du schon gewählt.) ` : ''}Mehrfachauswahl möglich. Flug = Bogen ab zu Hause, Auto und Zug folgen Autobahnen und Bahnlinien.</p>`;
+      case 4: return `<div class="choice">${TRANSPORT.map((t) => `<button data-t="${t}" class="${w.transport.includes(t) ? 'on' : ''}">${t}</button>`).join('')}</div><p class="small">${w.stops.length > 1 || w.stops.some((x) => x.ap) ? 'Aus deinen Stationen übernommen – hier nur noch ergänzen. ' : ''}Mehrfachauswahl möglich. Flug = Bogen ab zu Hause, Auto und Zug folgen Autobahnen und Bahnlinien.</p>`;
       case 5: { const reg = w.place?.radius_km; return `<div class="choice">${[[3, 'Ein Ort'], [15, 'Umgebung'], [reg || 50, reg ? `ganz ${esc(w.place.name)}` : 'Region'], [150, 'Rundreise']].map(([r, l]) => `<button data-r="${r}" class="${w.area === r ? 'on' : ''}">${l} · ${r} km</button>`).join('')}</div><p class="small">Ohne GPS-Daten zeigt die Karte eine gestrichelte Fläche – lieber zu klein als zu gross.</p>`; }
-      default: { const [s, e, n, ap] = dates(); return `<p><b>${esc(w.stops.map((x) => x.name).join(' → ') || '?')}</b>, ${esc(w.place?.country || '')}</p><p>${fmtD(s)} – ${fmtD(e)} · ${n} Nächte${ap ? ' · <span class="status">Datum geschätzt</span>' : ''}</p><p>${esc(w.who || 'wer offen')} · ${esc(w.transport.join(' · ') || '–')} · Fläche ${w.area ?? 0} km</p><label class="field">Notiz<textarea id="wnote" rows="2" maxlength="1000">${esc(w.note)}</textarea></label>`; }
+      default: { const [s, e, n, ap] = dates(); return `<p><b>${w.stops.map(stopLabel).join(' → ') || '?'}</b>, ${esc(w.place?.country || '')}</p><p>${fmtD(s)} – ${fmtD(e)} · ${n} Nächte${ap ? ' · <span class="status">Datum geschätzt</span>' : ''}</p><p>${esc(w.who || 'wer offen')} · ${esc(w.transport.join(' · ') || '–')} · Fläche ${w.area ?? 0} km</p><label class="field">Notiz<textarea id="wnote" rows="2" maxlength="1000">${esc(w.note)}</textarea></label>`; }
     }
   };
   const render = () => {
@@ -614,21 +620,20 @@ function wizard() {
     $('wback').onclick = () => { if (!w.step) return d.close(); collect(); w.step--; render(); };
     $('wnext').onclick = async () => {
       collect();
-      if (w.step === 0) { w.place = w.stops[0] || null; if (!w.place) return toast('Bitte einen Ort aus der Liste wählen'); }
+      if (w.step === 0) { w.place = w.stops.find((x) => !x.ap) || w.stops[0] || null; if (!w.place) return toast('Bitte einen Ort oder Flughafen aus der Liste wählen'); w.transport = [...new Set([...w.transport, ...w.stops.map((x) => x.transport || (x.ap ? 'Flug' : 'Auto'))])]; }
       if (w.step < steps.length - 1) { w.step++; if (w.step === 2 && w.start) w.nights = dates()[2]; if (w.step === 5 && w.area == null) w.area = w.place?.radius_km || 15; return render(); }
       const [s, e, n, ap] = dates(); const home = st.cfg?.home;
       const km = home ? haversine(home[0], home[1], w.place.lat, w.place.lon) : null;
       try {
-        const multi = w.stops.length > 1, first = w.transport.includes('Flug') ? 'Flug' : w.transport[0] || 'Auto';
-        const legs = multi ? w.stops.map((x, i) => ({name: x.name, country: x.country, lat: x.lat, lon: x.lon, transport: i ? x.transport : first})) : [];
+        const r = stopsToTrip(w.stops), legs = r.legs, multi = legs.length > 0;
         const far = home ? Math.max(...w.stops.map((x) => haversine(home[0], home[1], x.lat, x.lon))) : null;
-        const tr = [...new Set([...w.transport, ...legs.slice(1).map((x) => x.transport)])];
-        await post('api/trips', {start_date: s, end_date: e, nights: n, destination: multi ? w.stops.map((x) => x.name).join(' – ').slice(0, 200) : w.place.name, country: w.place.country, who: w.who, confidence: w.who ? 'bestätigt' : 'tief', lat: w.place.lat, lon: w.place.lon, radius_km: w.area, approx: ap, transport: tr.join(' · '), note: w.note, source: 'manual', reason: 'von Hand erfasst', max_km: far ?? km, legs});
+        const tr = [...new Set([...w.transport, ...legs.map((x) => x.transport)])];
+        await post('api/trips', {start_date: s, end_date: e, nights: n, destination: multi ? r.destination : w.place.name, country: w.place.country, who: w.who, confidence: w.who ? 'bestätigt' : 'tief', lat: w.place.lat, lon: w.place.lon, radius_km: w.area, approx: ap, transport: tr.join(' · '), note: w.note, source: 'manual', reason: 'von Hand erfasst', max_km: far ?? km, legs, ap_from: w.ap_from || ''});
         saved = true; d.close(); toast('Reise gespeichert'); notifyParent('changed'); refresh();
       } catch (err) { toast(err.message, 4000); }
     };
     const wb = $('wb');
-    if (w.step === 0) { stopsEditor($('wse'), w.stops, () => { w.place = w.stops[0] || null; w.area = null; }); $('wse').querySelector('.sq').focus(); }
+    if (w.step === 0) { stopsEditor($('wse'), w.stops, () => { w.place = w.stops.find((x) => !x.ap) || w.stops[0] || null; w.area = null; }, {dep: w.ap_from || '', onDep: (c) => { w.ap_from = c; }}); $('wse').querySelector('.sq').focus(); }
     wb.querySelectorAll('[data-n]').forEach((b) => (b.onclick = () => { w.nights = +b.dataset.n; render(); }));
     wb.querySelectorAll('[data-who]').forEach((b) => (b.onclick = () => { w.who = b.dataset.who; render(); }));
     wb.querySelectorAll('[data-t]').forEach((b) => (b.onclick = () => { const t = b.dataset.t; w.transport = w.transport.includes(t) ? w.transport.filter((x) => x !== t) : [...w.transport, t]; render(); }));

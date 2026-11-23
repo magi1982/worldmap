@@ -92,3 +92,59 @@ def nearest_large(lat: float, lon: float, max_km: float = 400.0):
                 if d < bd:
                     best, bd = row, d
     return (best[0], best[1], best[3], best[4]) if best else None
+
+
+def _fold(s: str) -> str:
+    import unicodedata
+
+    return unicodedata.normalize("NFKD", s or "").encode("ascii", "ignore").decode().lower().strip()
+
+
+def search(query: str, limit: int = 8, near: tuple | None = None) -> list[dict]:
+    """Airports for a free text: a code ("DXB"), an airport name ("Malpensa") or a town ("Dubai", "Mailand").
+
+    Nobody has to know the codes. ``near`` (lat, lon) of a town that was found adds the airports around it.
+    Big airports come first. -> [{"code", "name", "city", "lat", "lon", "size"}]
+    """
+    q = _fold(query)
+    if len(q) < 2:
+        return []
+    keys = {q}
+    try:  # other-language town names: "mailand" → "milan"
+        from . import places
+
+        alias = places._exonyms().get(q)
+        if alias:
+            keys.add(_fold(alias[0]))
+            near = near or (alias[1], alias[2])
+        if near is None and len(q) >= 3:  # an island or region ("Teneriffa", "Kreta"): the airports around it
+            hit = next((h for h in places.search(query, limit=3) if h.get("lat") is not None
+                        and h.get("kind") != "country"), None)
+            if hit:
+                near = (hit["lat"], hit["lon"])
+    except Exception:  # noqa: BLE001 – the search works without the alias list too
+        pass
+    found: dict = {}
+    for rows in _index().values():
+        for r in rows:
+            if len(q) == 3 and r[0].lower() == q:
+                found[r[0]] = (0, r)
+                continue
+            name, city = _fold(r[1]), _fold(r[2] or "")
+            for k in keys:
+                if len(k) < 3:
+                    continue
+                if city == k or city.startswith(k + " ") or city.startswith(k + "("):
+                    best = 0.5 if k in name else 1  # "Dubai International" before "Al Maktoum (Dubai)"
+                    found.setdefault(r[0], (best if r[5] == 2 else 2, r))
+                elif k in name.replace("-", " ") or (len(k) >= 4 and k in city):
+                    found.setdefault(r[0], (1.5 if r[5] == 2 else 4, r))
+    if near:
+        for rows in _index().values():
+            for r in rows:
+                d = haversine_km(near[0], near[1], r[3], r[4])
+                if r[0] not in found and d <= (LARGE_KM if r[5] == 2 else MEDIUM_KM):
+                    found[r[0]] = (2 if r[5] == 2 else 5, r)
+    ranked = sorted(found.values(), key=lambda x: (x[0], -x[1][5], x[1][1]))
+    return [{"code": r[0], "name": r[1], "city": r[2] or "", "lat": r[3], "lon": r[4], "size": r[5]}
+            for _, r in ranked[:limit]]

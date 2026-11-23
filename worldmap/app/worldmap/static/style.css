@@ -254,10 +254,6 @@ body.embed-new{background:transparent}
 #stTabs{margin-top:4px}
 #stForm .card{padding-top:6px;padding-bottom:6px}
 @media (max-width:900px){.stlive{height:320px}}
-.apbtn{border:1px solid var(--line);background:transparent;color:inherit;border-radius:8px;padding:4px 8px;font:700 12.5px Inter,system-ui,sans-serif;cursor:pointer;white-space:nowrap}
-.apbtn[data-dim]{opacity:.45}
-.appop{width:min(320px,calc(100vw - 16px));padding:12px}
-.appop .field{display:block;margin-top:8px}
 /* trips without details: marked so they can be completed */
 #grid tr.vague td{background:color-mix(in srgb,#FFB020 12%,transparent)}
 #grid tr.vague td:nth-child(4)::before{content:'⚠︎ ';color:#D9480F}
@@ -293,3 +289,9 @@ body.embed-new{background:transparent}
 .wsw-w .wsw{min-width:0}.wsw-w .wit{grid-column:1/-1}
 .wsw{line-height:1.2}
 .q .qplace{flex:1;min-width:200px}
+/* stops: places and airports in one list */
+.stops li.ap{background:color-mix(in srgb,#FF3D9A 8%,transparent)}
+.stops li select{font:inherit;font-size:12.5px;padding:3px 4px;border-radius:7px;border:1px solid var(--line);background:var(--card,transparent);color:inherit}
+.sugg button.isap{border-left:3px solid #FF3D9A}
+.dep{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;padding:8px 10px;border:1px dashed var(--line);border-radius:10px;margin-bottom:8px}
+.dep .dq{flex:1 1 180px;min-width:0}.dep .sugg{flex-basis:100%}.dep .rm{border:0;background:none;cursor:pointer;color:var(--mute)}
