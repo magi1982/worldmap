@@ -1,13 +1,14 @@
 """Orchestration: rebuild trips, ask questions, poll HA, notify, publish sensors."""
 from __future__ import annotations
 
+import json
 import logging
 import threading
 import time
 from collections import defaultdict
 from datetime import UTC, datetime, timedelta
 
-from . import asking, places, questions, routing, trips
+from . import asking, places, questions, routing, stations, trips
 from .db import Database
 from .geo import haversine_km, simplify
 from .ha import HomeAssistant, position_from_state
@@ -78,10 +79,45 @@ class Engine:
             rules = self.db.rules()
             created = updated = 0
             labels = set(self.s.labels)
+            by_person: dict = {}
+            for p in pts:
+                by_person.setdefault(p["person"], []).append(p)
+
+            def gps_stations(c):
+                """Stations from the positions of the person who was away longest on this trip."""
+                who = max(c.days_by_person, key=lambda k: len(c.days_by_person[k]), default=None)
+                try:
+                    return stations.from_points(by_person.get(who, []), c.start, c.end, tz, home, self.home_radius_km())
+                except Exception:  # noqa: BLE001 – stations are a bonus, never break the detection
+                    log.exception("stations for %s–%s", c.start, c.end)
+                    return []
+
+            def keep_point(t):
+                """The trip's own point: its position, or the place its name stands for (Lindau, not a night on the way)."""
+                if t["lat"] is not None:
+                    return {"lat": t["lat"], "lon": t["lon"]}
+                from .importers.triplist import geocode
+
+                hit = geocode(t["destination"] or "", t["country"] or "", home, t["max_km"])
+                return {"lat": round(hit[0], 4), "lon": round(hit[1], 4)} if hit and hit[3] == "place" else {}
+
+            def all_auto(t):
+                try:
+                    legs = json.loads(t.get("legs") or "[]")
+                except ValueError:
+                    return False
+                return all(isinstance(x, dict) and x.get("auto") for x in legs)
+
             for c in cands:
                 present = {p for p in c.persons if p in labels}
                 match = next((t for t in existing if not (c.end < t["start_date"] or c.start > t["end_date"])), None)
                 if match and match["locked"]:
+                    if all_auto(match):  # confirmed by you, but its places were only guessed: add the stations
+                        st = gps_stations(c)
+                        if len(st) >= 2:
+                            self.db.upsert_trip({"legs": json.dumps(st, ensure_ascii=False), **keep_point(match),
+                                                 "country": match["country"], "transport": match["transport"]}, match["id"])
+                            updated += 1
                     continue
                 if not match and c.nights == 0 and c.max_km < self.s.min_day_trip_km:
                     continue  # a short day out is not a trip
@@ -89,6 +125,14 @@ class Engine:
                     # entered by hand or imported (e.g. a trip list): the user's data wins, GPS only fills gaps
                     fill = {k: v for k, v in (("lat", c.lat), ("lon", c.lon), ("max_km", round(c.max_km, 1)))
                             if match.get(k) in (None, "")}
+                    if all_auto(match):  # only places we guessed ourselves: the recording knows better
+                        st = gps_stations(c)
+                        if len(st) >= 2:
+                            fill["legs"] = json.dumps(st, ensure_ascii=False)
+                            for k_, v_ in keep_point(match).items():
+                                fill.setdefault(k_, v_)
+                            fill.setdefault("country", match["country"])
+                            fill.setdefault("transport", match["transport"])
                     if fill:
                         self.db.upsert_trip(fill, match["id"])
                         updated += 1
@@ -118,6 +162,10 @@ class Engine:
                     else:
                         data.update(who=rule["value"], confidence="hoch")
                     self.db.query("UPDATE rules SET hits = hits + 1 WHERE id = ?", (rule["id"],))
+                if not match or all_auto(match):  # stations edited by hand are never replaced
+                    st = gps_stations(c)
+                    if st:
+                        data["legs"] = json.dumps(st, ensure_ascii=False)
                 if match:
                     self.db.upsert_trip(data, match["id"])
                     updated += 1

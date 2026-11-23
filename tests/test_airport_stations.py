@@ -82,7 +82,7 @@ def test_old_airport_fields_become_stops(tmp_path):
     l2 = json.loads(t2["legs"])
     assert [x.get("ap") for x in l2] == ["TFS", None, None] and l2[1]["transport"] == "Auto"
     assert l2[2]["transport"] == "Schiff"                                   # the ship stays a ship
-    assert t3["ap_to"] == "QQQ" and not t3["legs"]                         # unknown: left alone
+    assert t3["ap_to"] == "QQQ" and json.loads(t3["legs"])[0]["name"] == "Nirgendwo"   # unknown code: left alone
     assert [x.get("ap") for x in json.loads(t4["legs"])] == ["DXB"]       # hotel at the airport: one stop
     db._conn.execute("UPDATE trips SET ap_to='HER' WHERE id=?", (t4["id"],))
     db.close()

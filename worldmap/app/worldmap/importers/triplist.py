@@ -6,6 +6,7 @@ Destinations without coordinates are looked up in the bundled gazetteer (regions
 """
 from __future__ import annotations
 
+import json
 import re
 from datetime import UTC, date, datetime
 
@@ -25,6 +26,7 @@ TRANSPORT = ("unterwegsmit", "verkehrsmittel", "transport", "womit", "anreiseart
 NOTE = ("notiz", "note", "bemerkung", "kommentar", "comment")
 SOURCE = ("quelle", "source")
 KM = ("maxentfernungkm", "entfernungkm", "entfernung", "km", "distancekm", "distance")
+STATIONS = ("stationen", "stations", "route", "etappen")
 LAT = ("lat", "latitude", "breite", "breitengrad")
 LON = ("lon", "lng", "longitude", "laenge", "lange", "laengengrad", "langengrad")
 
@@ -122,6 +124,43 @@ def geocode(name: str, country: str = "", home: tuple | None = None,
     return None
 
 
+TRANSPORT_WORDS = ("Auto", "Zug", "Bus", "Flug", "Wasserflugzeug", "Schiff", "Wohnmobil", "Velo", "zu Fuss")
+
+
+def stations_text(legs: list) -> str:
+    """Stops as one cell: "✈ DXB [Flug] → Abu Dhabi [Auto]" – readable, and read back by ``parse_stations``."""
+    out = []
+    for x in legs or []:
+        name = f"✈ {x['ap']}" if x.get("ap") else str(x.get("name") or "")
+        out.append(f"{name} [{x.get('transport') or 'Auto'}]")
+    return " → ".join(out)
+
+
+def parse_stations(text: str, country: str = "") -> list[dict]:
+    """A "Stationen" cell back into stops; places are looked up offline, unknown ones keep only their name."""
+    out: list[dict] = []
+    for part in re.split(r"\s*(?:→|->|>)\s*", text or "")[:20]:
+        part = part.strip()
+        if not part:
+            continue
+        m = re.match(r"^(.*?)\s*[\[(]([^\])]*)[\])]\s*$", part)
+        name, tr = (m.group(1).strip(), m.group(2).strip()) if m else (part, "")
+        parts = [w.strip() for w in tr.split("·") if w.strip() in TRANSPORT_WORDS]
+        tr = " · ".join(parts) or "Auto"
+        code = re.match(r"^✈\s*([A-Za-z]{3})$", name)
+        ap = airports.by_iata(code.group(1)) if code else None
+        if ap:
+            out.append({"name": ap[1], "country": "", "lat": ap[2], "lon": ap[3], "transport": tr, "ap": ap[0]})
+            continue
+        g = geocode(name[:80], country)
+        if g and g[3] == "place":
+            out.append({"name": name[:80], "country": country, "lat": round(g[0], 4), "lon": round(g[1], 4),
+                        "transport": tr})
+        else:  # not found offline: a stop without a point, it gets the "where exactly?" question
+            out.append({"name": name[:80], "country": country, "lat": None, "lon": None, "transport": tr})
+    return out
+
+
 def parse_rows(rows: list) -> tuple[dict, list[dict], int]:
     """-> (column names, trips, skipped rows)."""
     hi = next((i for i, r in enumerate(rows[:30]) if looks_like_trip_list(r)), None)
@@ -131,7 +170,7 @@ def parse_rows(rows: list) -> tuple[dict, list[dict], int]:
     col = {k: _find(header, names, exact=k in ("start", "end", "lat", "lon"))
            for k, names in (("start", START), ("end", END), ("dest", DEST), ("country", COUNTRY), ("who", WHO),
                             ("conf", CONF), ("nights", NIGHTS), ("transport", TRANSPORT), ("note", NOTE),
-                            ("source", SOURCE), ("km", KM), ("lat", LAT), ("lon", LON))}
+                            ("source", SOURCE), ("km", KM), ("lat", LAT), ("lon", LON), ("stations", STATIONS))}
     names = {k: header[v] for k, v in col.items() if v is not None}
 
     def cell(row, k):
@@ -171,5 +210,8 @@ def parse_rows(rows: list) -> tuple[dict, list[dict], int]:
                 t["lat"], t["lon"] = round(g[0], 4), round(g[1], 4)
                 if g[2]:
                     t["radius_km"] = g[2]
+        legs = parse_stations(str(cell(row, "stations") or ""), t["country"])
+        if legs:
+            t["legs"] = json.dumps(legs, ensure_ascii=False)
         trips.append(t)
     return names, trips, skipped

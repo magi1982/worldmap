@@ -1,5 +1,30 @@
 # Changelog
 
+## 0.12.0 – 2026-11-23
+
+### Changed
+- **A trip = a name + stations.** Where a trip went is only given as stations (places or airports, in order), each
+  with its own transport. The trip list shows "Name" and "Stations" (as chips with the transport); the columns
+  "Destination", "Country", "Transport" and "Confidence" are gone – countries and transport follow from the
+  stations and can still be filtered by typing in the stations filter. The wizard asks for a name and the stations;
+  the separate transport step is gone. A country alone ("Kenia") is a stop without a point and keeps its
+  "where exactly?" question; the answer goes into that stop.
+- **Migration** (once, at start): every trip gets a station from its old destination, country, position and
+  transport; the old destination becomes its name. Checked on a real-sized database: all trips stay where they
+  were on the map.
+
+### Added
+- **Seaplane** as transport: a low, short arc straight to the place, no airport, with its own icon (plane with
+  floats); counted as flight km.
+- **Stations from recordings**: trips found in Google Timeline, OwnTracks, Home Assistant positions, photo GPS or
+  GPX get their stations from the places where you slept (several nights at one place = one station; a night just
+  before home on the way back is none), with the transport found on the way; a flight lands at the real airport,
+  which becomes a station of its own when the place is further away. Stations you edited are never replaced;
+  stations found in the recording never change your trip's name, point, country or transport, and do not change
+  the estimated route of trips without a full recording.
+- Trip lists: a "Stations" column is exported ("✈ DXB [Flug] → Abu Dhabi [Auto]") and read back on import;
+  "Name" works as column name for the trip name.
+
 ## 0.11.0 – 2026-11-23
 
 ### Added

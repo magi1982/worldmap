@@ -112,6 +112,8 @@ TRIP_FIELDS = (
     "ap_from", "ap_to", "legs",
 )
 CONFIDENCE = ("tief", "mittel", "hoch", "bestätigt")
+# writing one of these keeps the stations and the trip in step
+STATION_KEYS = {"destination", "country", "lat", "lon", "transport", "legs"}
 
 
 class Database:
@@ -127,6 +129,7 @@ class Database:
             if col not in cols:
                 self._conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {decl}")  # nosec B608 - constant names
         self._migrate_airport_stations()
+        self.migrate_stations()
 
     def _migrate_airport_stations(self) -> None:
         """0.11.0: the airport at the destination (``ap_to``) becomes an airport stop in ``legs``.
@@ -245,7 +248,9 @@ class Database:
             marks = ", ".join("?" for _ in clean)
             with self.tx() as c:
                 cur = c.execute(f"INSERT INTO trips ({cols}) VALUES ({marks})", tuple(clean.values()))  # nosec B608 - column names are whitelisted
-                return int(cur.lastrowid)
+                trip_id = int(cur.lastrowid)
+                self._sync_stations(c, trip_id, set(clean))
+            return trip_id
         if not clean:
             return trip_id
         sets = ", ".join(f"{k} = ?" for k in clean)
@@ -254,7 +259,85 @@ class Database:
                 f"UPDATE trips SET {sets}, updated_at = strftime('%s','now') WHERE id = ?",  # nosec B608 - whitelisted
                 (*clean.values(), trip_id),
             )
+            self._sync_stations(c, trip_id, set(clean))
         return trip_id
+
+    @staticmethod
+    def _sync_stations(c, trip_id: int, changed: set) -> None:
+        """Where a trip went is its stations; country, transport and position of the trip follow from them.
+
+        * no stations yet (import, Excel, GPS, old data): one station from destination/country/position/transport,
+          marked ``auto`` – it may be replaced by better data later, a station edited by hand never is
+        * one station and the trip's position, country or transport was written (an answer, a GPS refresh):
+          the station follows
+        * then country, transport and position of the trip are taken from the stations
+        """
+        if not changed & STATION_KEYS:
+            return
+        r = c.execute("SELECT destination, country, lat, lon, transport, legs FROM trips WHERE id = ?",
+                      (trip_id,)).fetchone()
+        if not r:
+            return
+        try:
+            legs = json.loads(r["legs"]) if r["legs"] else []
+        except ValueError:
+            legs = []
+        if not isinstance(legs, list):
+            legs = []
+        if not legs:
+            if r["lat"] is None and not (r["destination"] or r["country"]):
+                return
+            legs = [{"name": (r["destination"] or r["country"] or "Ziel")[:80] if r["lat"] is not None
+                     else (r["country"] or r["destination"])[:80],
+                     "country": r["country"] or "", "lat": r["lat"], "lon": r["lon"],
+                     "transport": r["transport"] or "", "auto": 1}]
+        elif len(legs) == 1 and "legs" not in changed:
+            st = legs[0]
+            if changed & {"lat", "lon"} and r["lat"] is not None:
+                st["lat"], st["lon"] = r["lat"], r["lon"]
+            if "country" in changed and r["country"]:
+                st["country"] = r["country"]
+            if "transport" in changed:
+                st["transport"] = r["transport"] or ""
+        countries: list = []
+        for x in legs:
+            for cc in str(x.get("country") or "").split(" · "):
+                if cc and cc not in countries:
+                    countries.append(cc)
+        transport: list = []
+        for x in legs:
+            for part in str(x.get("transport") or "").split("·"):
+                part = part.strip()
+                if part and part not in transport:
+                    transport.append(part)
+        placed = [x for x in legs if x.get("lat") is not None and x.get("lon") is not None]
+        spots = [x for x in placed if not x.get("ap")]
+        main = (max(spots, key=lambda x: x.get("n") or 0) if spots and any(x.get("n") for x in spots)  # most nights
+                else spots[0] if spots else placed[0] if placed else None)
+        lat, lon = (main["lat"], main["lon"]) if main else (None, None)
+        if "legs" in changed and changed & {"lat", "lon"} and r["lat"] is not None:
+            lat, lon = r["lat"], r["lon"]  # written together with the stops: the caller knows the main place
+        if not main and len(legs) == 1 and "legs" not in changed:
+            lat, lon = r["lat"], r["lon"]
+        country = " · ".join(countries) or (r["country"] or "")
+        if "legs" in changed and "country" in changed and r["country"]:
+            country = r["country"]  # written together with the stops: the trip's own country wins
+        c.execute("UPDATE trips SET legs = ?, country = ?, transport = ?, lat = ?, lon = ? WHERE id = ?",
+                  (json.dumps(legs[:20], ensure_ascii=False), country,
+                   r["transport"] if "legs" in changed and "transport" in changed and r["transport"]
+                   else " · ".join(transport) or (r["transport"] or ""), lat, lon, trip_id))
+
+    def migrate_stations(self) -> int:
+        """0.12.0: every trip gets stations (its old destination becomes its name and its first station). Once."""
+        with self._lock:
+            if self._conn.execute("SELECT 1 FROM meta WHERE key='stations_v2'").fetchone():
+                return 0
+            ids = [r[0] for r in self._conn.execute("SELECT id FROM trips")]
+            with self.tx() as c:
+                for i in ids:
+                    self._sync_stations(c, i, set(STATION_KEYS))
+                c.execute("INSERT OR REPLACE INTO meta(key, value) VALUES('stations_v2', '1')")
+            return len(ids)
 
     def delete_trip(self, trip_id: int) -> bool:
         with self.tx() as c:

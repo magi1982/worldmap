@@ -295,3 +295,7 @@ body.embed-new{background:transparent}
 .sugg button.isap{border-left:3px solid #FF3D9A}
 .dep{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;padding:8px 10px;border:1px dashed var(--line);border-radius:10px;margin-bottom:8px}
 .dep .dq{flex:1 1 180px;min-width:0}.dep .sugg{flex-basis:100%}.dep .rm{border:0;background:none;cursor:pointer;color:var(--mute)}
+/* trip list: the stations as chips */
+.lgcell{display:flex;flex-wrap:wrap;align-items:center;gap:3px 4px;text-align:left;max-width:100%;white-space:normal}
+.lchip{display:inline-flex;align-items:center;gap:3px;padding:1px 7px;border-radius:99px;background:color-mix(in srgb,var(--mute) 12%,transparent);font-weight:600;font-size:12.5px;white-space:nowrap}
+.lgcell .arr{color:var(--mute);font-size:11px}.lgcell .vg{color:#D9480F}

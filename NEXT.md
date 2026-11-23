@@ -64,28 +64,28 @@ Ideen werden zuerst hier gesammelt. Code entsteht erst nach einem ausdrückliche
 
 ## Next update – waiting for "mach es" / Nächstes Update – wartet auf „mach es“
 
-### Trips = name + stations (waiting for "mach es")
-- [ ] A trip has a **name** you choose ("Sommerferien Korsika"); *where* is only ever given as **stations**
+### Trips = name + stations (done in 0.12.0)
+- [x] A trip has a **name** you choose ("Sommerferien Korsika"); *where* is only ever given as **stations**
       (places or airports, each with its own transport). The columns "Ziel", "Land" and "Verkehrsmittel" in the trip
       list become "Name" and "Stationen"; countries and transport are shown, filtered and counted from the stations.
-- [ ] New transport **Wasserflugzeug** (seaplane): a low, short arc straight to the place (no airport), own
+- [x] New transport **Wasserflugzeug** (seaplane): a low, short arc straight to the place (no airport), own
       icon in the animation and the film, counted as flight km.
-- [ ] Field **"Sicherheit"** removed from the trip list and the wizard. Internally it stays (the questions use it):
+- [x] Field **"Sicherheit"** removed from the trip list and the wizard. Internally it stays (the questions use it):
       trips entered or edited by hand count as confirmed, imported ones keep their value.
-- [ ] **Migration** (once, at start): every trip without stations gets one station from its old destination,
+- [x] **Migration** (once, at start): every trip without stations gets one station from its old destination,
       country, position and transport; the name becomes the old destination. Trips that only know a country get a
       station "Kenia (nur Land)" without a point – still marked as vague, still asked "where exactly?".
       Trips with stations keep them; transport moves into the stations (first station: the old trip transport).
-- [ ] Wizard: "Wie heisst die Reise?" + stations; the transport step disappears (it is in the stations).
-- [ ] Import (CSV/Excel trip lists with Ziel/Land/Verkehrsmittel) and export map to name + stations; the Worldmap
+- [x] Wizard: "Wie heisst die Reise?" + stations; the transport step disappears (it is in the stations).
+- [x] Import (CSV/Excel trip lists with Ziel/Land/Verkehrsmittel) and export map to name + stations; the Worldmap
       package keeps working with old files. Dashboard, film titles and map labels use the name.
-- [ ] **Imports fill in the stations** when the data allows it: Google Timeline (Takeout and phone export), OwnTracks
+- [x] **Imports fill in the stations** when the data allows it: Google Timeline (Takeout and phone export), OwnTracks
       and Home Assistant positions, photo CSV, GPX/KML. The places where you slept or stayed (≥ 1 night or several
       hours) become stations in order, with the transport found on the way there (flight → airport station at the
-      real airport, ferry → Schiff, train, car, foot). Google's own place names are used when the export has them,
-      else the nearest town. Short stops on the way (petrol, lunch) are not stations. Stations you edited by hand are
+      real airport, ferry → Schiff, train, car, foot). The nearest town names the station.
+- [ ] Google's own place names (hotel, restaurant) as station names – the import does not keep them yet. Short stops on the way (petrol, lunch) are not stations. Stations you edited by hand are
       never overwritten by a later import.
-- [ ] Tests for migration, import of old lists, seaplane route, stations from a sample timeline; run on a copy of the private test data.
+- [x] Tests for migration, import of old lists, seaplane route, stations from a sample timeline; run on a copy of the private test data.
 
 ### Stations with airports – one picker for everything (done in 0.11.0)
 - [x] One search per station finds **places and airports** by city, airport name or code: "Dubai" shows

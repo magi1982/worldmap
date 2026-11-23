@@ -93,7 +93,7 @@ def csv_safe(v) -> str:
     return "'" + s if s[:1] in ("=", "+", "-", "@", "\t", "\r") else s
 
 
-LEG_TRANSPORT = ("Auto", "Zug", "Bus", "Flug", "Schiff", "Wohnmobil", "Velo", "zu Fuss")
+LEG_TRANSPORT = ("Auto", "Zug", "Bus", "Flug", "Wasserflugzeug", "Schiff", "Wohnmobil", "Velo", "zu Fuss")
 
 
 def validate_legs(raw) -> str:
@@ -117,20 +117,26 @@ def validate_legs(raw) -> str:
             if not re.fullmatch(r"[A-Z]{3}", code) or not (ap := airports.by_iata(code)):
                 raise ValueError(f"unknown airport code: {code[:8]}")
             leg = {**leg, "lat": ap[2], "lon": ap[3], "name": leg.get("name") or ap[1]}
-        try:
-            la, lo = float(leg["lat"]), float(leg["lon"])
-        except (KeyError, TypeError, ValueError) as e:
-            raise ValueError("every stop needs lat and lon") from e
-        if not (-90 <= la <= 90 and -180 <= lo <= 180):
-            raise ValueError("stop coordinates out of range")
+        if leg.get("lat") in (None, "") and leg.get("lon") in (None, ""):
+            la = lo = None  # only the country is known ("Kenia"): a stop without a point, still asked "where exactly?"
+        else:
+            try:
+                la, lo = float(leg["lat"]), float(leg["lon"])
+            except (KeyError, TypeError, ValueError) as e:
+                raise ValueError("every stop needs lat and lon") from e
+            if not (-90 <= la <= 90 and -180 <= lo <= 180):
+                raise ValueError("stop coordinates out of range")
         name = str(leg.get("name") or "").strip()[:80]
         if not name:
             raise ValueError("every stop needs a name")
         tr = str(leg.get("transport") or ("Flug" if ap else "Auto"))
-        if tr not in LEG_TRANSPORT:
-            raise ValueError(f"unknown transport: {tr[:20]}")
+        parts = [x.strip() for x in tr.split("·") if x.strip()]
+        if not parts or len(parts) > 4 or any(x not in LEG_TRANSPORT for x in parts):
+            raise ValueError(f"unknown transport: {tr[:30]}")
+        tr = " · ".join(dict.fromkeys(parts))
         stop = {"name": name, "country": str(leg.get("country") or "").strip()[:60],
-                "lat": round(la, 5), "lon": round(lo, 5), "transport": tr}
+                "lat": None if la is None else round(la, 5), "lon": None if lo is None else round(lo, 5),
+                "transport": tr}
         if ap:
             stop["ap"] = ap[0]
         out.append(stop)
@@ -558,9 +564,13 @@ def make_handler(app: App):
                 w = csv.writer(buf, delimiter=";")
                 cols = ["start_date", "end_date", "destination", "country", "who", "confidence", "nights",
                         "max_km", "transport", "reason", "note", "source"]
-                w.writerow(cols)
+                w.writerow(cols + ["stations"])
                 for t in eng.db.trips():
-                    w.writerow([csv_safe(t[c]) for c in cols])
+                    try:
+                        legs = json.loads(t["legs"]) if t["legs"] else []
+                    except ValueError:
+                        legs = []
+                    w.writerow([csv_safe(t[c]) for c in cols] + [csv_safe(triplist.stations_text(legs))])
                 return self._send(HTTPStatus.OK, ("﻿" + buf.getvalue()).encode(), "text/csv; charset=utf-8",
                                   {"Content-Disposition": 'attachment; filename="worldmap-trips.csv"'})
             return self._send(HTTPStatus.NOT_FOUND, {"error": "not found"})

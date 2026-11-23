@@ -207,7 +207,7 @@ function buildR(){
  // estimates
  for(const [ti,la,lo,rk] of D.est){const t=tripById[ti];if(!t||!onIds.has(t.id))continue;est.push([la,lo,rk,R.color=='w'?WCOL[t.w]:MCOL[t.m[0]]])}
  // flights
- const pairs=new Map();if(R.m.has('fly'))for(const t of on){for(const [x,y,ia,ib] of t.fl){const A=ia?'ap:'+ia:ptGroup(x,t),Bg=ib?'ap:'+ib:ptGroup(y,t);if(!A||!Bg||A==Bg)continue;const hm=q=>q=='home'||(q.startsWith('ap:')&&D.airports[q.slice(3)]&&km2(D.airports[q.slice(3)][0],D.airports[q.slice(3)][1],HOME[0],HOME[1])<150);const k=[A,Bg].sort((p,q)=>hm(q)-hm(p)||p.localeCompare(q)).join('>');let e=pairs.get(k);if(!e){e={k,ws:new Set(),g:new Set()};pairs.set(k,e)}e.ws.add(t.w);if(t.g&&!t.gps)e.g.add(t.g)}}
+ const pairs=new Map();if(R.m.has('fly'))for(const t of on){for(const [x,y,ia,ib,sp] of t.fl){const A=ia?'ap:'+ia:ptGroup(x,t),Bg=ib?'ap:'+ib:ptGroup(y,t);if(!A||!Bg||A==Bg)continue;const hm=q=>q=='home'||(q.startsWith('ap:')&&D.airports[q.slice(3)]&&km2(D.airports[q.slice(3)][0],D.airports[q.slice(3)][1],HOME[0],HOME[1])<150);const k=[A,Bg].sort((p,q)=>hm(q)-hm(p)||p.localeCompare(q)).join('>');let e=pairs.get(k);if(!e){e={k,ws:new Set(),g:new Set(),sp:false};pairs.set(k,e)}if(sp)e.sp=true;e.ws.add(t.w);if(t.g&&!t.gps)e.g.add(t.g)}}
  const gr=[];for(const t of on){if(!t.gr||!(t.g||t.st))continue;/* only trips far away: short day trips stay dots */const m=t.m.find(x=>x=='rail'||x=='road')||'road';gr.push({t,m,col:R.color=='w'?WCOL[t.w]:MCOL[m]})}
  RC={own:out,far,est,near,gr,pairs:[...pairs.values()],on,onIds,st:{},ver:(RC?RC.ver:0)+1};
 }
@@ -275,7 +275,7 @@ function drawR(){
  // flights
  const TP=ST('trips'),AH=TP.arc_height??1,LWm=TP.line_width??1;
  drawEst(RC.gr,2.2/S*LWm);
- /* lines always stay on the map; the animation only moves the vehicles */for(const e of RC.pairs){const [A,Bg]=e.k.split('>');const [x1,y1]=gpos(A),[x2,y2]=gpos(Bg);const a=arcPts(x1,y1,x2,y2,(A=='home'?.2:.18)*AH);strokeArc(a,R.color=='w'?WHO.filter(w=>e.ws.has(w)).map(w=>WCOL[w]):[MCOL.fly],2.4*LWm,8,6)}
+ /* lines always stay on the map; the animation only moves the vehicles */for(const e of RC.pairs){const [A,Bg]=e.k.split('>');const [x1,y1]=gpos(A),[x2,y2]=gpos(Bg);const a=arcPts(x1,y1,x2,y2,(e.sp?.07:A=='home'?.2:.18)*AH);strokeArc(a,R.color=='w'?WHO.filter(w=>e.ws.has(w)).map(w=>WCOL[w]):[MCOL.fly],2.4*LWm,8,6)}
  endWorld();placed.length=0;usedNames.clear();
  for(const t of RC.on){if(!t.st)continue;t.st.forEach(([la,lo,nm,ap],k)=>{const [x,y]=toS(MX(lo),MY(la));if(x<-20||y<-20||x>V.W+20||y>V.H+20)return;const c=WCOL[t.w]||MC.strong;ctx.beginPath();ctx.arc(x,y,3.6,0,7);ctx.fillStyle=MC.ring;ctx.fill();ctx.beginPath();ctx.arc(x,y,2.6,0,7);ctx.fillStyle=c;ctx.fill();if((k>0||ap)&&V.S>12000)lbl(ap?'✈ '+ap:nm,x+6,y+4,11,600,MC.text)})}
  homeMark();if(TP.airports!==false)apMarks(RC.pairs.flatMap(e=>e.k.split(">")));const DS=TP.dot_size??1,LS=TP.label_size??1,LM=TP.labels||'normal';
@@ -627,7 +627,7 @@ function animBuild(){
  const okV=(m,km)=>m=='rail'?A.trains!==false&&km>=minT:m=='ferry'?A.ferries!==false&&km>=minF:A.cars!==false&&km>=minC;
  const arcs=[],veh=[];
  if(TAB=='reisen'&&RC){const AH=ST('trips').arc_height??1;
-  if(A.planes!==false)for(const e of RC.pairs){const [a1,b1]=e.k.split('>');const [x1,y1]=gpos(a1),[x2,y2]=gpos(b1);const km=wkm(x1,y1,x2,y2);if(km<minP)continue;arcs.push({km,a:arcPts(x1,y1,x2,y2,(a1=='home'?.2:.18)*AH),cols:R.color=='w'?WHO.filter(w=>e.ws.has(w)).map(w=>WCOL[w]):[MCOL.fly],ph:rnd()*2})}
+  if(A.planes!==false)for(const e of RC.pairs){const [a1,b1]=e.k.split('>');const [x1,y1]=gpos(a1),[x2,y2]=gpos(b1);const km=wkm(x1,y1,x2,y2);if(km<minP)continue;arcs.push({km,sp:e.sp,a:arcPts(x1,y1,x2,y2,(e.sp?.07:a1=='home'?.2:.18)*AH),cols:R.color=='w'?WHO.filter(w=>e.ws.has(w)).map(w=>WCOL[w]):[MCOL.fly],ph:rnd()*2})}
   if(TR){const hc=(D.region&&D.region.name)||'';
    for(const t of RC.on){if(!t.g||t.gr||!t.m.some(m=>m=='road'||m=='rail'))continue;if(hc&&t.c&&t.c==hc)continue;const km=km2(HOME[0],HOME[1],t.p[0],t.p[1]);
     let best=null,bl=0;for(let d=dayIdx(t.a);d<=dayIdx(t.b);d++)for(const li of byDay[d]||[]){const m=TCLS[TR[li].c];if(m!='road'&&m!='rail')continue;if(!R.m.has(m)||!okV(m,km))continue;const b=TR[li].bb;const l=Math.hypot(b[2]-b[0],b[3]-b[1]);if(l>bl){bl=l;best=li}}
@@ -643,6 +643,8 @@ function animRestart(){const on=animOn();AN.on=on;if(on){animBuild();sizeA();cva
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&AN.on&&!AN.raf)AN.raf=requestAnimationFrame(animFrame)});
 const pingpong=p=>{const q=p%2;const u=q<1?q:2-q;return u<.5?2*u*u:1-Math.pow(-2*u+2,2)/2};
 function dashArr(m){const d=SM(m).dash;return d=='dashed'?[8,6]:d=='dotted'?[.1,5]:d=='longdash'?[16,7]:d=='dashdot'?[10,4,.1,4]:d=='sparse'?[.1,10]:[]}
+/* seaplane: the plane with two floats underneath */
+function drawSeaplane(g,x,y,ang,col,s){drawPlane(g,x,y,ang,col,s);g.save();g.translate(x,y);g.rotate(ang);g.scale(s,s);g.strokeStyle=col;g.lineWidth=2.2;g.lineCap='round';g.beginPath();g.moveTo(-5,-4.2);g.lineTo(6,-4.2);g.moveTo(-5,4.2);g.lineTo(6,4.2);g.stroke();g.restore()}
 function drawPlane(g,x,y,ang,col,s){g.save();g.translate(x,y);g.rotate(ang);g.scale(s,s);g.fillStyle=col;g.strokeStyle=MC.ring;g.lineWidth=1.6;g.lineJoin='round';g.beginPath();g.moveTo(9,0);g.lineTo(2,-1.6);g.lineTo(-2,-7.5);g.lineTo(-4,-7.5);g.lineTo(-1.6,-1.6);g.lineTo(-6,-1.4);g.lineTo(-8,-4);g.lineTo(-9,-4);g.lineTo(-8,0);g.lineTo(-9,4);g.lineTo(-8,4);g.lineTo(-6,1.4);g.lineTo(-1.6,1.6);g.lineTo(-4,7.5);g.lineTo(-2,7.5);g.lineTo(2,1.6);g.closePath();g.stroke();g.fill();g.restore()}
 function drawCar(g,x,y,ang,col,s){g.save();g.translate(x,y);const flip=Math.abs(ang)>Math.PI/2;g.rotate(flip?ang+Math.PI:ang);g.scale(flip?-s:s,s);g.fillStyle=col;g.strokeStyle=MC.ring;g.lineWidth=1.5;g.beginPath();g.roundRect(-7,-3.2,14,5.2,2.2);g.moveTo(-3.6,-3.2);g.lineTo(-1.8,-6.4);g.lineTo(3.4,-6.4);g.lineTo(5,-3.2);g.closePath();g.stroke();g.fill();g.fillStyle=MC.ring;g.fillRect(-1.2,-5.6,1.6,2.1);g.fillRect(1.2,-5.6,1.8,2.1);g.fillStyle=MC.strong;for(const wx of [-4,4]){g.beginPath();g.arc(wx,2.2,1.9,0,7);g.fill()}g.restore()}
 function drawTrain(g,x,y,ang,col,s){g.save();g.translate(x,y);const flip=Math.abs(ang)>Math.PI/2;g.rotate(flip?ang+Math.PI:ang);g.scale(flip?-s:s,s);g.fillStyle=col;g.strokeStyle=MC.ring;g.lineWidth=1.5;g.beginPath();g.moveTo(-10,-4.5);g.lineTo(6,-4.5);g.quadraticCurveTo(10.5,-4.5,10.5,1.5);g.lineTo(10.5,3);g.lineTo(-10,3);g.closePath();g.stroke();g.fill();g.fillStyle=MC.ring;for(const wx of [-8,-4,0])g.fillRect(wx,-3,2.6,2.2);g.beginPath();g.moveTo(5,-3);g.lineTo(8,-3);g.lineTo(9.3,-.8);g.lineTo(5,-.8);g.fill();g.restore()}
@@ -657,7 +659,7 @@ function animFrame(ts){
   const len=Math.hypot(P[2][0]-P[0][0],P[2][1]-P[0][1]);/* every plane flies the same speed: time by km, not by screen size */const per=Math.max(.8,A2.km/(380*(A.plane_speed||1)));const raw=tp/per+A2.ph;const u=pingpong(raw),back=(raw%2)>=1;
   const at=s=>{const v=1-s;return [v*v*P[0][0]+2*v*s*P[1][0]+s*s*P[2][0],v*v*P[0][1]+2*v*s*P[1][1]+s*s*P[2][1]]};
   if(len<40)continue;
-  A2.cols.forEach((c,ci)=>{const uu=Math.max(0,Math.min(1,u-(back?-1:1)*ci*Math.min(.08,14/len)));const [px,py]=at(uu),[qx,qy]=at(Math.min(1,uu+.01)),[rx,ry]=at(Math.max(0,uu-.01));let ang=Math.atan2(qy-ry,qx-rx);if(back)ang+=Math.PI;if(A.hide_line){actx.globalAlpha=.85;actx.fillStyle=MC.land;actx.beginPath();actx.arc(px,py,9*sz,0,7);actx.fill();actx.globalAlpha=1}drawPlane(actx,px,py,ang,c,sz)});
+  A2.cols.forEach((c,ci)=>{const uu=Math.max(0,Math.min(1,u-(back?-1:1)*ci*Math.min(.08,14/len)));const [px,py]=at(uu),[qx,qy]=at(Math.min(1,uu+.01)),[rx,ry]=at(Math.max(0,uu-.01));let ang=Math.atan2(qy-ry,qx-rx);if(back)ang+=Math.PI;if(A.hide_line){actx.globalAlpha=.85;actx.fillStyle=MC.land;actx.beginPath();actx.arc(px,py,9*sz,0,7);actx.fill();actx.globalAlpha=1}(A2.sp?drawSeaplane:drawPlane)(actx,px,py,ang,c,sz)});
  }
  for(const v of AN.cars){const b=v.bb;const [sx0,sy0]=toS(b[0],b[1]),[sx1,sy1]=toS(b[2],b[3]);if(sx1<-20||sy1<-20||sx0>V.W+20||sy0>V.H+20)continue;
   const lenpx=v.len*V.S;if(lenpx<40)continue;const lkm=v.len*40075*Math.cos(IY((b[1]+b[3])/2)*Math.PI/180);const per=Math.max(2.5,lkm/(v.m=='ferry'?45:v.m=='rail'?110:90));const raw=t/per+v.ph,u=pingpong(raw),back=(raw%2)>=1;

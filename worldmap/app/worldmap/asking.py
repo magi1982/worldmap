@@ -223,7 +223,18 @@ def _answer_place(db, q: dict, ans: str) -> dict:
             raise ValueError(f"«{ans}» nicht gefunden – bitte Stadt, Insel oder Region anders schreiben")
         dest = t["destination"] or ""
         new = ans if not dest or dest == (t["country"] or "") or geocode(dest, t["country"] or "") else f"{dest} ({ans})"
-        db.upsert_trip({"lat": round(hit[0], 4), "lon": round(hit[1], 4), "radius_km": hit[2], "approx": 1,
+        try:
+            legs = json.loads(t["legs"]) if t.get("legs") else []
+        except ValueError:
+            legs = []
+        here = {"name": ans, "country": (legs[0].get("country") if legs else "") or t["country"] or "",
+                "lat": round(hit[0], 4), "lon": round(hit[1], 4)}
+        i = next((n for n, x in enumerate(legs) if x.get("lat") is None), None)  # the stop without a point
+        if i is None:
+            legs = [{**here, "transport": t["transport"] or ""}] + legs[1:] if len(legs) <= 1 else legs
+        else:
+            legs[i] = {**legs[i], **here}
+        db.upsert_trip({"legs": json.dumps(legs, ensure_ascii=False), "radius_km": hit[2], "approx": 1,
                         "destination": new[:120], "locked": 1}, t["id"])
         out["place"] = [round(hit[0], 4), round(hit[1], 4)]
     with db.tx() as c:

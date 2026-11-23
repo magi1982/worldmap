@@ -50,10 +50,10 @@ $('tabs').addEventListener('click', (e) => { const b = e.target.closest('button[
 /* ================================================================ GRID (Excel style) */
 const COLS = [
   {k: 'start_date', n: 'Von', t: 'date', w: 110}, {k: 'end_date', n: 'Bis', t: 'date', w: 110},
-  {k: 'destination', n: 'Ziel', w: 220}, {k: 'country', n: 'Land', w: 120},
-  {k: 'who', n: 'Wer', t: 'who', w: 130}, {k: 'confidence', n: 'Sicherheit', t: 'conf', w: 110},
+  {k: 'destination', n: 'Name', w: 200}, {k: 'legs', n: 'Stationen', t: 'legs', w: 340},
+  {k: 'who', n: 'Wer', t: 'who', w: 130},
   {k: 'nights', n: 'Nächte', t: 'num', w: 70}, {k: 'max_km', n: 'km', t: 'num', w: 80},
-  {k: 'transport', n: 'Verkehrsmittel', t: 'tr', w: 170}, {k: 'legs', n: 'Stationen', t: 'legs', w: 130}, {k: 'note', n: 'Notiz', w: 200}, {k: 'source', n: 'Quelle', w: 110},
+  {k: 'note', n: 'Notiz', w: 200}, {k: 'source', n: 'Quelle', w: 110},
 ];
 function gridHead() {
   $('grid').tHead.innerHTML = `<tr><th class="sel"><input type="checkbox" id="selAll" aria-label="Alle auswählen"></th>${COLS.map((c) => `<th data-k="${c.k}" style="min-width:${c.w}px" class="${st.sort[0] === c.k ? (st.sort[1] > 0 ? 'asc' : 'desc') : ''}">${c.n}</th>`).join('')}</tr>
@@ -64,12 +64,12 @@ function gridHead() {
   $('grid').tHead.querySelectorAll('[data-f]').forEach((inp) => (inp.oninput = () => { st.filter[inp.dataset.f] = inp.value; gridBody(); }));
   $('selAll').onchange = (e) => { st.sel = e.target.checked ? new Set(visibleRows().map((t) => t.id)) : new Set(); gridBody(); };
 }
-function cellText(t, c) { const v = t[c.k]; if (c.t === 'date') return fmtD(v); if (c.k === 'max_km' && v != null) return String(Math.round(v)); return v ?? ''; }
+function cellText(t, c) { const v = t[c.k]; if (c.t === 'date') return fmtD(v); if (c.t === 'legs') return legsOf(t).map((x) => `${x.name} ${x.ap || ''} ${x.country || ''} ${x.transport || ''}`).join(' ') + ' ' + (t.country || '') + ' ' + (t.transport || ''); if (c.k === 'max_km' && v != null) return String(Math.round(v)); return v ?? ''; }
 /* a trip without real details: no place, only a whole country, or no coordinates – worth completing */
 function vague(t) {
-  const d = (t.destination || '').trim().toLowerCase(), c = (t.country || '').trim().toLowerCase();
-  if (!d || t.lat == null || t.lon == null) return 'kein Ort';
-  if ((t.radius_km || 0) >= 250 || (c && d === c)) return 'nur Land';
+  const L = legsOf(t);
+  if (L.length ? !L.some((x) => x.lat != null) : t.lat == null || t.lon == null) return L.some((x) => x.country) ? 'nur Land' : 'kein Ort';
+  if ((t.radius_km || 0) >= 250) return 'nur Land';
   return '';
 }
 function visibleRows() {
@@ -84,7 +84,8 @@ function gridBody() {
   const whoOpts = [...new Set(['', ...whoList(), ...st.trips.map((t) => t.who)])];
   $('grid').tBodies[0].innerHTML = rows.map((t) => `<tr data-id="${t.id}" class="${t.status === 'ignored' ? 'ign' : ''} ${vague(t) ? 'vague' : ''}" ${vague(t) ? `title="Ungenau: ${vague(t)} – Ort, Stationen oder Daten ergänzen"` : ''}><td class="sel"><input type="checkbox" ${st.sel.has(t.id) ? 'checked' : ''} aria-label="Zeile auswählen"></td>${COLS.map((c) => {
     if (c.t === 'who') return `<td><select data-k="who" data-c="${colorOf(t.who)}" class="who">${whoOpts.map((w) => `<option ${w === t.who ? 'selected' : ''} value="${esc(w)}">${esc(w || '– offen –')}</option>`).join('')}</select></td>`;
-    if (c.t === 'legs') { const L = legsOf(t); return `<td class="trc"><button type="button" class="lgbtn" aria-label="Stationen bearbeiten">${L.length > 1 || L.some((x) => x.ap) ? `🧭 ${L.length} ${L.length === 1 ? 'Station' : 'Stationen'}${L.some((x) => x.ap) ? ' · ✈︎ ' + esc(L.filter((x) => x.ap).map((x) => x.ap).join(' ')) : ''}` : t.ap_from ? `✈︎ ab ${esc(t.ap_from)}` : `<span class="small">${vague(t) ? '⚠︎ Ort ergänzen' : '+ Station'}</span>`}</button></td>`; }
+    if (c.t === 'legs') { const L = legsOf(t), v = vague(t); const chip = (x) => `<span class="lchip">${TICON[(x.transport || '').split(' · ')[0]] || '📍'} ${x.ap ? `<b>${esc(x.ap)}</b>` : esc(x.name)}${x.lat == null ? ' <span class="small">(nur Land)</span>' : ''}</span>`;
+      return `<td class="trc"><button type="button" class="lgbtn lgcell" aria-label="Stationen bearbeiten">${L.length ? L.slice(0, 4).map(chip).join('<span class="arr">→</span>') + (L.length > 4 ? ` <span class="small">+${L.length - 4}</span>` : '') : '<span class="small">+ Station</span>'}${v ? ' <span class="small vg">⚠︎</span>' : ''}${t.ap_from ? ` <span class="small">ab ${esc(t.ap_from)}</span>` : ''}</button></td>`; }
     if (c.t === 'tr') { const sel = trList(t.transport); return `<td class="trc"><button type="button" class="trbtn" data-k="transport" aria-label="Verkehrsmittel wählen">${sel.length ? sel.map((x) => `<span class="tpill">${TICON[x] || ''} ${esc(x)}</span>`).join('') : '<span class="small">wählen …</span>'}</button></td>`; }
     if (c.t === 'conf') return `<td><select data-k="confidence" class="conf-${esc(t.confidence)}">${CONF.map((x) => `<option ${x === t.confidence ? 'selected' : ''}>${x}</option>`).join('')}</select></td>`;
     return `<td contenteditable="true" spellcheck="false" data-k="${c.k}" class="${c.t === 'num' ? 'num' : ''}">${esc(cellText(t, c))}</td>`;
@@ -123,7 +124,7 @@ $('grid').addEventListener('change', (e) => {
   const s = e.target.closest('select[data-k]'); if (s) { saveCell(s.closest('tr'), s.dataset.k, s.value, s); if (s.dataset.k === 'who') { s.dataset.c = colorOf(s.value); paint(s.parentElement); } }
 });
 /* transport: pick from a list instead of typing */
-const TICON = {Auto: '🚗', Zug: '🚆', Flug: '✈️', Schiff: '⛴️', Wohnmobil: '🚐', Velo: '🚲', 'zu Fuss': '🚶', Bus: '🚌', Motorrad: '🏍️'};
+const TICON = {Auto: '🚗', Zug: '🚆', Flug: '✈️', Wasserflugzeug: '🛩️', Schiff: '⛴️', Wohnmobil: '🚐', Velo: '🚲', 'zu Fuss': '🚶', Bus: '🚌', Motorrad: '🏍️'};
 function trList(v) { const parts = String(v || '').split(/\s*[·,/+]\s*/).map((x) => x.trim()).filter(Boolean);
   return parts.map((p) => TRANSPORT.find((o) => o.toLowerCase() === p.toLowerCase()) || p); }
 function trPicker(btn) {
@@ -159,7 +160,7 @@ function stopsEditor(box, stops, onChange, opts = {}) {
     const flies = stops.some((x) => x.transport === 'Flug' || x.ap);
     box.innerHTML = `${opts.onDep && flies ? `<div class="dep"><span class="small">Abflug ab</span><b>${opts.dep ? `✈︎ ${esc(opts.dep)}${opts.depName ? ' · ' + esc(opts.depName) : ''}` : 'automatisch (dein Flughafen)'}</b>${opts.dep ? '<button type="button" class="rm" data-dep="0" aria-label="Abflug automatisch">✕</button>' : ''}
         <input class="dq" placeholder="anderer Abflug, z. B. Basel" autocomplete="off" aria-label="Abflughafen suchen"><div class="sugg dsg"></div></div>` : ''}
-     <ol class="stops">${stops.map((x, i) => `<li class="${x.ap ? 'ap' : ''}"><select data-leg="${i}" aria-label="Wie nach ${esc(x.name)}">${TRANSPORT.map((tr) => `<option ${tr === (x.transport || (x.ap ? 'Flug' : 'Auto')) ? 'selected' : ''}>${tr}</option>`).join('')}</select><span class="arr">→</span><b>${stopLabel(x)}</b><span class="small">${esc(x.country || '')}</span><button type="button" class="rm" data-rm="${i}" aria-label="${esc(x.name)} entfernen">✕</button></li>`).join('')}</ol>
+     <ol class="stops">${stops.map((x, i) => `<li class="${x.ap ? 'ap' : ''}"><select data-leg="${i}" aria-label="Wie nach ${esc(x.name)}">${(TRANSPORT.includes(x.transport) || !x.transport ? TRANSPORT : [x.transport, ...TRANSPORT]).map((tr) => `<option ${tr === (x.transport || (x.ap ? 'Flug' : 'Auto')) ? 'selected' : ''}>${esc(tr)}</option>`).join('')}</select><span class="arr">→</span><b>${stopLabel(x)}</b><span class="small">${x.lat == null ? 'nur Land – genauer Ort unbekannt' : esc(x.country || '')}</span><button type="button" class="rm" data-rm="${i}" aria-label="${esc(x.name)} entfernen">✕</button></li>`).join('')}</ol>
      <input class="sq" placeholder="${stops.length ? 'Nächste Station – Ort oder Flughafen' : 'Ort, Insel, Flughafen – oder Google-Maps-Link'}" autocomplete="off" aria-label="Ort oder Flughafen suchen"><div class="sugg ssg"></div>
      <p class="small">${stops.length ? 'Pro Station: wie ihr dorthin gekommen seid. Ein Flughafen als Station heisst: genau dort gelandet – die nächste Station startet von dort.' : 'Suche einen Ort oder Flughafen (Stadt, Name oder Code) – oder füge einen Link aus Google Maps ein.'}${ONLINE ? ` Online-Suche: ${st.cfg.place_search === 'google' ? 'Google Maps' : 'OpenStreetMap'}.` : ''}</p>`;
     const q = box.querySelector('.sq'), sg = box.querySelector('.ssg'); let tm, res = [], seq = 0;
@@ -175,6 +176,7 @@ function stopsEditor(box, stops, onChange, opts = {}) {
         if (ONLINE && v.length > 2 && !isLink) { const more = await api('api/places?online=1&q=' + encodeURIComponent(v)); if (my !== seq) return; const seen = new Set(res.map((p) => p.name.toLowerCase() + (p.country || ''))); res = res.concat(more.filter((p) => p.kind === 'online' && !seen.has(p.name.toLowerCase() + p.country))); show(); } } catch (e) { /* offline */ } }, 220); };
     sg.onclick = (e) => { const b = e.target.closest('button'); if (!b) return; const p = res[+b.dataset.i];
       if (p.kind === 'airport') stops.push({name: p.name, country: '', lat: p.lat, lon: p.lon, ap: p.code, transport: 'Flug'});
+      else if (p.kind === 'country') stops.push({name: p.name, country: p.country || p.name, lat: null, lon: null, transport: stops.length ? 'Auto' : opts.firstTransport || 'Auto'});
       else stops.push({name: p.name, country: p.country || '', lat: p.lat, lon: p.lon, radius_km: p.radius_km || null, transport: stops.length && stops[stops.length - 1].ap ? 'Auto' : (stops.length ? 'Auto' : opts.firstTransport || 'Auto')});
       onChange(); draw(); box.querySelector('.sq').focus(); };
     box.querySelectorAll('[data-rm]').forEach((b) => (b.onclick = () => { stops.splice(+b.dataset.rm, 1); onChange(); draw(); }));
@@ -190,8 +192,7 @@ function stopsEditor(box, stops, onChange, opts = {}) {
 function stopsToTrip(stops) {
   const legs = stops.map((x) => ({name: x.name, country: x.country || '', lat: x.lat, lon: x.lon, transport: x.transport || (x.ap ? 'Flug' : 'Auto'), ...(x.ap ? {ap: x.ap} : {})}));
   const places = stops.filter((x) => !x.ap), main = places[0] || stops[0];
-  const keep = legs.length > 1 || legs.some((x) => x.ap);
-  return {legs: keep ? legs : [], main, destination: (places.length ? places : stops).map((x) => x.name).join(' – ').slice(0, 200),
+  return {legs, main, destination: (places.length ? places : stops).map((x) => x.name).join(' – ').slice(0, 200),
     transport: [...new Set(legs.map((x) => x.transport))]};
 }
 function legsPopup(btn) {
@@ -208,9 +209,9 @@ function legsPopup(btn) {
   $('lgX').onclick = () => pop.remove();
   $('lgOk').onclick = async () => {
     const r = stopsToTrip(stops); const body = {legs: r.legs, ap_from: dep.v};
-    if (r.main) Object.assign(body, {lat: r.main.lat, lon: r.main.lon, destination: stops.length > 1 || r.legs.length ? r.destination : (t.destination && t.lat != null ? t.destination : r.main.name), country: t.country || r.main.country});
-    if (r.main && r.main.radius_km && (t.radius_km == null || t.radius_km >= 250)) body.radius_km = Math.min(r.main.radius_km, 150);
-    if (r.transport.length) body.transport = r.transport.join(' · ');
+    if (!(t.destination || '').trim() && r.destination) body.destination = r.destination;  // no name yet: from the stops
+    const main = r.main;
+    if (main && main.radius_km && (t.radius_km == null || t.radius_km >= 250)) body.radius_km = Math.min(main.radius_km, 150);
     try { Object.assign(t, await post('api/trips/' + t.id, body, 'PATCH')); pop.remove(); toast('Stationen gespeichert – die Karte rechnet neu'); gridBody(); } catch (e) { toast(e.message, 5000); }
   };
   pop.addEventListener('keydown', (e) => { if (e.key === 'Escape') pop.remove(); });
@@ -583,10 +584,11 @@ async function loadRules() {
 }
 
 /* ================================================================ WIZARD: trip by hand */
-const TRANSPORT = ['Auto', 'Zug', 'Bus', 'Flug', 'Schiff', 'Wohnmobil', 'Velo', 'zu Fuss'];
+const TRANSPORT = ['Auto', 'Zug', 'Bus', 'Flug', 'Wasserflugzeug', 'Schiff', 'Wohnmobil', 'Velo', 'zu Fuss'];
 function wizard() {
-  const d = $('wizard'); const w = {step: 0, place: null, stops: [], year: new Date().getFullYear() - 1, month: '', start: '', end: '', nights: 7, who: '', transport: [], area: null, note: '', ap_from: ''};
-  const steps = ['Wohin?', 'Wann?', 'Wie lange?', 'Wer war dabei?', 'Wie seid ihr gereist?', 'Wie gross war die Gegend?', 'Passt das so?'];
+  const d = $('wizard'); const w = {step: 0, name: '', place: null, stops: [], year: new Date().getFullYear() - 1, month: '', start: '', end: '', nights: 7, who: '', transport: [], area: null, note: '', ap_from: ''};
+  const steps = ['Wohin?', 'Wann?', 'Wie lange?', 'Wer war dabei?', 'Wie gross war die Gegend?', 'Passt das so?'];
+  const KEY = ['where', 'when', 'long', 'who', 'area', 'check'];
   const months = ['', 'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
   const dates = () => {
     if (w.start) { const e = w.end || w.start; return [w.start, e, Math.max(0, Math.round((new Date(e) - new Date(w.start)) / 864e5)), 0]; }
@@ -594,15 +596,14 @@ function wizard() {
     const e = new Date(new Date(s).getTime() + w.nights * 864e5).toISOString().slice(0, 10); return [s, e, w.nights, 1];
   };
   const body = () => {
-    switch (w.step) {
-      case 0: return `<div id="wse"></div>`;
-      case 1: return `<div class="prow"><label class="field">Jahr<input id="wy" type="number" min="1950" max="2100" value="${w.year}"></label><label class="field">Monat (falls bekannt)<select id="wm">${months.map((m, i) => `<option value="${i || ''}" ${String(i || '') === String(w.month) ? 'selected' : ''}>${m || 'weiss nicht'}</option>`).join('')}</select></label></div>
+    switch (KEY[w.step]) {
+      case 'where': return `<label class="field">Name der Reise<input id="wname" value="${esc(w.name)}" maxlength="120" placeholder="z. B. Sommerferien Korsika – leer: aus den Stationen"></label><div id="wse"></div>`;
+      case 'when': return `<div class="prow"><label class="field">Jahr<input id="wy" type="number" min="1950" max="2100" value="${w.year}"></label><label class="field">Monat (falls bekannt)<select id="wm">${months.map((m, i) => `<option value="${i || ''}" ${String(i || '') === String(w.month) ? 'selected' : ''}>${m || 'weiss nicht'}</option>`).join('')}</select></label></div>
         <p class="small">Genaue Daten bekannt?</p><div class="prow"><label class="field">Von<input id="wst" type="date" value="${w.start}"></label><label class="field">Bis<input id="wen" type="date" value="${w.end}"></label></div>`;
-      case 2: return `<div class="choice">${[[0, 'Tagesausflug'], [2, 'Wochenende'], [7, '1 Woche'], [14, '2 Wochen'], [21, '3 Wochen']].map(([n, l]) => `<button data-n="${n}" class="${w.nights === n ? 'on' : ''}">${l}</button>`).join('')}</div><label class="field">Nächte<input id="wn" type="number" min="0" max="365" value="${w.nights}"></label>${w.start ? '<p class="small">Aus den Daten berechnet.</p>' : ''}`;
-      case 3: return `<div class="choice">${whoList().map((o) => `<button data-who="${esc(o)}" class="${o === w.who ? 'on' : ''}">${esc(o)}</button>`).join('')}</div><input id="wwho" placeholder="oder eigene Angabe" value="${esc(whoList().includes(w.who) ? '' : w.who)}" maxlength="60">`;
-      case 4: return `<div class="choice">${TRANSPORT.map((t) => `<button data-t="${t}" class="${w.transport.includes(t) ? 'on' : ''}">${t}</button>`).join('')}</div><p class="small">${w.stops.length > 1 || w.stops.some((x) => x.ap) ? 'Aus deinen Stationen übernommen – hier nur noch ergänzen. ' : ''}Mehrfachauswahl möglich. Flug = Bogen ab zu Hause, Auto und Zug folgen Autobahnen und Bahnlinien.</p>`;
-      case 5: { const reg = w.place?.radius_km; return `<div class="choice">${[[3, 'Ein Ort'], [15, 'Umgebung'], [reg || 50, reg ? `ganz ${esc(w.place.name)}` : 'Region'], [150, 'Rundreise']].map(([r, l]) => `<button data-r="${r}" class="${w.area === r ? 'on' : ''}">${l} · ${r} km</button>`).join('')}</div><p class="small">Ohne GPS-Daten zeigt die Karte eine gestrichelte Fläche – lieber zu klein als zu gross.</p>`; }
-      default: { const [s, e, n, ap] = dates(); return `<p><b>${w.stops.map(stopLabel).join(' → ') || '?'}</b>, ${esc(w.place?.country || '')}</p><p>${fmtD(s)} – ${fmtD(e)} · ${n} Nächte${ap ? ' · <span class="status">Datum geschätzt</span>' : ''}</p><p>${esc(w.who || 'wer offen')} · ${esc(w.transport.join(' · ') || '–')} · Fläche ${w.area ?? 0} km</p><label class="field">Notiz<textarea id="wnote" rows="2" maxlength="1000">${esc(w.note)}</textarea></label>`; }
+      case 'long': return `<div class="choice">${[[0, 'Tagesausflug'], [2, 'Wochenende'], [7, '1 Woche'], [14, '2 Wochen'], [21, '3 Wochen']].map(([n, l]) => `<button data-n="${n}" class="${w.nights === n ? 'on' : ''}">${l}</button>`).join('')}</div><label class="field">Nächte<input id="wn" type="number" min="0" max="365" value="${w.nights}"></label>${w.start ? '<p class="small">Aus den Daten berechnet.</p>' : ''}`;
+      case 'who': return `<div class="choice">${whoList().map((o) => `<button data-who="${esc(o)}" class="${o === w.who ? 'on' : ''}">${esc(o)}</button>`).join('')}</div><input id="wwho" placeholder="oder eigene Angabe" value="${esc(whoList().includes(w.who) ? '' : w.who)}" maxlength="60">`;
+      case 'area': { const reg = w.place?.radius_km; return `<div class="choice">${[[3, 'Ein Ort'], [15, 'Umgebung'], [reg || 50, reg ? `ganz ${esc(w.place.name)}` : 'Region'], [150, 'Rundreise']].map(([r, l]) => `<button data-r="${r}" class="${w.area === r ? 'on' : ''}">${l} · ${r} km</button>`).join('')}</div><p class="small">Ohne GPS-Daten zeigt die Karte eine gestrichelte Fläche – lieber zu klein als zu gross.</p>`; }
+      default: { const [s, e, n, ap] = dates(); return `<p><b>${esc(w.name || stopsToTrip(w.stops).destination)}</b></p><p>${w.stops.map((x) => `${TICON[x.transport] || ''} ${stopLabel(x)}`).join(' → ') || '?'}</p><p>${fmtD(s)} – ${fmtD(e)} · ${n} Nächte${ap ? ' · <span class="status">Datum geschätzt</span>' : ''}</p><p>${esc(w.who || 'wer offen')} · Fläche ${w.area ?? 0} km</p><label class="field">Notiz<textarea id="wnote" rows="2" maxlength="1000">${esc(w.note)}</textarea></label>`; }
     }
   };
   const render = () => {
@@ -611,24 +612,24 @@ function wizard() {
     bind();
   };
   const collect = () => {
+    if (w.step === 0 && $('wname')) w.name = $('wname').value.trim();
     if (w.step === 1) { w.year = +$('wy').value || w.year; w.month = $('wm').value; w.start = $('wst').value; w.end = $('wen').value; if (w.start && w.end && w.end < w.start) [w.start, w.end] = [w.end, w.start]; if (w.start) w.year = +w.start.slice(0, 4); }
     if (w.step === 2) w.nights = Math.max(0, +$('wn').value || 0);
     if (w.step === 3 && $('wwho').value.trim()) w.who = $('wwho').value.trim();
-    if (w.step === 6) w.note = $('wnote').value;
+    if (KEY[w.step] === 'check') w.note = $('wnote').value;
   };
   const bind = () => {
     $('wback').onclick = () => { if (!w.step) return d.close(); collect(); w.step--; render(); };
     $('wnext').onclick = async () => {
       collect();
-      if (w.step === 0) { w.place = w.stops.find((x) => !x.ap) || w.stops[0] || null; if (!w.place) return toast('Bitte einen Ort oder Flughafen aus der Liste wählen'); w.transport = [...new Set([...w.transport, ...w.stops.map((x) => x.transport || (x.ap ? 'Flug' : 'Auto'))])]; }
-      if (w.step < steps.length - 1) { w.step++; if (w.step === 2 && w.start) w.nights = dates()[2]; if (w.step === 5 && w.area == null) w.area = w.place?.radius_km || 15; return render(); }
+      if (w.step === 0) { w.place = w.stops.find((x) => !x.ap) || w.stops[0] || null; if (!w.place) return toast('Bitte einen Ort oder Flughafen aus der Liste wählen');  }
+      if (w.step < steps.length - 1) { w.step++; if (w.step === 2 && w.start) w.nights = dates()[2]; if (KEY[w.step] === 'area' && w.area == null) w.area = w.place?.radius_km || 15; return render(); }
       const [s, e, n, ap] = dates(); const home = st.cfg?.home;
-      const km = home ? haversine(home[0], home[1], w.place.lat, w.place.lon) : null;
+      const km = home && w.place.lat != null ? haversine(home[0], home[1], w.place.lat, w.place.lon) : null;
       try {
-        const r = stopsToTrip(w.stops), legs = r.legs, multi = legs.length > 0;
-        const far = home ? Math.max(...w.stops.map((x) => haversine(home[0], home[1], x.lat, x.lon))) : null;
-        const tr = [...new Set([...w.transport, ...legs.map((x) => x.transport)])];
-        await post('api/trips', {start_date: s, end_date: e, nights: n, destination: multi ? r.destination : w.place.name, country: w.place.country, who: w.who, confidence: w.who ? 'bestätigt' : 'tief', lat: w.place.lat, lon: w.place.lon, radius_km: w.area, approx: ap, transport: tr.join(' · '), note: w.note, source: 'manual', reason: 'von Hand erfasst', max_km: far ?? km, legs, ap_from: w.ap_from || ''});
+        const r = stopsToTrip(w.stops);
+        const far = home && w.stops.some((x) => x.lat != null) ? Math.max(...w.stops.filter((x) => x.lat != null).map((x) => haversine(home[0], home[1], x.lat, x.lon))) : null;
+        await post('api/trips', {start_date: s, end_date: e, nights: n, destination: w.name || r.destination, who: w.who, confidence: w.who ? 'bestätigt' : 'tief', radius_km: w.area, approx: ap, note: w.note, source: 'manual', reason: 'von Hand erfasst', max_km: far ?? km, legs: r.legs, ap_from: w.ap_from || ''});
         saved = true; d.close(); toast('Reise gespeichert'); notifyParent('changed'); refresh();
       } catch (err) { toast(err.message, 4000); }
     };
@@ -636,7 +637,6 @@ function wizard() {
     if (w.step === 0) { stopsEditor($('wse'), w.stops, () => { w.place = w.stops.find((x) => !x.ap) || w.stops[0] || null; w.area = null; }, {dep: w.ap_from || '', onDep: (c) => { w.ap_from = c; }}); $('wse').querySelector('.sq').focus(); }
     wb.querySelectorAll('[data-n]').forEach((b) => (b.onclick = () => { w.nights = +b.dataset.n; render(); }));
     wb.querySelectorAll('[data-who]').forEach((b) => (b.onclick = () => { w.who = b.dataset.who; render(); }));
-    wb.querySelectorAll('[data-t]').forEach((b) => (b.onclick = () => { const t = b.dataset.t; w.transport = w.transport.includes(t) ? w.transport.filter((x) => x !== t) : [...w.transport, t]; render(); }));
     wb.querySelectorAll('[data-r]').forEach((b) => (b.onclick = () => { w.area = +b.dataset.r; render(); }));
   };
   let saved = false;

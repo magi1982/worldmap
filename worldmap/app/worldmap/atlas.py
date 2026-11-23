@@ -508,7 +508,7 @@ class Atlas:
                 if m not in modes:
                     modes.append(m)
             legs = _legs(t["legs"])
-            for lg_ in legs:
+            for lg_ in (x for x in legs if not x.get("auto")):  # found in the recording: the GPS shows the modes
                 for m in modes_of_transport(lg_["transport"]):
                     if m not in modes:
                         modes.append(m)
@@ -531,7 +531,8 @@ class Atlas:
                 lat, lon, nopos = home[0], home[1], 2  # imported before 0.7.2: the middle of the country was stored
             dist = t["max_km"] if t["max_km"] is not None else haversine_km(home[0], home[1], lat, lon)
             fl, gr, lg = [], None, None
-            if not k and (len(legs) > 1 or any(x.get("ap") for x in legs)):  # no GPS, several stops or an airport: every leg its own way (plane, road, rail, ship)
+            by_hand = any(not x.get("auto") for x in legs)  # stops found in the recording do not draw the estimate
+            if not k and by_hand and (len(legs) > 1 or any(x.get("ap") for x in legs)):  # several stops or an airport: each leg its own way
                 fl, gr, lg, k = self._leg_ways(home, h_ap, t, legs, used_ap)
                 if rad and rad <= 250:
                     est.append([i, lat, lon, rad])
@@ -724,12 +725,19 @@ class Atlas:
         """
         fl, gr, lg, km = [], [], [], defaultdict(float)
         prev, prev_home, prev_ap = (home[0], home[1]), True, None
-        fly_idx = [n for n, x in enumerate(legs) if "fly" in modes_of_transport(x["transport"])]
+        fly_idx = [n for n, x in enumerate(legs) if "fly" in modes_of_transport(x["transport"])
+                   and "Wasserflugzeug" not in (x["transport"] or "")]
         for n, leg in enumerate(legs):
             ms = modes_of_transport(leg["transport"]) or ["road"]
             here = (leg["lat"], leg["lon"])
             d = haversine_km(*prev, *here)
-            if "fly" in ms:
+            if "Wasserflugzeug" in (leg["transport"] or ""):  # seaplane: straight from where you are, no airport
+                ca = prev_ap[0] if prev_ap else ""
+                a, b = [round(prev[0], 4), round(prev[1], 4)], [round(here[0], 4), round(here[1], 4)]
+                fl += [[a, b, ca, "", 1], [b, a, "", ca, 1]]
+                lg.append(["fly", [a[0], a[1], b[0], b[1]], [ca, ""], 1])
+                km["fly"] += d
+            elif "fly" in ms:
                 a_ap = prev_ap or (airports.by_iata(t["ap_from"] or "") if n == fly_idx[0] else None) or \
                     (h_ap if prev_home else airports.snap(prev[0], prev[1], 60, 0))
                 b_ap = airports.by_iata(leg.get("ap") or "") or \

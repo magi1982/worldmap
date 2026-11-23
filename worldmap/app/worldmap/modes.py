@@ -6,7 +6,7 @@ MIN_FLIGHT_KM = 150.0
 
 # Google activity names and our transport words -> mode
 ACTIVITY = (
-    ("fly", ("FLYING", "flying", "Flug", "flight")),
+    ("fly", ("FLYING", "flying", "Flug", "flight", "Wasserflugzeug", "seaplane")),
     ("ferry", ("FERRY", "ferry", "Schiff", "boat", "SAILING")),
     ("rail", ("TRAIN", "SUBWAY", "TRAM", "BUS", "in train", "in subway", "in tram", "in bus", "Zug", "rail",
               "METRO", "in metro")),
