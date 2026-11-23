@@ -47,7 +47,36 @@ Ideen werden zuerst hier gesammelt. Code entsteht erst nach einem ausdrückliche
 - Animated map (planes, trains, cars), cinema time-lapse with trip cards, colour palettes, base map colours, more line types,
   sticky header on phones, smooth level-of-detail fades, continuous rail/road matching with progress.
 
+## Done in 0.6.1–0.6.3 (not released yet)
+
+- Polite tile downloads with back-off, real airports with IATA tags, flights recorded in pieces merged,
+  trips without coordinates located offline, dotted gaps, updates without Ctrl+F5.
+
 ## Next update (0.7) – waiting for "mach es" / Nächstes Update – wartet auf „mach es“
+
+### 0. Wishes of 23 Nov / Wünsche vom 23.11. (first / zuerst)
+- [ ] **Bug – missing connections**: trips without GPS by car or train (England 2011/2015, Corsica 2009, …) have no line
+      from home, only a dot. Draw an *estimated route* home → destination: soft dashed line along the road/rail network
+      where known, otherwise a gentle curve; **ferry legs** over water (Corsica, England) as a dotted sea line.
+      Setting: estimated routes on/off, style (dashed / dotted / like real ones), opacity.
+- [ ] **Animation: choose vehicles** – planes, trains, cars, ferries each on/off; **from which distance** a vehicle
+      appears (slider per vehicle, e.g. cars only for trips over 300 km); **how many** at the same time (max).
+- [ ] **Planes at the same speed** on every route (constant km/h on screen, short and long flights alike);
+      setting: speed; optional "long flights take a bit longer".
+- [ ] **Areas connected instead of circles on circles**: the semi-transparent areas become one organic shape per
+      trip/person – nearby circles melt together along the route (soft "metaball" outline), with detail when zooming in.
+      Settings: radius, how far circles connect, smoothness, opacity, outline width and colour, shape (organic / circles).
+- [ ] **Places & days – all settings**: circle size (min/max, by days or visits), circle style (filled / ring / glow),
+      colour by (person / year / days), which names show (none / big places / all), label size, minimum days for a
+      label, label collision (hide overlapping), home/work marker.
+- [ ] **Regions – border settings**: grey region lines colour, width, opacity, only visited / all, country borders
+      stronger, fill colour scale (by days / by visits / by first year), unvisited fill.
+- [ ] **Every map: the maximum of settings** – one settings section per map (Trips, Tracks, Places & days, Regions,
+      Time-lapse), each with a live preview on the real map. Trips: arc height, line width, IATA tags, group bubbles,
+      labels. Tracks: width, opacity, gaps, everyday vs trips colours, density fade.
+- [ ] **Time-lapse rebuilt as a travel film** (replaces the current one, see C): camera flies from trip to trip,
+      the route draws itself with the vehicle, title card, year chapters with counters, everyday life skipped,
+      speed and selection (years / person / trips only), export as video.
 
 ### A. Settings you can feel / Einstellungen, die man sieht
 - [ ] **Style drawer on the map**: a 🎨 button opens a panel right on the real map; every slider changes the map live
