@@ -289,10 +289,13 @@ class Atlas:
         tid_of_day: dict[str, int] = {}
         # trips where a person said "no plane" (transport edited, e.g. Auto): fast GPS bits are not flights there
         no_fly: dict[int, str] = {}
+        fly_only: set = set()  # … and trips where a person said "by plane" only: no long ways on the ground there
         for i, t in enumerate(trip_rows):
             ms = modes_of_transport(t["transport"])
             if (t["locked"] or t["source"] == "manual") and ms and "fly" not in ms:
                 no_fly[i] = "rail" if "rail" in ms and "road" not in ms else "road"
+            if (t["locked"] or t["source"] == "manual") and "fly" in ms and not set(ms) - {"fly", "foot"}:
+                fly_only.add(i)
         for i, t in enumerate(trip_rows):
             d = date.fromisoformat(t["start_date"])
             while d.isoformat() <= t["end_date"]:
@@ -390,6 +393,8 @@ class Atlas:
             tid = tid_of_day.get(day, -1)
             if tid in no_fly and mode in ("fly", "jump") and dkm >= 20:
                 mode, air = no_fly[tid], None  # corrected by hand: by car / train, not a flight
+            if tid in fly_only and mode in ("road", "rail", "ferry") and dkm >= 150:
+                mode = "jump"  # corrected by hand: flown – a long way "on the ground" is a gap or a stray photo
             if mode == "jump":  # GPS jump: no line, no kilometres
                 flush()
                 cur_key = None
@@ -561,6 +566,16 @@ class Atlas:
                     gr = self.est_route(home, (lat, lon), "rail" if "rail" in modes and "road" not in modes else "road")
             else:
                 fl = [[f[1], f[2], f[5], f[6]] for f in flights if t["start_date"] <= f[0] <= t["end_date"]]
+                if not fl and i in fly_only and not nopos and dist >= MIN_FLIGHT_KM:  # flown, but not recorded
+                    d_ap = airports.by_iata(t["ap_to"] or "") or next(
+                        (airports.by_iata(x["ap"]) for x in legs if x.get("ap")), None) or airports.snap(lat, lon, 60, 0)
+                    o_ap = airports.by_iata(t["ap_from"] or "") or h_ap
+                    if d_ap and o_ap and d_ap[0] != o_ap[0]:
+                        ha, da = [o_ap[2], o_ap[3]], [d_ap[2], d_ap[3]]
+                        for ap in (o_ap, d_ap):
+                            used_ap[ap[0]] = [ap[2], ap[3], ap[1]]
+                        fl = [[ha, da, o_ap[0], d_ap[0]], [da, ha, d_ap[0], o_ap[0]]]
+                        k = {**k, "fly": k.get("fly", 0) + round(haversine_km(*ha, *da) * 2)}
             name = t["destination"] or "Reise"
             out_trips.append({
                 "id": i, "dbid": t["id"], "a": t["start_date"], "b": t["end_date"], "y": int(t["start_date"][:4]),

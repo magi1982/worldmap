@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.12.1 – 2026-11-23
+
+### Fixed
+- Flights recorded as "in train" or "in car" by Google (e.g. 600 km in 1.5 h) were drawn as railway or road lines.
+  Nothing on the ground is faster than ~320 km/h (train) or ~200 km/h (car): faster is a flight now.
+- Trips set to "Flug" by hand no longer show long ways on the ground: stray positions (e.g. photos jumping between
+  home and the destination) are ignored there, and when no flight was recorded the flight is drawn from your
+  airport to the destination's airport.
+
+### Added
+- Trip list: columns "Countries" and "Transport" are back (from the stations, read-only) with a pick-list filter
+  each, and a "Sort" picker above the list: newest/oldest, km up/down, longest/shortest, name, country, who.
+  Empty values always go to the end.
+
 ## 0.12.0 – 2026-11-23
 
 ### Changed

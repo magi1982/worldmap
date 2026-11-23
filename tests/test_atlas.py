@@ -256,3 +256,25 @@ def test_trip_corrections_win_over_gps_flights(engine, tmp_path):
     assert ("BSL", "GRO") in codes                            # airports set by hand
     assert not any(f[0].startswith("2024-07") for f in core["flights"])  # "by car" → no flight to Pula
     assert a and "PUY" not in core["airports"]
+
+
+def test_a_train_at_400_kmh_is_a_plane():
+    a = {"ts": 0, "lat": 47.46, "lon": 8.55, "hint": None}
+    b = {"ts": 5400, "lat": 52.31, "lon": 4.76, "hint": "in train"}       # Google says "train", 1.5 h for 600 km
+    assert A.mode_of_pair(a, b, 595) == "fly"
+    slow = {**b, "ts": 4 * 3600}
+    assert A.mode_of_pair(a, slow, 595) == "rail"                          # 150 km/h: a train with a gap
+
+
+def test_trips_set_to_plane_by_hand_have_no_long_ways_on_the_ground(engine, tmp_path):
+    t0 = ts("2023-06-16T09:00:00")   # stray photo positions jumping between home and the city, no recorded flight
+    pts = [(t0 - 3600, 47.40, 8.30), (t0, 47.46, 8.55), (t0 + 3 * 3600, 52.37, 4.89), (t0 + 4 * 3600, 52.36, 4.88),
+           (t0 + 10 * 3600, 47.70, 9.20), (t0 + 30 * 3600, 52.37, 4.90), (t0 + 50 * 3600, 52.37, 4.90)]
+    engine.import_points([(t, la, lo, "Alex", "t", None, None) for t, la, lo in pts])
+    engine.db.upsert_trip({"start_date": "2023-06-16", "end_date": "2023-06-18", "destination": "Grachtenstadt",
+                           "transport": "Flug", "locked": 1, "source": "manual", "confidence": "bestätigt",
+                           "lat": 52.37, "lon": 4.9})
+    core = load(A.Atlas(engine, str(tmp_path)), "core")
+    t = next(x for x in core["trips"] if x["name"] == "Grachtenstadt")
+    assert t["k"].get("road", 0) < 100 and "rail" not in t["k"]            # no 600 km "car trips"
+    assert [f[2:] for f in t["fl"]] == [["ZRH", "AMS"], ["AMS", "ZRH"]]    # the flight you said you took

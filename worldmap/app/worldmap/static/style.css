@@ -299,3 +299,5 @@ body.embed-new{background:transparent}
 .lgcell{display:flex;flex-wrap:wrap;align-items:center;gap:3px 4px;text-align:left;max-width:100%;white-space:normal}
 .lchip{display:inline-flex;align-items:center;gap:3px;padding:1px 7px;border-radius:99px;background:color-mix(in srgb,var(--mute) 12%,transparent);font-weight:600;font-size:12.5px;white-space:nowrap}
 .lgcell .arr{color:var(--mute);font-size:11px}.lgcell .vg{color:#D9480F}
+#grid td.ro{color:var(--mute);cursor:default}
+.sortpick{display:inline-flex;align-items:center;gap:6px}.sortpick select{font:inherit;padding:6px 8px;border-radius:9px;border:1px solid var(--line);background:var(--card,transparent);color:inherit}

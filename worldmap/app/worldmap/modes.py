@@ -3,6 +3,8 @@ from __future__ import annotations
 
 FLIGHT_KMH = 220.0
 MIN_FLIGHT_KM = 150.0
+# nothing on the ground is faster: a "train" at 400 km/h was a plane (Google labels flights as trains at times)
+MAX_KMH = {"rail": 320.0, "road": 200.0, "ferry": 80.0}
 
 # Google activity names and our transport words -> mode
 ACTIVITY = (
@@ -43,8 +45,8 @@ def mode_of_pair(a: dict, b: dict, dist_km: float) -> str:
             return "fly"  # a piece of a recorded flight (points every few minutes while flying)
         if dist_km < MIN_FLIGHT_KM or b["ts"] - a["ts"] < 300:
             return "jump"  # a few fast kilometres or hundreds of km in no time are GPS jumps, not flights
-        if hinted in ("rail", "road", "ferry") and dist_km < 600:
-            return hinted  # a train or car trip with a gap in the recording
+        if hinted in ("rail", "road", "ferry") and dist_km < 600 and speed <= MAX_KMH[hinted]:
+            return hinted  # a train or car trip with a gap in the recording (faster than that: Google got it wrong)
         return "fly"
     if hinted and hinted != "fly":
         return hinted

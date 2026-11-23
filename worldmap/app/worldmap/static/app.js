@@ -53,19 +53,27 @@ const COLS = [
   {k: 'destination', n: 'Name', w: 200}, {k: 'legs', n: 'Stationen', t: 'legs', w: 340},
   {k: 'who', n: 'Wer', t: 'who', w: 130},
   {k: 'nights', n: 'Nächte', t: 'num', w: 70}, {k: 'max_km', n: 'km', t: 'num', w: 80},
+  {k: 'country', n: 'Länder', t: 'cc', w: 130}, {k: 'transport', n: 'Verkehrsmittel', t: 'tro', w: 150},
   {k: 'note', n: 'Notiz', w: 200}, {k: 'source', n: 'Quelle', w: 110},
 ];
 function gridHead() {
   $('grid').tHead.innerHTML = `<tr><th class="sel"><input type="checkbox" id="selAll" aria-label="Alle auswählen"></th>${COLS.map((c) => `<th data-k="${c.k}" style="min-width:${c.w}px" class="${st.sort[0] === c.k ? (st.sort[1] > 0 ? 'asc' : 'desc') : ''}">${c.n}</th>`).join('')}</tr>
-  <tr class="filters"><th></th>${COLS.map((c) => { const opts = c.t === 'who' ? [...new Set([...whoList(), ...st.trips.map((t) => t.who).filter(Boolean)])] : c.t === 'tr' ? TRANSPORT : c.t === 'conf' ? CONF : null;
+  <tr class="filters"><th></th>${COLS.map((c) => { const opts = c.t === 'who' ? [...new Set([...whoList(), ...st.trips.map((t) => t.who).filter(Boolean)])] : c.t === 'tr' || c.t === 'tro' ? TRANSPORT : c.t === 'conf' ? CONF : c.t === 'cc' ? countryList() : null;
     if (opts) return `<th><select data-f="${c.k}" aria-label="Filter ${c.n}"><option value="">alle</option>${opts.map((o) => `<option ${st.filter[c.k] === o ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select></th>`;
     return `<th><input data-f="${c.k}" placeholder="Filter" value="${esc(st.filter[c.k] || '')}" aria-label="Filter ${c.n}"></th>`; }).join('')}</tr>`;
   $('grid').tHead.querySelectorAll('th[data-k]').forEach((th) => (th.onclick = () => { const k = th.dataset.k; st.sort = [k, st.sort[0] === k ? -st.sort[1] : 1]; gridHead(); gridBody(); }));
-  $('grid').tHead.querySelectorAll('[data-f]').forEach((inp) => (inp.oninput = () => { st.filter[inp.dataset.f] = inp.value; gridBody(); }));
+  $('grid').tHead.querySelectorAll('[data-f]').forEach((inp) => (inp.oninput = inp.onchange = () => { st.filter[inp.dataset.f] = inp.value; gridBody(); }));
+  sortPicker();
   $('selAll').onchange = (e) => { st.sel = e.target.checked ? new Set(visibleRows().map((t) => t.id)) : new Set(); gridBody(); };
 }
 function cellText(t, c) { const v = t[c.k]; if (c.t === 'date') return fmtD(v); if (c.t === 'legs') return legsOf(t).map((x) => `${x.name} ${x.ap || ''} ${x.country || ''} ${x.transport || ''}`).join(' ') + ' ' + (t.country || '') + ' ' + (t.transport || ''); if (c.k === 'max_km' && v != null) return String(Math.round(v)); return v ?? ''; }
 /* a trip without real details: no place, only a whole country, or no coordinates – worth completing */
+function countryList() { return [...new Set(st.trips.flatMap((t) => String(t.country || '').split(/\s*·\s*/)).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'de')); }
+/* sort picker above the list: the same as clicking a column head */
+const SORTS = [['start_date', -1, 'Neueste zuerst'], ['start_date', 1, 'Älteste zuerst'], ['max_km', -1, 'km absteigend'], ['max_km', 1, 'km aufsteigend'],
+  ['nights', -1, 'Längste zuerst'], ['nights', 1, 'Kürzeste zuerst'], ['destination', 1, 'Name A–Z'], ['country', 1, 'Land A–Z'], ['who', 1, 'Wer A–Z']];
+function sortPicker() { const el = $('gridSort'); if (!el) return; el.innerHTML = SORTS.map(([k, d, n], i) => `<option value="${i}" ${st.sort[0] === k && st.sort[1] === d ? 'selected' : ''}>${n}</option>`).join('') + (SORTS.some(([k, d]) => st.sort[0] === k && st.sort[1] === d) ? '' : '<option selected disabled>eigene Sortierung</option>');
+  el.onchange = () => { const [k, d] = SORTS[+el.value]; st.sort = [k, d]; gridHead(); gridBody(); }; }
 function vague(t) {
   const L = legsOf(t);
   if (L.length ? !L.some((x) => x.lat != null) : t.lat == null || t.lon == null) return L.some((x) => x.country) ? 'nur Land' : 'kein Ort';
@@ -75,9 +83,12 @@ function vague(t) {
 function visibleRows() {
   const f = Object.entries(st.filter).filter(([, v]) => v && v.trim());
   const onlyVague = $('gridVague') && $('gridVague').checked;
-  const rows = st.trips.filter((t) => (!onlyVague || vague(t)) && f.every(([k, v]) => { const c = COLS.find((x) => x.k === k); return String(cellText(t, c)).toLowerCase().includes(v.trim().toLowerCase()); }));
+  const rows = st.trips.filter((t) => (!onlyVague || vague(t)) && f.every(([k, v]) => { const c = COLS.find((x) => x.k === k);
+    if (c && (c.t === 'cc' || c.t === 'tro')) return String(t[k] || '').split(/\s*·\s*/).includes(v);  // exact: "Flug" is not "Wasserflugzeug"
+    return String(cellText(t, c)).toLowerCase().includes(v.trim().toLowerCase()); }));
   const [k, dir] = st.sort;
-  return rows.sort((a, b) => { const x = a[k] ?? '', y = b[k] ?? ''; return (typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y), 'de')) * dir; });
+  return rows.sort((a, b) => { const x = a[k] ?? '', y = b[k] ?? ''; if (x === '' || y === '') return (x === '') - (y === '');  // empty always last
+    return (typeof x === 'number' && typeof y === 'number' ? x - y : String(x).localeCompare(String(y), 'de')) * dir; });
 }
 function gridBody() {
   const rows = visibleRows();
@@ -87,6 +98,8 @@ function gridBody() {
     if (c.t === 'legs') { const L = legsOf(t), v = vague(t); const chip = (x) => `<span class="lchip">${TICON[(x.transport || '').split(' · ')[0]] || '📍'} ${x.ap ? `<b>${esc(x.ap)}</b>` : esc(x.name)}${x.lat == null ? ' <span class="small">(nur Land)</span>' : ''}</span>`;
       return `<td class="trc"><button type="button" class="lgbtn lgcell" aria-label="Stationen bearbeiten">${L.length ? L.slice(0, 4).map(chip).join('<span class="arr">→</span>') + (L.length > 4 ? ` <span class="small">+${L.length - 4}</span>` : '') : '<span class="small">+ Station</span>'}${v ? ' <span class="small vg">⚠︎</span>' : ''}${t.ap_from ? ` <span class="small">ab ${esc(t.ap_from)}</span>` : ''}</button></td>`; }
     if (c.t === 'tr') { const sel = trList(t.transport); return `<td class="trc"><button type="button" class="trbtn" data-k="transport" aria-label="Verkehrsmittel wählen">${sel.length ? sel.map((x) => `<span class="tpill">${TICON[x] || ''} ${esc(x)}</span>`).join('') : '<span class="small">wählen …</span>'}</button></td>`; }
+    if (c.t === 'cc') return `<td class="ro" title="aus den Stationen">${esc(t.country || '')}</td>`;
+    if (c.t === 'tro') { const sel = trList(t.transport); return `<td class="ro" title="aus den Stationen">${sel.map((x) => `<span class="tpill">${TICON[x] || ''} ${esc(x)}</span>`).join('')}</td>`; }
     if (c.t === 'conf') return `<td><select data-k="confidence" class="conf-${esc(t.confidence)}">${CONF.map((x) => `<option ${x === t.confidence ? 'selected' : ''}>${x}</option>`).join('')}</select></td>`;
     return `<td contenteditable="true" spellcheck="false" data-k="${c.k}" class="${c.t === 'num' ? 'num' : ''}">${esc(cellText(t, c))}</td>`;
   }).join('')}</tr>`).join('');
