@@ -165,3 +165,9 @@ def test_regions_from_trips_without_gps(engine, tmp_path):
     reg = load(at, "reg")
     crete = at.region_at(35.24, 24.90)
     assert any(r[0] == crete and r[1] == 0 and r[2] == "2012-06-20" and r[3] == 8 and r[4] == 1 for r in reg)
+
+
+def test_transport_words_from_the_picker():
+    from worldmap.modes import modes_of_transport
+    assert modes_of_transport("Auto · Zug · Bus · Flug · Schiff · Wohnmobil · Velo · zu Fuss") == ["road", "rail", "fly", "ferry", "foot"]
+    assert modes_of_transport("Bus") == ["road"]

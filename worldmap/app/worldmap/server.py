@@ -26,6 +26,7 @@ from .engine import Engine
 from .ha import Supervisor, list_trackers
 from .importers import UserImportError, detect_and_parse, triplist
 from .settings import COLOR_RE, ENTITY_RE, LABEL_RE, SERVICE_RE, USER_RE, from_dict
+from .style import StyleStore
 
 log = logging.getLogger(__name__)
 
@@ -258,6 +259,7 @@ class App:
         self.busy = threading.Lock()
         self.supervisor = Supervisor()
         self.atlas = getattr(engine, "atlas", None) or Atlas(engine, os.environ.get("WORLDMAP_DATA"))
+        self.style = StyleStore(os.environ.get("WORLDMAP_DATA"))
         self.sync_state: dict = {}
 
     def changed(self) -> None:
@@ -418,6 +420,8 @@ def make_handler(app: App):
                 return self._gz_json(app.atlas.get(m.group(1)))
             if path == "/api/rules":
                 return self._send(HTTPStatus.OK, eng.db.rules())
+            if path == "/api/style":
+                return self._send(HTTPStatus.OK, app.style.get())
             if path == "/api/notify_services":
                 return self._send(HTTPStatus.OK, notify_services(eng.ha))
             if path == "/api/places":
@@ -466,6 +470,15 @@ def make_handler(app: App):
                     app.changed()
                     eng.publish_sensors()
                     return self._send(HTTPStatus.OK, {"ok": True, **res})
+                if path == "/api/style":
+                    body = self._json()
+                    return self._send(HTTPStatus.OK, app.style.save(body.get("style"), str(body.get("note", ""))))
+                m = re.fullmatch(r"/api/style/versions/(\d+)/restore", path)
+                if m:
+                    try:
+                        return self._send(HTTPStatus.OK, app.style.restore(int(m.group(1))))
+                    except LookupError:
+                        return self._send(HTTPStatus.NOT_FOUND, {"error": "not found"})
                 if path == "/api/trips/bulk":
                     body = self._json()
                     rows = body.get("rows")

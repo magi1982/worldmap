@@ -5,7 +5,9 @@ const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({'&': '&amp;', '<
 const NEON = ['#0A7CFF', '#FF3D9A', '#8B3DFF', '#00BFB3', '#FF8A00', '#12A84F', '#E03131', '#5C7CFA'];
 const CONF = ['tief', 'mittel', 'hoch', 'bestätigt'];
 const EMBED = new URLSearchParams(location.search).get('embed');
-(function theme() { let t = 'auto'; try { t = localStorage.getItem('wm-theme') || 'auto'; } catch (e) { /* ignore */ } document.documentElement.dataset.theme = t === 'dark' || (t === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light'; })();
+function applyTheme() { let t = 'auto'; try { t = localStorage.getItem('wm-theme') || 'auto'; } catch (e) { /* ignore */ } document.documentElement.dataset.theme = t === 'dark' || (t === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light'; }
+applyTheme();
+window.addEventListener('storage', (e) => { if (e.key === 'wm-theme') applyTheme(); });
 const st = {cfg: null, trips: [], questions: [], sort: ['start_date', -1], filter: {}, sel: new Set()};
 
 async function api(path, opt = {}) {
@@ -32,9 +34,11 @@ function colorOf(who) {
 
 /* ---------- tabs ---------- */
 function showTab(name) {
+  document.querySelectorAll('.trpop').forEach((x) => x.remove());
   document.querySelectorAll('nav button').forEach((b) => b.classList.toggle('on', b.dataset.tab === name));
   document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('on', t.id === 'tab-' + name));
   if (name === 'people') loadPeople();
+  if (name === 'style') loadStyle();
   if (name === 'connectors') loadConnectors();
   if (name === 'notify') loadNotify();
   if (name === 'rules') loadRules();
@@ -49,13 +53,15 @@ const COLS = [
   {k: 'destination', n: 'Ziel', w: 220}, {k: 'country', n: 'Land', w: 120},
   {k: 'who', n: 'Wer', t: 'who', w: 130}, {k: 'confidence', n: 'Sicherheit', t: 'conf', w: 110},
   {k: 'nights', n: 'Nächte', t: 'num', w: 70}, {k: 'max_km', n: 'km', t: 'num', w: 80},
-  {k: 'transport', n: 'Verkehrsmittel', w: 150}, {k: 'note', n: 'Notiz', w: 200}, {k: 'source', n: 'Quelle', w: 110},
+  {k: 'transport', n: 'Verkehrsmittel', t: 'tr', w: 170}, {k: 'note', n: 'Notiz', w: 200}, {k: 'source', n: 'Quelle', w: 110},
 ];
 function gridHead() {
   $('grid').tHead.innerHTML = `<tr><th class="sel"><input type="checkbox" id="selAll" aria-label="Alle auswählen"></th>${COLS.map((c) => `<th data-k="${c.k}" style="min-width:${c.w}px" class="${st.sort[0] === c.k ? (st.sort[1] > 0 ? 'asc' : 'desc') : ''}">${c.n}</th>`).join('')}</tr>
-  <tr class="filters"><th></th>${COLS.map((c) => `<th><input data-f="${c.k}" placeholder="Filter" value="${esc(st.filter[c.k] || '')}" aria-label="Filter ${c.n}"></th>`).join('')}</tr>`;
+  <tr class="filters"><th></th>${COLS.map((c) => { const opts = c.t === 'who' ? [...new Set([...whoList(), ...st.trips.map((t) => t.who).filter(Boolean)])] : c.t === 'tr' ? TRANSPORT : c.t === 'conf' ? CONF : null;
+    if (opts) return `<th><select data-f="${c.k}" aria-label="Filter ${c.n}"><option value="">alle</option>${opts.map((o) => `<option ${st.filter[c.k] === o ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select></th>`;
+    return `<th><input data-f="${c.k}" placeholder="Filter" value="${esc(st.filter[c.k] || '')}" aria-label="Filter ${c.n}"></th>`; }).join('')}</tr>`;
   $('grid').tHead.querySelectorAll('th[data-k]').forEach((th) => (th.onclick = () => { const k = th.dataset.k; st.sort = [k, st.sort[0] === k ? -st.sort[1] : 1]; gridHead(); gridBody(); }));
-  $('grid').tHead.querySelectorAll('input[data-f]').forEach((inp) => (inp.oninput = () => { st.filter[inp.dataset.f] = inp.value; gridBody(); }));
+  $('grid').tHead.querySelectorAll('[data-f]').forEach((inp) => (inp.oninput = () => { st.filter[inp.dataset.f] = inp.value; gridBody(); }));
   $('selAll').onchange = (e) => { st.sel = e.target.checked ? new Set(visibleRows().map((t) => t.id)) : new Set(); gridBody(); };
 }
 function cellText(t, c) { const v = t[c.k]; if (c.t === 'date') return fmtD(v); if (c.k === 'max_km' && v != null) return String(Math.round(v)); return v ?? ''; }
@@ -70,6 +76,7 @@ function gridBody() {
   const whoOpts = [...new Set(['', ...whoList(), ...st.trips.map((t) => t.who)])];
   $('grid').tBodies[0].innerHTML = rows.map((t) => `<tr data-id="${t.id}" class="${t.status === 'ignored' ? 'ign' : ''}"><td class="sel"><input type="checkbox" ${st.sel.has(t.id) ? 'checked' : ''} aria-label="Zeile auswählen"></td>${COLS.map((c) => {
     if (c.t === 'who') return `<td><select data-k="who" data-c="${colorOf(t.who)}" class="who">${whoOpts.map((w) => `<option ${w === t.who ? 'selected' : ''} value="${esc(w)}">${esc(w || '– offen –')}</option>`).join('')}</select></td>`;
+    if (c.t === 'tr') { const sel = trList(t.transport); return `<td class="trc"><button type="button" class="trbtn" data-k="transport" aria-label="Verkehrsmittel wählen">${sel.length ? sel.map((x) => `<span class="tpill">${TICON[x] || ''} ${esc(x)}</span>`).join('') : '<span class="small">wählen …</span>'}</button></td>`; }
     if (c.t === 'conf') return `<td><select data-k="confidence" class="conf-${esc(t.confidence)}">${CONF.map((x) => `<option ${x === t.confidence ? 'selected' : ''}>${x}</option>`).join('')}</select></td>`;
     return `<td contenteditable="true" spellcheck="false" data-k="${c.k}" class="${c.t === 'num' ? 'num' : ''}">${esc(cellText(t, c))}</td>`;
   }).join('')}</tr>`).join('');
@@ -106,6 +113,25 @@ $('grid').addEventListener('change', (e) => {
   if (e.target.matches('td.sel input')) { const id = +e.target.closest('tr').dataset.id; e.target.checked ? st.sel.add(id) : st.sel.delete(id); $('gridDel').disabled = !st.sel.size; return; }
   const s = e.target.closest('select[data-k]'); if (s) { saveCell(s.closest('tr'), s.dataset.k, s.value, s); if (s.dataset.k === 'who') { s.dataset.c = colorOf(s.value); paint(s.parentElement); } }
 });
+/* transport: pick from a list instead of typing */
+const TICON = {Auto: '🚗', Zug: '🚆', Flug: '✈️', Schiff: '⛴️', Wohnmobil: '🚐', Velo: '🚲', 'zu Fuss': '🚶', Bus: '🚌', Motorrad: '🏍️'};
+function trList(v) { const parts = String(v || '').split(/\s*[·,/+]\s*/).map((x) => x.trim()).filter(Boolean);
+  return parts.map((p) => TRANSPORT.find((o) => o.toLowerCase() === p.toLowerCase()) || p); }
+function trPicker(btn) {
+  document.querySelectorAll('.trpop').forEach((x) => x.remove());
+  const tr = btn.closest('tr'), t = st.trips.find((x) => x.id === +tr.dataset.id); const chosen = new Set(trList(t.transport));
+  const pop = document.createElement('div'); pop.className = 'trpop'; pop.setAttribute('role', 'dialog'); pop.setAttribute('aria-label', 'Verkehrsmittel');
+  const extra = [...chosen].filter((x) => !TRANSPORT.includes(x));
+  pop.innerHTML = `<div class="trgrid">${[...TRANSPORT, ...extra].map((o) => `<button type="button" class="tchip ${chosen.has(o) ? 'on' : ''}" data-v="${esc(o)}" aria-pressed="${chosen.has(o)}">${TICON[o] || '•'} ${esc(o)}</button>`).join('')}</div><div class="foot"><span class="small">mehrere möglich</span><button type="button" class="primary">Fertig</button></div>`;
+  document.body.appendChild(pop); const r = btn.getBoundingClientRect(); pop.style.left = Math.min(window.innerWidth - pop.offsetWidth - 8, r.left) + 'px'; pop.style.top = Math.min(window.innerHeight - pop.offsetHeight - 8, r.bottom + 4) + 'px';
+  const close = () => { pop.remove(); document.removeEventListener('mousedown', outside, true); const val = [...TRANSPORT, ...extra].filter((o) => chosen.has(o)).join(' · ');
+    if (val !== (t.transport || '')) saveCell(tr, 'transport', val, null).then(() => gridBody()); };
+  const outside = (e) => { if (!pop.contains(e.target)) close(); };
+  pop.addEventListener('click', (e) => { const b = e.target.closest('.tchip'); if (b) { const v = b.dataset.v; chosen.has(v) ? chosen.delete(v) : chosen.add(v); b.classList.toggle('on'); b.setAttribute('aria-pressed', String(chosen.has(v))); } else if (e.target.closest('.primary')) close(); });
+  pop.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
+  setTimeout(() => document.addEventListener('mousedown', outside, true), 0); pop.querySelector('.tchip').focus();
+}
+$('grid').addEventListener('click', (e) => { const b = e.target.closest('.trbtn'); if (b) trPicker(b); });
 /* paste rows straight from Excel / Google Sheets */
 function tsvRows(text) { return text.replace(/\r/g, '').split('\n').filter((l) => l.trim()).map((l) => l.split('\t')); }
 async function pasteRows(rows) {
@@ -290,6 +316,96 @@ function infoize(root) {
   });
 }
 
+/* ================================================================ MAP STYLE (with versions) */
+const MODE_UI = [['road', '🚗', 'Auto'], ['rail', '🚆', 'Zug & ÖV'], ['fly', '✈️', 'Flug'], ['ferry', '⛴️', 'Schiff'], ['foot', '🚶', 'Zu Fuss']];
+const DASH_UI = [['solid', 'durchgezogen', ''], ['dashed', 'gestrichelt', '7 5'], ['dotted', 'gepunktet', '0.1 5']];
+const PREVIEW = {light: {sea: '#DCE4F6', land: '#FCFBFF', lake: '#C9D8F3', river: '#B6CAEF', prov: '#E4DFF3', text: '#3C3560', halo: 'rgba(252,251,255,.9)'},
+  dark: {sea: '#0B1230', land: '#1A1C33', lake: '#1E3769', river: '#3B63AA', prov: '#2B2D4A', text: '#CFCAEB', halo: 'rgba(17,18,36,.9)'}};
+const sty = {data: null, cur: null, saved: ''};
+const same = () => JSON.stringify(sty.cur) === sty.saved;
+async function loadStyle() {
+  const box = $('style');
+  try { sty.data = await api('api/style'); } catch (e) { box.innerHTML = `<div class="card">${esc(e.message)}</div>`; return; }
+  sty.cur = JSON.parse(JSON.stringify(sty.data.style)); sty.saved = JSON.stringify(sty.cur);
+  const seg = (name, opts, val) => `<div class="seg2" role="radiogroup" data-name="${name}">${opts.map(([v, l]) => `<button type="button" role="radio" aria-checked="${v === val}" class="${v === val ? 'on' : ''}" data-v="${v}">${l}</button>`).join('')}</div>`;
+  const sw = (name, on, label) => `<label class="switch"><input type="checkbox" data-name="${name}" ${on ? 'checked' : ''}><span></span>${label}</label>`;
+  const c = sty.cur;
+  box.innerHTML = `<div class="style-grid">
+   <div class="style-main">
+    <div class="card"><h3>🎨 Linien &amp; Farben</h3>
+      <p class="small">Farbe, Linientyp und Dicke pro Verkehrsmittel. Gilt für alle Karten. Personen- und Gruppenfarben stellst du unter „Personen &amp; Gruppen“ ein.</p>
+      <div class="modes">${MODE_UI.map(([m, ico, n]) => `<div class="mode-row" data-m="${m}">
+        <div class="mn"><span aria-hidden="true">${ico}</span>${n}</div>
+        <input type="color" data-name="modes.${m}.color" value="${esc(c.modes[m].color)}" aria-label="Farbe ${n}">
+        ${seg('modes.' + m + '.dash', DASH_UI.map(([v, l, d]) => [v, `<svg width="34" height="10" aria-hidden="true"><path d="M2 5H32" stroke="currentColor" stroke-width="3" stroke-linecap="round" ${d ? `stroke-dasharray="${d}"` : ''}/></svg><span class="sr">${l}</span>`]), c.modes[m].dash)}
+        <label class="rng" title="Dicke"><span>Dicke</span><input type="range" min="0.5" max="3" step="0.1" data-name="modes.${m}.width" value="${c.modes[m].width}" aria-label="Dicke ${n}"><b>${c.modes[m].width.toFixed(1)}×</b></label>
+      </div>`).join('')}</div></div>
+    <div class="card"><h3>🫧 Flächen für viele kurze Wege</h3>
+      <p class="small">Wo du dich oft auf kleinem Raum bewegst (Ferienort, Stadt), zeigt die Reisekarte statt vieler Striche eine weiche Fläche.</p>
+      <div class="opts-col">${sw('areas.show', c.areas.show, 'Flächen anzeigen')}${sw('areas.outline', c.areas.outline, 'Kräftiger Rand')}
+      <label class="rng"><span>Deckkraft</span><input type="range" min="0.1" max="1" step="0.05" data-name="areas.opacity" value="${c.areas.opacity}"><b>${Math.round(c.areas.opacity * 100)} %</b></label>
+      <label class="rng"><span>Grösse</span><input type="range" min="0.5" max="3" step="0.1" data-name="areas.size" value="${c.areas.size}"><b>${c.areas.size.toFixed(1)}×</b></label></div></div>
+    <div class="card"><h3>🗺️ Grundkarte</h3>
+      <div class="opts-col">${sw('map.rivers', c.map.rivers, 'Flüsse')}${sw('map.provinces', c.map.provinces, 'Grenzen von Kantonen und Regionen')}
+      <div class="field">Ortsnamen ${seg('map.labels', [['many', 'viele'], ['normal', 'normal'], ['few', 'wenige'], ['off', 'keine']], c.map.labels)}</div>
+      <div class="field">Erscheinungsbild ${seg('map.theme', [['auto', 'wie das Gerät'], ['light', '☀ hell'], ['dark', '☾ dunkel']], c.map.theme)}</div></div></div>
+   </div>
+   <div class="style-side">
+    <div class="card sticky"><h3>👀 Vorschau <span class="status" id="stState"></span></h3>
+      <canvas id="stPrev" width="560" height="360" aria-label="Vorschau des Kartenstils"></canvas>
+      <label class="field">Notiz zu dieser Version (optional)<input id="stNote" maxlength="80" placeholder="z. B. Zug gepunktet"></label>
+      <div class="opts"><button class="primary" id="stSave">Speichern</button><button class="btn" id="stUndo">Verwerfen</button><button class="btn" id="stDef">Standard</button><a class="btn" href="./">Karte öffnen</a></div></div>
+    <div class="card"><h3>🕘 Versionen <span class="status">${sty.data.versions.length}</span></h3>
+      <p class="small">Jedes Speichern legt eine Version an (die letzten 20 bleiben). Mit „Zurück“ holst du einen früheren Stil wieder – auch das wird wieder eine Version, nichts geht verloren.</p>
+      <div class="vlist">${sty.data.versions.map((v, i) => `<div class="vrow"><div><b>${esc(v.note)}</b><span class="small">${new Date(v.ts * 1000).toLocaleString('de-CH', {dateStyle: 'medium', timeStyle: 'short'})}${i === 0 ? ' · aktuell' : ''}</span></div>${i === 0 ? '' : `<button class="btn" data-restore="${v.id}">Zurück</button>`}</div>`).join('') || '<p class="small keep">Noch keine – nach dem ersten Speichern erscheinen sie hier.</p>'}</div></div>
+   </div></div>`;
+  infoize(box);
+  const set = (name, val) => { const ks = name.split('.'); let o = sty.cur; for (let i = 0; i < ks.length - 1; i++) o = o[ks[i]]; o[ks[ks.length - 1]] = val; };
+  box.addEventListener('input', (e) => { const t = e.target; if (!t.dataset.name) return;
+    const v = t.type === 'checkbox' ? t.checked : t.type === 'range' ? +t.value : t.value; set(t.dataset.name, v);
+    if (t.type === 'range') { const b = t.parentElement.querySelector('b'); if (b) b.textContent = t.dataset.name === 'areas.opacity' ? Math.round(v * 100) + ' %' : v.toFixed(1) + '×'; }
+    styleChanged(); });
+  box.querySelectorAll('.seg2').forEach((g) => g.addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return;
+    g.querySelectorAll('button').forEach((x) => { x.classList.toggle('on', x === b); x.setAttribute('aria-checked', String(x === b)); }); set(g.dataset.name, b.dataset.v); styleChanged(); }));
+  $('stSave').onclick = async () => { try { sty.data = await post('api/style', {style: sty.cur, note: $('stNote').value}); themeLocal(sty.cur.map.theme); toast('Gespeichert – neue Version angelegt'); loadStyle(); } catch (e) { toast(e.message, 5000); } };
+  $('stUndo').onclick = () => loadStyle();
+  $('stDef').onclick = () => { sty.cur = JSON.parse(JSON.stringify(sty.data.default)); redrawControls(); styleChanged(); };
+  box.querySelectorAll('[data-restore]').forEach((b) => (b.onclick = async () => { try { sty.data = await post('api/style/versions/' + b.dataset.restore + '/restore'); themeLocal(sty.data.style.map.theme); toast('Früherer Stil wiederhergestellt'); loadStyle(); } catch (e) { toast(e.message, 5000); } }));
+  styleChanged();
+}
+function themeLocal(t) { try { if (t === 'auto') localStorage.removeItem('wm-theme'); else localStorage.setItem('wm-theme', t); } catch (e) { /* ignore */ } applyTheme(); }
+function redrawControls() { const box = $('style'); const get = (n) => n.split('.').reduce((o, k) => o[k], sty.cur);
+  box.querySelectorAll('input[data-name]').forEach((t) => { const v = get(t.dataset.name); if (t.type === 'checkbox') t.checked = v; else t.value = v; if (t.type === 'range') t.dispatchEvent(new Event('input', {bubbles: true})); });
+  box.querySelectorAll('.seg2').forEach((g) => { const v = get(g.dataset.name); g.querySelectorAll('button').forEach((b) => { b.classList.toggle('on', b.dataset.v === v); b.setAttribute('aria-checked', String(b.dataset.v === v)); }); }); }
+let stRaf = 0;
+function styleChanged() { const s = $('stState'); if (s) { const ok = same(); s.textContent = ok ? 'gespeichert' : 'nicht gespeichert'; s.className = 'status ' + (ok ? 'ok' : 'warn'); }
+  if (!stRaf) stRaf = requestAnimationFrame(() => { stRaf = 0; drawPreview(); }); }
+function drawPreview() {
+  const cv = $('stPrev'); if (!cv) return; const st = sty.cur; const dark = st.map.theme === 'dark' || (st.map.theme === 'auto' && document.documentElement.dataset.theme === 'dark');
+  const P = PREVIEW[dark ? 'dark' : 'light'], W = cv.width, H = cv.height, g = cv.getContext('2d');
+  g.setLineDash([]); g.fillStyle = P.sea; g.fillRect(0, 0, W, H);
+  g.fillStyle = P.land; g.beginPath(); g.moveTo(0, 0); g.lineTo(W * .78, 0); g.bezierCurveTo(W * .7, H * .3, W * .86, H * .55, W * .72, H); g.lineTo(0, H); g.fill();
+  g.fillStyle = P.lake; g.beginPath(); g.ellipse(W * .3, H * .66, 60, 22, -.4, 0, 7); g.fill();
+  if (st.map.provinces) { g.strokeStyle = P.prov; g.lineWidth = 1.2; g.beginPath(); g.moveTo(W * .45, 0); g.bezierCurveTo(W * .4, H * .4, W * .55, H * .6, W * .5, H); g.stroke(); }
+  if (st.map.rivers) { g.strokeStyle = P.river; g.lineWidth = 2; g.beginPath(); g.moveTo(0, H * .2); g.bezierCurveTo(W * .2, H * .3, W * .25, H * .5, W * .3, H * .63); g.stroke(); }
+  const A = st.areas; if (A.show) { const r = 9 * A.size, c = st.modes.foot.color; g.globalAlpha = A.opacity;
+    const pts = [[.6, .7], [.63, .76], [.57, .75], [.61, .82], [.66, .7]].map(([x, y]) => [x * W, y * H]);
+    if (A.outline) { g.fillStyle = c; g.beginPath(); pts.forEach(([x, y]) => { g.moveTo(x + r + 1.4, y); g.arc(x, y, r + 1.4, 0, 7); }); g.fill(); }
+    g.fillStyle = mixC(c, P.land, .7); g.beginPath(); pts.forEach(([x, y]) => { g.moveTo(x + r, y); g.arc(x, y, r, 0, 7); }); g.fill(); g.globalAlpha = 1; }
+  const line = (m, pts, base) => { const s = st.modes[m]; g.strokeStyle = s.color; g.lineWidth = base * s.width; g.lineCap = 'round'; g.lineJoin = 'round';
+    g.setLineDash(s.dash === 'dashed' ? [9, 6] : s.dash === 'dotted' ? [0.1, 6] : []); g.beginPath(); pts.forEach(([x, y], i) => (i ? g.lineTo(x * W, y * H) : g.moveTo(x * W, y * H))); g.stroke(); g.setLineDash([]); };
+  line('road', [[.05, .9], [.18, .78], [.3, .8], [.42, .62], [.6, .7]], 2.6);
+  line('rail', [[.04, .45], [.2, .42], [.35, .35], [.5, .38], [.64, .2]], 2.6);
+  line('foot', [[.6, .7], [.62, .6], [.58, .56], [.63, .5]], 2.2);
+  line('ferry', [[.72, .45], [.82, .5], [.95, .42]], 2.4);
+  { const s = st.modes.fly; g.strokeStyle = s.color; g.lineWidth = 2.4 * s.width; g.setLineDash(s.dash === 'dashed' ? [9, 6] : s.dash === 'dotted' ? [0.1, 6] : []);
+    g.beginPath(); g.moveTo(W * .14, H * .3); g.quadraticCurveTo(W * .55, -H * .12, W * .93, H * .2); g.stroke(); g.setLineDash([]); }
+  const lab = (t, x, y) => { g.font = '600 13px Inter, system-ui, sans-serif'; g.lineWidth = 4; g.strokeStyle = P.halo; g.strokeText(t, x, y); g.fillStyle = P.text; g.fillText(t, x, y); };
+  if (st.map.labels !== 'off') { lab('Hafenstadt', W * .64, H * .16); if (st.map.labels !== 'few') { lab('Seedorf', W * .2, H * .58); lab('Bergtal', W * .08, H * .38); } if (st.map.labels === 'many') { lab('Feldheim', W * .36, H * .9); lab('Uferweg', W * .66, H * .9); } }
+  g.font = '700 12px Inter, system-ui, sans-serif'; let x = 12; MODE_UI.forEach(([m, , n]) => { g.fillStyle = st.modes[m].color; g.fillRect(x, H - 18, 10, 10); g.fillStyle = P.text; g.fillText(n, x + 14, H - 9); x += g.measureText(n).width + 30; });
+}
+function mixC(c, base, a) { const h = (s) => [1, 3, 5].map((i) => parseInt(s.slice(i, i + 2), 16)); const [r, gg, b] = h(c), [R, G, B] = h(base); return `rgb(${Math.round(R + (r - R) * (1 - a))},${Math.round(G + (gg - G) * (1 - a))},${Math.round(B + (b - B) * (1 - a))})`; }
+
 /* ================================================================ CONNECTIONS */
 async function loadConnectors() {
   const box = $('conn');
@@ -364,29 +480,52 @@ async function loadRules() {
   try { [c, rules] = await Promise.all([api('api/connectors'), api('api/rules')]); } catch (e) { box.innerHTML = `<div class="card">${esc(e.message)}</div>`; return; }
   const DAYS = {all: 'alle Tage', weekday: 'unter der Woche', weekend: 'am Wochenende'};
   box.innerHTML = `
-  <div class="card wide"><h3>🧠 So fragt Worldmap</h3>
+  <div class="card wide"><h3>📏 Gelernte Regeln <span class="status">${rules.length}</span></h3>
     <ul class="small"><li>Ähnliche Reisen (gleicher Ort, gleiche Art Tag, gleicher Vorschlag) kommen als <b>eine</b> Frage – die Antwort gilt für alle.</li>
     <li>Jede Antwort kann als <b>Regel</b> gemerkt werden: dort und an solchen Tagen wird nie mehr gefragt.</li>
     <li>Antworten: jede Person, jede Gruppe, „Keine Reise (Alltag)“, „Mit Reise davor zusammenlegen“ und „Einzeln fragen“.</li>
-    <li>Vorschläge kommen aus: wer gleichzeitig weg war, Wochenende, Schulferien, Wörter in Ordnernamen und gelernten Regeln.</li></ul></div>
-  <div class="card wide"><h3>📏 Gelernte Regeln <span class="status">${rules.length}</span></h3>
-    ${rules.length ? `<table class="mini"><thead><tr><th>Ort</th><th>Tage</th><th>Dann</th><th>Umkreis</th><th>angewendet</th><th></th></tr></thead><tbody>${rules.map((r) => `<tr data-id="${r.id}"><td>${esc(r.label)}</td><td>${DAYS[r.days] || esc(r.days)}</td><td>${r.action === 'ignore' ? 'keine Reise' : '<span class="pill" data-c="' + colorOf(r.value) + '">' + esc(r.value) + '</span>'}</td><td>${r.radius_km} km</td><td>${r.hits}×</td><td><button class="btn rm" aria-label="Regel löschen">✕</button></td></tr>`).join('')}</tbody></table>` : '<p class="small">Noch keine – sie entstehen beim Beantworten der Fragen.</p>'}</div>
-  <div class="card wide" id="cRules"><h3>⚙️ Einstellungen</h3>
-    <p class="small keep">Personen und Gruppen für „Wer war dabei?“ stellst du unter <a href="#people">Personen &amp; Gruppen</a> ein.</p>
-    <div class="prow"><label class="field">Reise ab km Entfernung<input id="minkm" type="number" min="1" max="1000" value="${c.min_trip_km}"></label>
-    <label class="field">Alltagsort ab so vielen Tagen<input id="routd" type="number" min="0" max="3650" value="${c.routine_days}" title="Orte wie die Arbeit, die man an so vielen Tagen besucht, gelten nie als Reise"></label>
-    <label class="field">Fragen, wenn Sicherheit unter<select id="askb">${['mittel', 'hoch', 'bestätigt'].map((x) => `<option ${x === c.ask_below ? 'selected' : ''}>${x}</option>`).join('')}</select></label></div>
-    <label class="field">Schulferien (eine Zeile pro Zeitraum: 2026-07-04..2026-08-09) – in den Ferien wird „Familie“ vorgeschlagen<textarea id="hol" rows="3">${esc(c.school_holidays.join('\n'))}</textarea></label>
-    <label class="field">Wörter in Ordner- oder Dateinamen (Wort=Antwort, eine pro Zeile)<textarea id="kw" rows="2" placeholder="Papa=Papa + Kinder">${esc(c.hint_keywords.join('\n'))}</textarea></label>
-    <div class="opts"><button class="primary" id="saveQ">Speichern</button><button class="btn" data-sync="rebuild">Reisen neu erkennen</button></div></div>`;
+    <li>Vorschläge kommen aus: wer gleichzeitig weg war, Wochenende, Schulferien, Wörter in Ordnernamen und gelernten Regeln.</li></ul><p class="small">Eine Regel sagt: „An diesem Ort, an solchen Tagen ist es immer …“. Sie entsteht, wenn du beim Beantworten einer Frage „merken“ anhakst. Mit ✕ löschst du sie wieder.</p>
+    ${rules.length ? `<table class="mini"><thead><tr><th>Ort</th><th>Tage</th><th>Dann</th><th>Umkreis</th><th>angewendet</th><th></th></tr></thead><tbody>${rules.map((r) => `<tr data-id="${r.id}"><td>${esc(r.label)}</td><td>${DAYS[r.days] || esc(r.days)}</td><td>${r.action === 'ignore' ? 'keine Reise' : '<span class="pill" data-c="' + colorOf(r.value) + '">' + esc(r.value) + '</span>'}</td><td>${r.radius_km} km</td><td>${r.hits}×</td><td><button class="btn rm" aria-label="Regel löschen">✕</button></td></tr>`).join('')}</tbody></table>` : '<p class="small keep">Noch keine – sie entstehen beim Beantworten der Fragen, wenn du „merken“ anhakst.</p>'}</div>
+  <div class="card" id="cTrip"><h3>🧭 Wann ist es eine Reise?</h3>
+    <p class="small">Ein Tag zählt als Reise, wenn jemand weiter weg war als diese Entfernung. Orte, die du sehr oft besuchst (Arbeit, Schule, Familie), zählen nie als Reise – so wird der Arbeitsweg nicht zur Reise.</p>
+    <label class="rng"><span>Ab</span><input type="range" id="minkm" min="5" max="300" step="5" value="${Math.min(300, c.min_trip_km)}"><b id="minkmV">${Math.round(c.min_trip_km)} km</b></label>
+    <label class="switch" style="margin-top:10px"><input type="checkbox" id="routOn" ${c.routine_days ? 'checked' : ''}><span></span>Oft besuchte Orte nie als Reise zählen</label>
+    <label class="rng" id="routRow" style="margin-top:6px"><span>ab</span><input type="range" id="routd" min="5" max="120" step="5" value="${c.routine_days || 20}"><b id="routV" class="wide-b">${c.routine_days || 20} Tagen</b></label></div>
+  <div class="card" id="cAsk"><h3>💬 Wann soll ich nachfragen?</h3>
+    <p class="small">Worldmap rät bei jeder Reise, wer dabei war, und weiss, wie sicher es ist. Je nach Wahl kommt eine Frage nur bei unsicheren Reisen oder bei allen.</p>
+    ${'<div class="seg2" id="askb" role="radiogroup">' + [['mittel', 'nur wenn unsicher'], ['hoch', 'normal (empfohlen)'], ['bestätigt', 'bei jeder Reise']].map(([v, l]) => `<button type="button" role="radio" data-v="${v}" class="${v === c.ask_below ? 'on' : ''}" aria-checked="${v === c.ask_below}">${l}</button>`).join('') + '</div>'}</div>
+  <div class="card" id="cHol"><h3>🏖️ Schulferien</h3>
+    <p class="small">Reisen in den Schulferien sind eher Familienreisen – Worldmap schlägt dann „Familie“ vor.</p>
+    <div id="holList" class="rowlist"></div><div class="opts"><button class="btn" id="holAdd" type="button">+ Ferien</button></div></div>
+  <div class="card" id="cKw"><h3>🔤 Stichwörter</h3>
+    <p class="small">Kommt ein Wort im Namen einer importierten Datei oder eines Ordners vor, wird die passende Antwort vorgeschlagen – z. B. „Skilager“ → Familie.</p>
+    <div id="kwList" class="rowlist"></div><div class="opts"><button class="btn" id="kwAdd" type="button">+ Stichwort</button></div></div>
+  <div class="card wide"><div class="opts"><button class="primary" id="saveQ">Speichern</button><button class="btn" data-sync="rebuild">Reisen neu erkennen</button><span class="small">Personen und Gruppen stellst du unter <a href="#people">Personen &amp; Gruppen</a> ein.</span></div></div>`;
   paint(box); infoize(box);
   box.querySelectorAll('tr[data-id] .rm').forEach((b) => (b.onclick = async () => { const tr = b.closest('tr'); try { await api('api/rules/' + tr.dataset.id, {method: 'DELETE'}); tr.remove(); } catch (e) { toast(e.message); } }));
-  $('saveQ').onclick = () => save({hint_keywords: lines('kw'), school_holidays: lines('hol'), min_trip_km: +$('minkm').value, routine_days: +$('routd').value, ask_below: $('askb').value}, loadRules);
+  const holRow = (a = '', b = '') => `<div class="lrow"><input type="date" class="h1" value="${esc(a)}" aria-label="von"><span>bis</span><input type="date" class="h2" value="${esc(b)}" aria-label="bis"><button class="btn rm" type="button" aria-label="Entfernen">✕</button></div>`;
+  const kwRow = (w = '', v = '') => `<div class="lrow"><input class="k1" value="${esc(w)}" placeholder="Wort, z. B. Skilager" maxlength="40" aria-label="Wort"><span>→</span><select class="k2" aria-label="Antwort">${whoList().map((o) => `<option ${o === v ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select><button class="btn rm" type="button" aria-label="Entfernen">✕</button></div>`;
+  $('holList').innerHTML = c.school_holidays.map((h) => holRow(...h.split('..'))).join('');
+  $('kwList').innerHTML = c.hint_keywords.map((h) => kwRow(...h.split('='))).join('');
+  $('holAdd').onclick = () => $('holList').insertAdjacentHTML('beforeend', holRow());
+  $('kwAdd').onclick = () => $('kwList').insertAdjacentHTML('beforeend', kwRow());
+  box.querySelectorAll('.rowlist').forEach((l) => l.addEventListener('click', (e) => { if (e.target.closest('.rm')) e.target.closest('.lrow').remove(); }));
+  $('minkm').oninput = (e) => { $('minkmV').textContent = e.target.value + ' km'; };
+  $('routd').oninput = (e) => { $('routV').textContent = e.target.value + ' Tagen'; };
+  const routVis = () => { $('routRow').style.opacity = $('routOn').checked ? 1 : 0.4; $('routd').disabled = !$('routOn').checked; }; $('routOn').onchange = routVis; routVis();
+  let ask = c.ask_below; $('askb').onclick = (e) => { const b = e.target.closest('button'); if (!b) return; ask = b.dataset.v; $('askb').querySelectorAll('button').forEach((x) => { x.classList.toggle('on', x === b); x.setAttribute('aria-checked', String(x === b)); }); };
+  $('saveQ').onclick = () => {
+    const hol = [...box.querySelectorAll('#holList .lrow')].map((r) => [r.querySelector('.h1').value, r.querySelector('.h2').value]).filter(([a, b]) => a && b);
+    if (hol.some(([a, b]) => b < a)) return toast('Bei den Ferien liegt „bis“ vor „von“');
+    const kw = [...box.querySelectorAll('#kwList .lrow')].map((r) => [r.querySelector('.k1').value.trim(), r.querySelector('.k2').value]).filter(([a, b]) => a && b);
+    save({hint_keywords: kw.map(([a, b]) => `${a}=${b}`), school_holidays: hol.map(([a, b]) => `${a}..${b}`), min_trip_km: +$('minkm').value,
+      routine_days: $('routOn').checked ? +$('routd').value : 0, ask_below: ask}, loadRules);
+  };
   syncButtons(box);
 }
 
 /* ================================================================ WIZARD: trip by hand */
-const TRANSPORT = ['Auto', 'Zug', 'Flug', 'Schiff', 'Wohnmobil', 'Velo', 'zu Fuss'];
+const TRANSPORT = ['Auto', 'Zug', 'Bus', 'Flug', 'Schiff', 'Wohnmobil', 'Velo', 'zu Fuss'];
 function wizard() {
   const d = $('wizard'); const w = {step: 0, place: null, year: new Date().getFullYear() - 1, month: '', start: '', end: '', nights: 7, who: '', transport: [], area: null, note: ''};
   const steps = ['Wohin?', 'Wann?', 'Wie lange?', 'Wer war dabei?', 'Wie seid ihr gereist?', 'Wie gross war die Gegend?', 'Passt das so?'];

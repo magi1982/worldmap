@@ -38,16 +38,14 @@ Ideen werden zuerst hier gesammelt. Code entsteht erst nach einem ausdrückliche
 - "Show for" bar (person / group) in all maps, people & groups configurator, home/work settings, worldwide regions view,
   info buttons.
 
+## Done in 0.5.0 (not released yet)
+
+- Map style editor with live preview and versions, transport picker in the trip list, clearer question settings.
+
 ## Next update – waiting for "mach es" / Nächstes Update – wartet auf „mach es“
 
-- [ ] **Map style editor** in the settings / **Kartenstil-Editor** in den Einstellungen:
-  - line type per transport (car, train, plane, ship, on foot): solid, dashed, dotted, width;
-  - colours per transport and per person/group;
-  - "many short ways" areas: on/off, transparency, size of the area, outline;
-  - live preview on a small map while changing; nothing is redrawn more than once per change (styles are applied when
-    the cached map tiles are drawn, so there is no cost while panning or zooming).
-- [ ] **Versions of the style** / **Versionen des Stils**: every save creates a version (date, short note), one click goes back;
-  last 20 versions kept in `/data`, export/import as a small JSON file.
+- [ ] Export/import of a map style as a small JSON file (share a style).
+- [ ] Every fix gets a new version number (so Home Assistant always offers it as an update).
 
 ## Next
 

@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.5.0 – 2026-11-23
+
+### Added
+- Settings › **Map style**: colour, line type (solid, dashed, dotted) and width per transport; areas for "many short ways"
+  (on/off, opacity, size, outline); base map (rivers, region borders, place names, light/dark). Live preview.
+- **Style versions**: every save creates a version with an optional note; one click goes back. The last 20 are kept in `/data/style.json`.
+- Trip list: transport is chosen from a list (car, train, bus, plane, ship, camper, bike, on foot – several at once);
+  the filters for who, confidence and transport are drop-downs.
+- Questions & rules: simpler controls (sliders, switches, plain-language choices, date pickers for school holidays,
+  keyword rows).
+
+### Changed
+- Settings tabs ordered by what you need first, with icons.
+- `routing: osrm` from 0.2 is accepted by the add-on configuration again (read as `tiles`), so updates no longer stop.
+
 ## 0.4.0 – 2026-11-23
 
 ### Added

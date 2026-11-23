@@ -13,12 +13,13 @@
   <a class="brand" href="./"><img src="logo.svg" alt="" width="28" height="28"><b>Worldmap</b></a>
   <nav id="tabs" role="tablist">
     <a class="back" href="./">← Karten</a>
-    <button data-tab="trips" class="on" role="tab">Reiseliste</button>
-    <button data-tab="people" role="tab">Personen &amp; Gruppen</button>
-    <button data-tab="import" role="tab">Import</button>
-    <button data-tab="connectors" role="tab">Verbindungen</button>
-    <button data-tab="notify" role="tab">Benachrichtigungen</button>
-    <button data-tab="rules" role="tab">Fragen &amp; Regeln</button>
+    <button data-tab="people" role="tab">👥 Personen &amp; Gruppen</button>
+    <button data-tab="style" role="tab">🎨 Kartenstil</button>
+    <button data-tab="trips" class="on" role="tab">📋 Reiseliste</button>
+    <button data-tab="import" role="tab">📥 Import</button>
+    <button data-tab="connectors" role="tab">📡 Verbindungen</button>
+    <button data-tab="notify" role="tab">🔔 Benachrichtigungen</button>
+    <button data-tab="rules" role="tab">❓ Fragen &amp; Regeln</button>
   </nav>
 </header>
 
@@ -52,6 +53,7 @@
     <div id="pastImports" class="cards"></div>
   </section>
 
+  <section id="tab-style" class="tab"><div id="style"></div></section>
   <section id="tab-people" class="tab"><div id="people" class="cards"></div></section>
   <section id="tab-connectors" class="tab"><div id="conn" class="cards"></div></section>
   <section id="tab-notify" class="tab"><div id="notify" class="cards"></div></section>

@@ -11,7 +11,8 @@ ACTIVITY = (
     ("rail", ("TRAIN", "SUBWAY", "TRAM", "BUS", "in train", "in subway", "in tram", "in bus", "Zug", "rail",
               "METRO", "in metro")),
     ("foot", ("WALKING", "RUNNING", "ON_FOOT", "CYCLING", "BICYCLE", "walking", "running", "cycling", "zu Fuss", "Velo")),
-    ("road", ("VEHICLE", "DRIVING", "MOTORCYCLING", "passenger vehicle", "Auto", "Wohnmobil", "car", "driving")),
+    ("road", ("VEHICLE", "DRIVING", "MOTORCYCLING", "passenger vehicle", "Auto", "Wohnmobil", "car", "driving", "Bus",
+              "Car", "Motorrad")),
 )
 
 
