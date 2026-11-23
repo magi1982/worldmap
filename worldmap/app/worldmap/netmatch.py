@@ -192,7 +192,8 @@ class OpenFreeMapTiles(TileSource):
     """Downloads zoom-12 vector tiles once and keeps the decoded lines on disk."""
 
     def __init__(self, cache_dir: str, tilejson: str = TILEJSON, timeout: float = 20.0, min_interval: float = 0.2,
-                 allow_http: bool = False):
+                 allow_http: bool = False, z: int = Z):
+        self.z = z  # 12 for map matching; 7 for long estimated car routes (motorways and main roads only)
         self.dir = Path(cache_dir)
         self.dir.mkdir(parents=True, exist_ok=True)
         self.tilejson = tilejson
@@ -220,7 +221,7 @@ class OpenFreeMapTiles(TileSource):
         return url
 
     def lines(self, x: int, y: int):
-        f = self.dir / f"{Z}-{x}-{y}.json.gz"
+        f = self.dir / f"{self.z}-{x}-{y}.json.gz"
         if f.exists():
             try:
                 return json.loads(gzip.decompress(f.read_bytes()))
@@ -234,7 +235,7 @@ class OpenFreeMapTiles(TileSource):
                 time.sleep(wait)
             self._last = time.monotonic()
         try:
-            url = self._template().replace("{z}", str(Z)).replace("{x}", str(x)).replace("{y}", str(y))
+            url = self._template().replace("{z}", str(self.z)).replace("{x}", str(x)).replace("{y}", str(y))
             req = urllib.request.Request(url, headers={"User-Agent": "worldmap-home-assistant-addon"})
             with urllib.request.urlopen(req, timeout=self.timeout) as r:  # nosec B310 - https URL from TileJSON
                 data = r.read(20_000_000)
@@ -247,7 +248,7 @@ class OpenFreeMapTiles(TileSource):
         except (OSError, ValueError) as exc:
             self._failed(exc, 120)
             return None
-        lines = decode_mvt(data, Z, x, y) if data else []
+        lines = decode_mvt(data, self.z, x, y) if data else []
         compact = [[c, [[round(a, 6), round(b, 6)] for a, b in pts]] for c, pts in lines]
         f.write_bytes(gzip.compress(json.dumps(compact, separators=(",", ":")).encode(), 6))
         self.downloaded += 1
@@ -265,12 +266,13 @@ class OpenFreeMapTiles(TileSource):
 class StaticLines(TileSource):
     """Lines from memory, bucketed into tiles (tests and offline use)."""
 
-    def __init__(self, lines):
+    def __init__(self, lines, z: int = Z):
+        self.z = z
         self.buckets = defaultdict(list)
         for code, pts in lines:
             seen = set()
             for la, lo in pts:
-                seen.add(tile_xy(la, lo))
+                seen.add(tile_xy(la, lo, z))
             for t in seen:
                 self.buckets[t].append([code, [list(p) for p in pts]])
 
@@ -284,7 +286,8 @@ KY = 110_540.0
 
 
 class Graph:
-    def __init__(self, lines, weights: dict, lat_ref: float):
+    def __init__(self, lines, weights: dict, lat_ref: float, cell: float = 0.002, stitch_m: float = STITCH_M):
+        self.stitch_m = stitch_m
         self.kx = KX * math.cos(math.radians(lat_ref))
         self.coord: list[tuple[float, float]] = []
         self.adj: list[list[tuple[int, float, float]]] = []
@@ -315,7 +318,7 @@ class Graph:
                     self.adj[i].append((prev, d * w, d))
                 prev = i
         # spatial grid for snapping and stitching
-        self.cell = 0.002
+        self.cell = cell
         self.grid = defaultdict(list)
         for i, (la, lo) in enumerate(self.coord):
             self.grid[(int(la / self.cell), int(lo / self.cell))].append(i)
@@ -338,7 +341,7 @@ class Graph:
         The nearest *segment* within STITCH_M is split at the projected point, like a real junction.
         """
         segs = defaultdict(list)  # cell -> [(u, v, w)], only cells that contain a loose end
-        cell = 0.002
+        cell = max(0.002, self.stitch_m / KY * 1.2)
         ends = [i for i, nb in enumerate(self.adj) if len(nb) == 1]
         want = {(int(self.coord[e][0] / cell), int(self.coord[e][1] / cell)) for e in ends}
         coord = self.coord
@@ -363,7 +366,7 @@ class Graph:
             la, lo = self.coord[e]
             ex, ey = lo * self.kx, la * KY
             best = None
-            bd = STITCH_M
+            bd = self.stitch_m
             own = self.adj[e][0][0]
             for (u, v, w) in segs.get((int(la / cell), int(lo / cell)), ()):
                 if e in (u, v) or own in (u, v) and (u == e or v == e):

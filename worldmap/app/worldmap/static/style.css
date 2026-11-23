@@ -254,3 +254,4 @@ body.embed-new{background:transparent}
 #stTabs{margin-top:4px}
 #stForm .card{padding-top:6px;padding-bottom:6px}
 @media (max-width:900px){.stlive{height:320px}}
+.q .qplace{flex:1;min-width:200px}

@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.7.2 – 2026-11-23
+
+### Added
+- **"Where exactly?" question** for trips where only the country is known ("Greece", "France & Spain"): type a
+  town, island or region (or "don't remember" / "round trip"), and the trip moves to the right place on the map.
+  More holiday regions are known (Costa Dorada, Costa Blanca, Costa del Sol, Santorini, Naxos, Paros, Corfu, Zakynthos,
+  Chalkidiki, Peloponnese).
+
+### Changed
+- **Estimated car routes follow real roads**: trips without GPS by car now go over motorways and main roads
+  (OpenFreeMap tiles at zoom 7 for the long way, the detailed zoom-12 network to and from the motorway) instead of a
+  slightly bent line over a land grid. Routes are computed once and cached (`est-roads.json.gz`); while tiles are not
+  loaded yet the rough estimate is shown and the map is built again later. With routing "off" nothing is downloaded.
+- **Lines never move**: with the animation on, flight lines stay on the map like all other lines; only planes, trains,
+  cars and ferries move. "Hide the line under the vehicle" now puts a small halo under planes too instead of cutting a
+  moving gap into the line.
+
+### Fixed
+- A trip with **only a country** as destination no longer gets a point in the middle of the country (the middle of
+  Greece is the Cyclades, the middle of "France & Spain" somewhere in Spain). The import no longer stores such a point,
+  and points stored by older versions are recognised and dropped.
+- **Islands without a big airport** (La Gomera): the plane now lands at the big airport nearby (Tenerife South) and the
+  way goes on by ferry and road, instead of a flight straight onto the island.
+
 ## 0.7.1 – 2026-11-23
 
 ### Fixed

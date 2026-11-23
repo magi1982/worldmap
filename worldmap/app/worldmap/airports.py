@@ -69,3 +69,23 @@ def snap(lat: float, lon: float, max_large: float = LARGE_KM, max_medium: float 
                 if d <= limit and s < score:
                     best, score = r, s
     return (best[0], best[1], best[3], best[4]) if best else None
+
+
+def nearest_large(lat: float, lon: float, max_km: float = 400.0):
+    """-> (IATA, name, lat, lon) of the nearest large airport within max_km, or None.
+
+    For a holiday island without big airport (La Gomera) the trip flies to the big one nearby (Tenerife) and goes on
+    by ferry or road from there.
+    """
+    best, bd = None, max_km
+    grid = _index()
+    r = int(max_km / 80) + 1  # cells are 1° (≈ 80–111 km)
+    for dy in range(-r, r + 1):
+        for dx in range(-r, r + 1):
+            for row in grid.get((math.floor(lat) + dy, math.floor(lon) + dx), ()):
+                if row[5] != 2:
+                    continue
+                d = haversine_km(lat, lon, row[3], row[4])
+                if d < bd:
+                    best, bd = row, d
+    return (best[0], best[1], best[3], best[4]) if best else None

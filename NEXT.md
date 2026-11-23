@@ -57,6 +57,11 @@ Ideen werden zuerst hier gesammelt. Code entsteht erst nach einem ausdrückliche
 - Settings for every map with a live 🎨 drawer and live preview on the settings page, estimated routes with ferries,
   animation choices (vehicles, distance, count, constant plane speed), areas that melt together, travel film with video export.
 
+## Done in 0.7.2
+
+- "Where exactly?" question for country-only trips, no point in the middle of a country, plane + ferry to islands
+  without a big airport, estimated car routes on real roads, lines never move (only vehicles).
+
 ## Next update (0.8) – waiting for "mach es" / Nächstes Update – wartet auf „mach es“
 
 ### A. Settings you can feel / Einstellungen, die man sieht
