@@ -13,6 +13,6 @@ def test_security_rating_settings():
         assert not cfg.get(risky), risky
     assert cfg.get("hassio_role", "default") == "default"
     profile = (ADDON / "apparmor.txt").read_text(encoding="utf-8")
-    assert "profile " in profile and "/data/{,**} rwk," in profile
+    assert "profile " in profile and "/data/{,**} rwkm," in profile
     assert "deny mount," in profile and "capability sys_admin" not in profile
     assert "\nfile," not in profile and "  file,\n" not in profile  # no blanket file access

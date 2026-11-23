@@ -50,7 +50,8 @@ profile worldmap flags=(attach_disconnected,mediate_deleted) {
   # Bashio and the start script
   /usr/lib/bashio/** ix,
   /run.sh ix,
-  /tmp/{,**} rwk,
+  /tmp/{,**} rwkm,
+  /var/tmp/{,**} rwkm,
 
   # Read-only: system, Python and the add-on code
   / r,
@@ -62,8 +63,8 @@ profile worldmap flags=(attach_disconnected,mediate_deleted) {
   /proc/** r,
   /sys/** r,
 
-  # The only persistent place the add-on writes to
-  /data/{,**} rwk,
+  # The only persistent place the add-on writes to (m: SQLite in WAL mode maps its -shm file into memory)
+  /data/{,**} rwkm,
 
   # Never allowed
   deny mount,

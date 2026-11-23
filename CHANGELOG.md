@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.5.3 – 2026-11-23
+
+### Fixed
+- AppArmor profile: SQLite may map its WAL index into memory (`m` on `/data`), temporary files also in `/var/tmp` –
+  0.5.2 failed with "unable to open database file" and the settings showed "502".
+- Persons without a Home Assistant entity (only imports or OwnTracks) no longer break the live position polling.
+
 ## 0.5.2 – 2026-11-23
 
 ### Added

@@ -166,3 +166,21 @@ def test_short_day_outings_and_imported_trips(engine):
     assert not any(t["start_date"] == "2025-03-01" for t in trips)
     listed = next(t for t in trips if t["start_date"] == "2025-03-08")
     assert listed["who"] == "Familie" and listed["destination"] == "Listed" and listed["max_km"] and listed["lat"]
+
+
+def test_persons_without_entity_are_skipped_when_polling(engine):
+    class HA:
+        available = True
+
+        def state(self, entity):
+            if not entity:
+                raise ValueError("invalid entity id: ''")
+            return None
+
+        def history(self, entity, since):
+            if not entity:
+                raise ValueError("invalid entity id: ''")
+            return []
+    engine.ha = HA()
+    engine.s.persons = [{"label": "Alex", "entity": "person.alex"}, {"label": "Sam", "entity": ""}, {"label": "Kim"}]
+    assert engine.poll_once() == 0 and engine.backfill_history() == 0

@@ -237,6 +237,8 @@ class Engine:
     def poll_once(self) -> int:
         rows = []
         for p in self.s.persons:
+            if not p.get("entity"):  # a person without a phone in Home Assistant (imports or OwnTracks only)
+                continue
             st = self.ha.state(p["entity"])
             pos = position_from_state(st)
             if pos:
@@ -248,6 +250,8 @@ class Engine:
         since = datetime.now(UTC) - timedelta(days=self.s.history_days_on_start)
         rows = []
         for p in self.s.persons:
+            if not p.get("entity"):
+                continue
             for st in self.ha.history(p["entity"], since):
                 pos = position_from_state(st)
                 if pos:
