@@ -99,3 +99,21 @@ def test_online_search_parses_and_never_breaks(monkeypatch):
     monkeypatch.setattr(geosearch, "_get", boom)
     geosearch._cache.clear()
     assert geosearch.search("Somewhere", "osm") == []
+
+
+def test_island_by_car_and_ferry_goes_back_the_same_way(engine, tmp_path):
+    # car to the port, ferry to the island: the way home is the same ferry, not a second one to another port
+    _trip(engine, [("Hafenstadt", 42.93, 10.53, "Auto"), ("Insel", 42.15, 9.10, "Schiff")], "Auto · Schiff")
+    t = load(A.Atlas(engine, str(tmp_path)), "core")["trips"][-1]
+    assert [x[0] for x in t["lg"]] == ["road", "ferry", "back"]
+    ferry_out = [r for r in t["lg"][1][1] if r[0]]
+    ferry_back = [r for r in t["lg"][2][1] if r[0]]
+    assert len(ferry_out) == 1 and len(ferry_back) == 1
+    assert ferry_back[0][1] == A._rev(ferry_out[0][1])                  # the same crossing, the other way
+    back_end = t["lg"][2][1][-1][1]
+    assert abs(back_end[-2] - t["lg"][0][1][0][1][0]) < .01              # ends at home, where the trip started
+    assert sum(1 for r in t["gr"] if r[0]) == 1                          # one ship line on the map, not two
+
+
+def test_reverse_of_a_line():
+    assert A._rev([1, 2, 3, 4, 5, 6]) == [5, 6, 3, 4, 1, 2]

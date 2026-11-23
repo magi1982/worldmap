@@ -43,6 +43,11 @@ def _code_version() -> str:
     return h.hexdigest()[:12]
 
 
+def _rev(flat: list) -> list:
+    """[lat, lon, lat, lon, ...] the other way round."""
+    return [c for i in range(len(flat) - 2, -1, -2) for c in flat[i:i + 2]]
+
+
 def _legs(raw) -> list:
     """Stops of a trip (JSON text from the database) → list of dicts; broken data → []."""
     if not raw:
@@ -752,9 +757,20 @@ class Atlas:
             prev, prev_home = here, False
         if not fly_idx and haversine_km(*prev, home[0], home[1]) > 30:  # round trip by land: the way back home
             first = modes_of_transport(legs[0]["transport"]) or ["road"]
-            back = [[r[0], r[1], "ferry" if r[0] else ("rail" if "rail" in first else "road")]
-                    for r in self.ground_route(prev, (home[0], home[1]), "rail" if "rail" in first else "road")]
-            gr += back
+            kind = "rail" if "rail" in first else "road"
+            ships = [n for n, x in enumerate(lg) if x[0] == "ferry"]
+            if ships:  # over the water: back the same way (Corsica ⛴ Piombino 🚗 home), not another ferry
+                j = ships[-1] - (1 if ships[-1] == 1 else 0)  # the first land leg is retraced too
+                back = [[r[0], _rev(r[1]), r[2]] for x in reversed(lg[j:]) for r in reversed(x[1])]
+                if j > 0:  # from the port home: its own way
+                    port = (back[-1][1][-2], back[-1][1][-1]) if back else prev
+                    more = [[r[0], r[1], "ferry" if r[0] else kind] for r in self.est_route(port, (home[0], home[1]), kind)]
+                    gr += more
+                    back += more
+            else:
+                back = [[r[0], r[1], "ferry" if r[0] else kind]
+                        for r in self.est_route(prev, (home[0], home[1]), kind)]
+                gr += back
             lg.append(["back", back])
             km["road"] += haversine_km(*prev, home[0], home[1]) / 2
         return fl, gr, lg, {m: round(v * 2) for m, v in km.items() if v >= 1}

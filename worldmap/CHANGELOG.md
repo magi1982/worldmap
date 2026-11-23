@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.10.2 – 2026-11-23
+
+### Fixed
+- A trip by car to a port and on by ship to an island (car to Piombino, ferry to Corsica) showed two ships: the way
+  home took the shortest ferry from somewhere else. A trip with a ferry now comes home the same way it went
+  (Corsica → Piombino → home); the way back is not drawn a second time on the map.
+
 ## 0.10.1 – 2026-11-23
 
 ### Changed
