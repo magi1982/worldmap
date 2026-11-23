@@ -339,9 +339,14 @@ function buildS(){
 }
 /* gaps without a known route: a soft dotted link instead of an interrupted line (setting: dotted / straight / open) */
 function gapSel(g){if(!SEL)return true;const pn=g[6]>=0?D.persons[g[6]]:null;const t=dayTrip(g[0]);if(isGroup(SEL)){const ms=members(SEL);return !!t&&t.w==SEL&&(!ms.length||ms.includes(pn))}return pn==SEL}
-function drawGaps(colOf,lw,bb){const st=STYLE?STYLE.map.gaps:'dotted';if(st=='open'||!D.gaps)return;const S=V.S,by=new Map();
- for(const g of D.gaps){const c=colOf(g);if(!c)continue;const x1=MX(g[3]),y1=MY(g[2]),x2=MX(g[5]),y2=MY(g[4]);if(Math.max(x1,x2)<bb[0]||Math.min(x1,x2)>bb[2]||Math.max(y1,y2)<bb[1]||Math.min(y1,y2)>bb[3])continue;let p=by.get(c);if(!p){p=new Path2D();by.set(c,p)}p.moveTo(x1,y1);p.lineTo(x2,y2)}
- ctx.save();ctx.lineCap='round';ctx.setLineDash(st=='straight'?[]:[.01/S,Math.max(3.2,lw*S*2.4)/S]);ctx.lineWidth=lw*(st=='straight'?.7:1.15);ctx.globalAlpha=st=='straight'?.55:.8;for(const [c,p] of by){ctx.strokeStyle=c;ctx.stroke(p)}ctx.restore()}
+function drawGaps(colOf,lw,bb){const st=STYLE?STYLE.map.gaps:'dotted';if(st=='open'||!D.gaps)return;const S=V.S,by=new Map(),rt=new Map();
+ /* long gaps come with a way along the main roads / railways (g[7]): drawn as a soft solid line, short ones as dots */
+ for(const g of D.gaps){const c=colOf(g);if(!c)continue;const x1=MX(g[3]),y1=MY(g[2]),x2=MX(g[5]),y2=MY(g[4]);if(!g[7]&&(Math.max(x1,x2)<bb[0]||Math.min(x1,x2)>bb[2]||Math.max(y1,y2)<bb[1]||Math.min(y1,y2)>bb[3]))continue;
+  if(g[7]){let p=rt.get(c);if(!p){p=new Path2D();rt.set(c,p)}const a=g[7];p.moveTo(MX(a[1]),MY(a[0]));for(let k=2;k+1<a.length;k+=2)p.lineTo(MX(a[k+1]),MY(a[k]));continue}
+  let p=by.get(c);if(!p){p=new Path2D();by.set(c,p)}p.moveTo(x1,y1);p.lineTo(x2,y2)}
+ ctx.save();ctx.lineCap='round';ctx.lineJoin='round';
+ ctx.setLineDash([]);ctx.lineWidth=lw*1.1;ctx.globalAlpha=.6;for(const [c,p] of rt){ctx.strokeStyle=c;ctx.stroke(p)}
+ ctx.setLineDash(st=='straight'?[]:[.01/S,Math.max(3.2,lw*S*2.4)/S]);ctx.lineWidth=lw*(st=='straight'?.7:1.15);ctx.globalAlpha=st=='straight'?.55:.8;for(const [c,p] of by){ctx.strokeStyle=c;ctx.stroke(p)}ctx.restore()}
 function contentS(bb){
  drawBase();const TK=ST('tracks'),S=V.S,lw=(S<300000?1/(S*(V.tf||1)):Math.min(2.4,S/250000)/S)*(TK.width??1),op=TK.opacity??1,eo=TK.everyday_opacity??.7;
  ctx.lineWidth=lw;ctx.lineJoin='round';ctx.lineCap='round';ctx.globalAlpha=1;

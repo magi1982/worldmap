@@ -225,5 +225,34 @@ def test_estimated_ground_route_finds_the_ferry():
     assert [r[0] for r in corsica] == [0, 1, 0]            # land – sea (ferry) – land
     assert corsica[0][1][:2] == [47.4, 8.5] and corsica[-1][1][-2:] == [42.2, 9.1]
     assert [r[0] for r in a.ground_route(home, (41.1, 1.1))] == [0]          # around the Gulf of Lion by land
-    assert [r[0] for r in a.ground_route(home, (52.0, -1.0))] == [0, 1, 0]   # across the Channel / North Sea
+    uk = a.ground_route(home, (52.0, -1.0))                                   # Channel Tunnel or ferry
+    assert uk[-1][1][-2:] == [52.0, -1.0] and sum(len(r[1]) for r in uk) > 60  # follows roads, not a straight line
     assert [r[0] for r in a.ground_route(home, (48.2, 16.4))] == [0]        # all on land
+
+
+def test_estimated_route_follows_main_roads_and_railways():
+    from worldmap import roadnet
+    road = roadnet.route("road", (47.4, 8.5), (48.2, 16.4))
+    rail = roadnet.route("rail", (47.4, 8.5), (48.9, 2.3))
+    for r in (road, rail):
+        assert r and all(x[0] == 0 for x in r) and len(r[0][1]) > 60
+    assert roadnet.route("road", (47.4, 8.5), (-33.9, 151.2)) is None          # no way by land to Sydney
+
+
+def test_trip_corrections_win_over_gps_flights(engine, tmp_path):
+    t0 = ts("2024-07-01T08:00:00")
+    pts = [(t0 - 3600, 47.458, 8.548), (t0, 47.46, 8.55), (t0 + 5400, 44.9, 13.9), (t0 + 7200, 44.89, 13.92)]  # → Pula
+    t1 = ts("2024-08-01T08:00:00")
+    pts += [(t1 - 3600, 47.458, 8.548), (t1, 47.46, 8.55), (t1 + 9000, 41.29, 2.07), (t1 + 9600, 41.3, 2.08)]  # → BCN
+    engine.import_points([(t, la, lo, "Alex", "t", None, None) for t, la, lo in pts])
+    engine.rebuild()
+    a = engine.db.upsert_trip({"start_date": "2024-07-01", "end_date": "2024-07-03", "destination": "Istrien",
+                               "transport": "Auto", "locked": 1, "source": "manual", "confidence": "bestätigt"})
+    engine.db.upsert_trip({"start_date": "2024-08-01", "end_date": "2024-08-03", "destination": "Spanien",
+                           "transport": "Flug", "locked": 1, "source": "manual", "confidence": "bestätigt",
+                           "ap_from": "BSL", "ap_to": "GRO"})
+    core = load(A.Atlas(engine, str(tmp_path)), "core")
+    codes = [(f[5], f[6]) for f in core["flights"]]
+    assert ("BSL", "GRO") in codes                            # airports set by hand
+    assert not any(f[0].startswith("2024-07") for f in core["flights"])  # "by car" → no flight to Pula
+    assert a and "PUY" not in core["airports"]

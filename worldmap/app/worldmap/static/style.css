@@ -254,3 +254,7 @@ body.embed-new{background:transparent}
 #stTabs{margin-top:4px}
 #stForm .card{padding-top:6px;padding-bottom:6px}
 @media (max-width:900px){.stlive{height:320px}}
+.apbtn{border:1px solid var(--line);background:transparent;color:inherit;border-radius:8px;padding:4px 8px;font:700 12.5px Inter,system-ui,sans-serif;cursor:pointer;white-space:nowrap}
+.apbtn[data-dim]{opacity:.45}
+.appop{width:min(320px,calc(100vw - 16px));padding:12px}
+.appop .field{display:block;margin-top:8px}

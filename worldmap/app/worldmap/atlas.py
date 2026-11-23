@@ -41,6 +41,16 @@ def _code_version() -> str:
     return h.hexdigest()[:12]
 
 
+@lru_cache(maxsize=4096)
+def _net_route(kind: str, la1: float, lo1: float, la2: float, lo2: float):
+    from . import roadnet
+
+    try:
+        return roadnet.route(kind, (la1, lo1), (la2, lo2))
+    except (ValueError, KeyError, IndexError):
+        return None
+
+
 @lru_cache(maxsize=2048)
 def _geocode(name: str, country: str, home: tuple, max_km):
     from .importers.triplist import geocode
@@ -143,10 +153,19 @@ class Atlas:
         # ---- trips (ids are positions in the list)
         trip_rows = sorted(trips_db, key=lambda t: (t["start_date"], t["id"]))
         tid_of_day: dict[str, int] = {}
+        # trips where a person said "no plane" (transport edited, e.g. Auto): fast GPS bits are not flights there
+        no_fly: dict[int, str] = {}
+        for i, t in enumerate(trip_rows):
+            ms = modes_of_transport(t["transport"])
+            if (t["locked"] or t["source"] == "manual") and ms and "fly" not in ms:
+                no_fly[i] = "rail" if "rail" in ms and "road" not in ms else "road"
         for i, t in enumerate(trip_rows):
             d = date.fromisoformat(t["start_date"])
             while d.isoformat() <= t["end_date"]:
-                tid_of_day.setdefault(d.isoformat(), i)
+                if t["locked"] or t["source"] == "manual":
+                    tid_of_day[d.isoformat()] = i  # what a person entered wins over a detected trip
+                else:
+                    tid_of_day.setdefault(d.isoformat(), i)
                 d += timedelta(days=1)
 
         # ---- walk the points: tracks, km per day/mode, cells, flights
@@ -234,12 +253,14 @@ class Atlas:
             if (air and mode != "fly" and dkm / max(1e-6, dt / 3600) >= 150
                     and not airports.snap(prev["lat"], prev["lon"], 25, 15)):
                 mode = "fly"  # still in the air between two sparse points of the same flight
+            tid = tid_of_day.get(day, -1)
+            if tid in no_fly and mode in ("fly", "jump") and dkm >= 20:
+                mode, air = no_fly[tid], None  # corrected by hand: by car / train, not a flight
             if mode == "jump":  # GPS jump: no line, no kilometres
                 flush()
                 cur_key = None
                 prev = p
                 continue
-            tid = tid_of_day.get(day, -1)
             km_idx = {"road": 1, "rail": 2, "foot": 3, "fly": 4, "ferry": 1}[mode]
             routed = bool(seg and seg["mode"] in ("road", "rail") and seg["geometry"])
             if routed:
@@ -250,9 +271,15 @@ class Atlas:
                     dkm = sum(haversine_km(*geom[i], *geom[i + 1]) for i in range(len(geom) - 1))
                 elif dkm > 3 and ((seg and seg["mode"] == "none") or dt > 3600 or dkm > 50):
                     # a long gap without a route: no solid line – the map shows it as a soft dotted link
-                    if dkm <= 400:
-                        gaps.append([di, TCLS.get(mode, 0), round(prev["lat"], 4), round(prev["lon"], 4),
-                                     round(p["lat"], 4), round(p["lon"], 4), pi])
+                    if dkm <= 1500:
+                        g = [di, TCLS.get(mode, 0), round(prev["lat"], 4), round(prev["lon"], 4),
+                             round(p["lat"], 4), round(p["lon"], 4), pi]
+                        if dkm >= 20 and mode in ("road", "rail"):  # long gaps follow the main roads / railways
+                            via = _net_route(mode, g[2], g[3], g[4], g[5])
+                            if via:
+                                g.append([c for r in via for c in r[1]])
+                        if len(g) > 7 or dkm <= 400:
+                            gaps.append(g)
                     days[di][km_idx] += dkm
                     if tid >= 0:
                         trip_km[tid][mode] += dkm
@@ -306,6 +333,20 @@ class Atlas:
         # pieces that start and end at the same airport (taxiing, holding patterns) are no flights
         flights[:] = [f for f in flights if not (f[5] and f[5] == f[6])
                       and haversine_km(*f[1], *f[2]) >= MIN_FLIGHT_KM * .6]
+        # airports set by hand on a trip win: the end nearer home gets "from", the other end "to"
+        for f in flights:
+            tid = tid_of_day.get(f[0], -1)
+            if tid < 0:
+                continue
+            t = trip_rows[tid]
+            fa, ta = airports.by_iata(t["ap_from"] or ""), airports.by_iata(t["ap_to"] or "")
+            if not (fa or ta):
+                continue
+            near_a = haversine_km(home[0], home[1], *f[1]) <= haversine_km(home[0], home[1], *f[2])
+            for end, code_i, is_home in ((1, 5, near_a), (2, 6, not near_a)):
+                ap = fa if is_home else ta
+                if ap:
+                    f[end], f[code_i] = [ap[2], ap[3]], ap[0]
         for f in flights:
             for code in (f[5], f[6]):
                 ap = airports.by_iata(code) if code else None
@@ -343,18 +384,20 @@ class Atlas:
             if not k:  # no GPS: estimate the distance there and back
                 k = estimate_km(dist, modes, t["nights"] or 0)
                 if "fly" in modes and not nopos:
-                    d_ap = airports.snap(lat, lon, 60, 0)  # only the big airport of a city (London → LHR); no guessing beyond
-                    ha = [h_ap[2], h_ap[3]] if h_ap else [home[0], home[1]]
+                    d_ap = (airports.by_iata(t["ap_to"] or "")
+                            or airports.snap(lat, lon, 60, 0))  # set by hand, else the big airport of the city (London → LHR)
+                    o_ap = airports.by_iata(t["ap_from"] or "") or h_ap
+                    ha = [o_ap[2], o_ap[3]] if o_ap else [home[0], home[1]]
                     da = [d_ap[2], d_ap[3]] if d_ap else [lat, lon]
-                    hc, dc = (h_ap[0] if h_ap else ""), (d_ap[0] if d_ap else "")
-                    for ap in (h_ap, d_ap):
+                    hc, dc = (o_ap[0] if o_ap else ""), (d_ap[0] if d_ap else "")
+                    for ap in (o_ap, d_ap):
                         if ap:
                             used_ap[ap[0]] = [ap[2], ap[3], ap[1]]
                     fl = [[ha, da, hc, dc], [da, ha, dc, hc]]
-                if rad and not nopos:
+                if rad and not nopos and rad <= 250:  # a whole country is no "area you were in"
                     est.append([i, lat, lon, rad])
                 if not nopos and "fly" not in modes and dist >= 30:
-                    gr = self.ground_route(home, (lat, lon))
+                    gr = self.ground_route(home, (lat, lon), "rail" if "rail" in modes and "road" not in modes else "road")
             else:
                 fl = [[f[1], f[2], f[5], f[6]] for f in flights if t["start_date"] <= f[0] <= t["end_date"]]
             name = t["destination"] or "Reise"
@@ -521,8 +564,22 @@ class Atlas:
                 cache.clear()
         return v
 
-    def ground_route(self, a: tuple, b: tuple) -> list:
+    def ground_route(self, a: tuple, b: tuple, kind: str = "road") -> list:
         """Estimated way by car or train for a trip without GPS: [[sea 0/1, [lat, lon, lat, lon, ...]], ...].
+
+        First along the real main roads / railways (offline Natural Earth network, ferries included);
+        only where that has no way, a path over a coarse land grid.
+        """
+        from . import roadnet
+
+        try:
+            via = roadnet.route(kind, a, b)
+        except (ValueError, KeyError, IndexError):
+            via = None
+        return via or self._grid_route(a, b)
+
+    def _grid_route(self, a: tuple, b: tuple) -> list:
+        """Way over a coarse land grid: [[sea 0/1, [lat, lon, ...]], ...].
 
         A shortest path over a coarse land grid (offline, from the region polygons): it goes around bays and seas
         on land and only crosses water where there is no way by land (a ferry: Corsica, Mallorca, England).

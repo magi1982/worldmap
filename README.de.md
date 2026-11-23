@@ -16,7 +16,7 @@ auf einer schnellen, schönen Karte mit fünf Ansichten. Alles läuft im Add-on,
 | | |
 |---|---|
 | 🗺️ **Fünf Kartenansichten** | **Reisen** (wer war wo und womit, Ziele, Flugbögen, Flächen, die zu einer Form verschmelzen, geschätzte Wege mit Fähren für Reisen ohne GPS), **Spuren** (jeder Weg, gefärbt nach Verkehrsmittel, Jahr oder Person), **Orte & Tage** (wo ihr Zeit verbracht habt, Kalender mit jedem Tag), **Regionen** (Kantone, Bundesländer und Provinzen weltweit) und **Reisefilm** (die Kamera fliegt von Reise zu Reise, jede Route zeichnet sich mit Flugzeug, Zug, Auto oder Fähre, Titelkarten, Jahres-Kapitel und Zähler – auch als Video speicherbar). |
-| 🛤️ **Echte Bahn- und Strassenlinien** | Lücken zwischen GPS-Punkten werden auf das echte Bahn- und Strassennetz aus OpenStreetMap gelegt. Das Netz entsteht aus Kartenkacheln, die einmal per Kachelnummer geladen und im Add-on gespeichert werden – es werden nie Positionen gesendet, danach läuft alles offline. Lücken ohne plausiblen Weg werden fein gepunktet verbunden (einstellbar: gepunktet, gerade, offen). Flüge beginnen und enden am echten Flughafen (OurAirports, offline). |
+| 🛤️ **Echte Bahn- und Strassenlinien** | Lücken zwischen GPS-Punkten werden auf das echte Bahn- und Strassennetz aus OpenStreetMap gelegt. Das Netz entsteht aus Kartenkacheln, die einmal per Kachelnummer geladen und im Add-on gespeichert werden – es werden nie Positionen gesendet, danach läuft alles offline. Reisen ohne GPS und lange Lücken folgen den Hauptstrassen, Bahnlinien und Fähren eines Offline-Weltnetzes (gerade fliegen nur Flugzeuge); kurze Lücken ohne plausiblen Weg werden fein gepunktet verbunden (einstellbar: gepunktet, gerade, offen). Flüge beginnen und enden am echten Flughafen (OurAirports, offline). |
 | ❓ **Kluge Fragen – ohne KI** | Ähnliche Reisen (gleiche Gegend, gleiche Art Tag, gleicher Vorschlag) kommen als **eine** Frage – eine Antwort für alle. Antworten lassen sich als **Regel** merken, dieselbe Frage kommt nie wieder. Antworten: jede Person und Gruppe, „Keine Reise (Alltag)“, „Mit Reise davor zusammenlegen“, „Einzeln fragen“. |
 | 👥 **Personen & Gruppen** | Einzelpersonen und Gruppen (Paar, Familie …) mit Farben. Oben in jeder Karte: alle, eine Person oder eine Gruppe antippen. Zuhause und Arbeit mit Umkreis; die Arbeit erscheint nur auf der Karte, wenn du es einschaltest. |
 | 📋 **Reiseliste wie in Excel** | In den Einstellungen: Filter pro Spalte, sortieren, Zellen direkt bearbeiten, Zeilen löschen, Zeilen direkt aus Excel oder Google Sheets einfügen (Strg+V). Doppelte werden erkannt. |
@@ -104,7 +104,7 @@ Ideen und Planung stehen in [NEXT.md](NEXT.md).
 ## Quellen
 
 Karten- und Ortsdaten: [Natural Earth](https://www.naturalearthdata.com/) (gemeinfrei, auch die Regionen und Städtenamen in anderen Sprachen),
-Flughäfen: [OurAirports](https://ourairports.com/data/) (gemeinfrei),
+Flughäfen: [OurAirports](https://ourairports.com/data/) (gemeinfrei), Hauptstrassen, Fähren und Bahnlinien: Natural Earth (gemeinfrei),
 Ortsnamen: [GeoNames](https://www.geonames.org/) (CC BY 4.0). Bahn- und Strassennetz: © [OpenStreetMap](https://www.openstreetmap.org/copyright)-Mitwirkende
 via [OpenFreeMap](https://openfreemap.org/).
 

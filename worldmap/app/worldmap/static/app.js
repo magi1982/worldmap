@@ -53,7 +53,7 @@ const COLS = [
   {k: 'destination', n: 'Ziel', w: 220}, {k: 'country', n: 'Land', w: 120},
   {k: 'who', n: 'Wer', t: 'who', w: 130}, {k: 'confidence', n: 'Sicherheit', t: 'conf', w: 110},
   {k: 'nights', n: 'Nächte', t: 'num', w: 70}, {k: 'max_km', n: 'km', t: 'num', w: 80},
-  {k: 'transport', n: 'Verkehrsmittel', t: 'tr', w: 170}, {k: 'note', n: 'Notiz', w: 200}, {k: 'source', n: 'Quelle', w: 110},
+  {k: 'transport', n: 'Verkehrsmittel', t: 'tr', w: 170}, {k: 'ap_from', n: 'Flughäfen', t: 'ap', w: 130}, {k: 'note', n: 'Notiz', w: 200}, {k: 'source', n: 'Quelle', w: 110},
 ];
 function gridHead() {
   $('grid').tHead.innerHTML = `<tr><th class="sel"><input type="checkbox" id="selAll" aria-label="Alle auswählen"></th>${COLS.map((c) => `<th data-k="${c.k}" style="min-width:${c.w}px" class="${st.sort[0] === c.k ? (st.sort[1] > 0 ? 'asc' : 'desc') : ''}">${c.n}</th>`).join('')}</tr>
@@ -76,6 +76,7 @@ function gridBody() {
   const whoOpts = [...new Set(['', ...whoList(), ...st.trips.map((t) => t.who)])];
   $('grid').tBodies[0].innerHTML = rows.map((t) => `<tr data-id="${t.id}" class="${t.status === 'ignored' ? 'ign' : ''}"><td class="sel"><input type="checkbox" ${st.sel.has(t.id) ? 'checked' : ''} aria-label="Zeile auswählen"></td>${COLS.map((c) => {
     if (c.t === 'who') return `<td><select data-k="who" data-c="${colorOf(t.who)}" class="who">${whoOpts.map((w) => `<option ${w === t.who ? 'selected' : ''} value="${esc(w)}">${esc(w || '– offen –')}</option>`).join('')}</select></td>`;
+    if (c.t === 'ap') { const fl = /flug/i.test(t.transport || ''); return `<td class="trc"><button type="button" class="apbtn" data-k="ap_from" aria-label="Flughäfen wählen" ${fl || t.ap_from || t.ap_to ? '' : 'data-dim="1"'}>${t.ap_from || t.ap_to ? `✈︎ ${esc(t.ap_from || 'auto')} → ${esc(t.ap_to || 'auto')}` : `<span class="small">${fl ? 'automatisch' : '–'}</span>`}</button></td>`; }
     if (c.t === 'tr') { const sel = trList(t.transport); return `<td class="trc"><button type="button" class="trbtn" data-k="transport" aria-label="Verkehrsmittel wählen">${sel.length ? sel.map((x) => `<span class="tpill">${TICON[x] || ''} ${esc(x)}</span>`).join('') : '<span class="small">wählen …</span>'}</button></td>`; }
     if (c.t === 'conf') return `<td><select data-k="confidence" class="conf-${esc(t.confidence)}">${CONF.map((x) => `<option ${x === t.confidence ? 'selected' : ''}>${x}</option>`).join('')}</select></td>`;
     return `<td contenteditable="true" spellcheck="false" data-k="${c.k}" class="${c.t === 'num' ? 'num' : ''}">${esc(cellText(t, c))}</td>`;
@@ -131,7 +132,32 @@ function trPicker(btn) {
   pop.addEventListener('keydown', (e) => { if (e.key === 'Escape') close(); });
   setTimeout(() => document.addEventListener('mousedown', outside, true), 0); pop.querySelector('.tchip').focus();
 }
-$('grid').addEventListener('click', (e) => { const b = e.target.closest('.trbtn'); if (b) trPicker(b); });
+$('grid').addEventListener('click', (e) => { const b = e.target.closest('.trbtn'); if (b) trPicker(b); const a = e.target.closest('.apbtn'); if (a) apPicker(a); });
+/* airports of a trip: the ones of your own flights to pick, or any international IATA code */
+let AIRPORTS = null;
+async function apPicker(btn) {
+  document.querySelectorAll('.trpop').forEach((x) => x.remove());
+  const tr = btn.closest('tr'), t = st.trips.find((x) => x.id === +tr.dataset.id);
+  if (!AIRPORTS) { try { AIRPORTS = await api('api/airports'); } catch (e) { AIRPORTS = []; } }
+  const pop = document.createElement('div'); pop.className = 'trpop appop'; pop.setAttribute('role', 'dialog'); pop.setAttribute('aria-label', 'Flughäfen');
+  const opts = AIRPORTS.map((a) => `<option value="${esc(a.code)}">${esc(a.code)} – ${esc(a.name)}</option>`).join('');
+  pop.innerHTML = `<datalist id="apList">${opts}</datalist>
+   <label class="field">Abflug (bei dir)<input id="apF" list="apList" maxlength="3" autocapitalize="characters" placeholder="automatisch, z. B. ZRH" value="${esc(t.ap_from || '')}"></label><div class="small" id="apFn"></div>
+   <label class="field">Ankunft (am Ziel)<input id="apT" list="apList" maxlength="3" autocapitalize="characters" placeholder="automatisch, z. B. NBO" value="${esc(t.ap_to || '')}"></label><div class="small" id="apTn"></div>
+   <p class="small">Gilt für Hin- und Rückflug dieser Reise. Leer = automatisch erkannt. Jeder internationale 3-Buchstaben-Code (IATA) geht.</p>
+   <div class="foot"><button type="button" class="btn" id="apClr">Automatisch</button><button type="button" class="primary" id="apOk">Speichern</button></div>`;
+  document.body.appendChild(pop); const r = btn.getBoundingClientRect(); pop.style.left = Math.max(8, Math.min(window.innerWidth - pop.offsetWidth - 8, r.left)) + 'px'; pop.style.top = Math.max(8, Math.min(window.innerHeight - pop.offsetHeight - 8, r.bottom + 4)) + 'px';
+  const look = async (inp, out) => { const v = inp.value.trim().toUpperCase(); inp.value = v; if (v.length !== 3) { out.textContent = ''; return; }
+    const k = AIRPORTS.find((a) => a.code === v); if (k) { out.textContent = k.name; return; }
+    try { const a = await api('api/airports?code=' + encodeURIComponent(v)); out.textContent = a.name || 'Unbekannter Code'; } catch (e) { out.textContent = ''; } };
+  $('apF').oninput = () => look($('apF'), $('apFn')); $('apT').oninput = () => look($('apT'), $('apTn')); look($('apF'), $('apFn')); look($('apT'), $('apTn'));
+  const done = async (f, to) => { try { Object.assign(t, await post('api/trips/' + t.id, {ap_from: f, ap_to: to}, 'PATCH')); pop.remove(); toast('Flughäfen gespeichert – die Karte rechnet neu'); gridBody(); } catch (e) { toast(e.message, 5000); } };
+  $('apOk').onclick = () => done($('apF').value.trim().toUpperCase(), $('apT').value.trim().toUpperCase());
+  $('apClr').onclick = () => done('', '');
+  pop.addEventListener('keydown', (e) => { if (e.key === 'Escape') pop.remove(); });
+  const outside = (e) => { if (!pop.contains(e.target) && e.target !== btn) { pop.remove(); document.removeEventListener('mousedown', outside, true); } };
+  setTimeout(() => document.addEventListener('mousedown', outside, true), 0); $('apF').focus();
+}
 /* paste rows straight from Excel / Google Sheets */
 function tsvRows(text) { return text.replace(/\r/g, '').split('\n').filter((l) => l.trim()).map((l) => l.split('\t')); }
 async function pasteRows(rows) {

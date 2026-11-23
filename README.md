@@ -16,7 +16,7 @@ fast, good-looking map with five views. Everything runs inside the add-on; no cl
 | | |
 |---|---|
 | 🗺️ **Five map views** | **Trips** (who went where and how, destinations, flight arcs, areas that melt together, estimated routes with ferries for trips without GPS), **Tracks** (every route, coloured by transport, year or person), **Places & days** (where you spent time, a calendar of every day), **Regions** (states, provinces and cantons worldwide) and **Travel film** (the camera flies from trip to trip, each route draws itself with its plane, train, car or ferry, title cards, year chapters and counters – can be saved as a video). |
-| 🛤️ **Real rail and road lines** | Gaps between GPS points are map-matched onto the real rail and road network from OpenStreetMap. The network is built from map tiles that are downloaded once by tile number and kept in the add-on – no positions are ever sent, afterwards it works offline. Gaps without a plausible path are joined by a fine dotted line (adjustable: dotted, straight, open). Flights start and end at the real airport (OurAirports, offline). |
+| 🛤️ **Real rail and road lines** | Gaps between GPS points are map-matched onto the real rail and road network from OpenStreetMap. The network is built from map tiles that are downloaded once by tile number and kept in the add-on – no positions are ever sent, afterwards it works offline. Trips without GPS and long gaps follow the main roads, railways and ferries of an offline world network (only planes fly straight); short gaps without a plausible path are joined by a fine dotted line (adjustable: dotted, straight, open). Flights start and end at the real airport (OurAirports, offline). |
 | ❓ **Smart questions – no AI needed** | Similar trips (same area, same kind of day, same suggestion) are asked **once** – one answer for all. Answers can be remembered as **rules**, so the same question never comes again. Answers: every person and group, "no trip (everyday life)", "merge with the trip before", "ask one by one". |
 | 👥 **People & groups** | Single persons and groups (couple, family …) with colours. A bar on top of every map shows everyone, one person or one group. Home and work with radius; the workplace is hidden on the map unless you switch it on. |
 | 📋 **Excel-style trip list** | In the settings: filter per column, sort, edit cells in place, delete rows, paste rows straight from Excel or Google Sheets (Ctrl+V). Duplicates are detected. |
@@ -104,7 +104,7 @@ Ideas and the roadmap live in [NEXT.md](NEXT.md).
 ## Credits
 
 Map and place data: [Natural Earth](https://www.naturalearthdata.com/) (public domain, including the regions and city names in other languages),
-airports: [OurAirports](https://ourairports.com/data/) (public domain),
+airports: [OurAirports](https://ourairports.com/data/) (public domain), main roads, ferries and railways: Natural Earth (public domain),
 place names: [GeoNames](https://www.geonames.org/) (CC BY 4.0). Rail and road network: © [OpenStreetMap](https://www.openstreetmap.org/copyright)
 contributors via [OpenFreeMap](https://openfreemap.org/).
 

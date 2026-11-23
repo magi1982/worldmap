@@ -142,9 +142,44 @@ def search(query: str, limit: int = 10) -> list[dict]:
     if ex:  # "Wien", "Mailand", "Genf": the city itself comes first
         regions.insert(0, {"name": query.strip()[:60], "lat": ex[1], "lon": ex[2], "country": COUNTRY_DE.get(ex[3], ex[3]),
                            "kind": "place"})
-    out = regions + [{"name": n, "lat": la, "lon": lo, "country": COUNTRY_DE.get(cc, cc), "kind": "place"}
-           for _, n, la, lo, cc in sorted(starts)[:limit] + sorted(contains)[:limit]][:limit]
+    # whole countries ("Kenia", "Thailand") and big cities all over the world ("Nairobi", "Bangkok")
+    countries = []
+    for cc, names, la, lo, r in _countries():
+        keys = [_fold(n) for n in names[:3]]
+        if any(k.startswith(q) for k in keys):
+            countries.append({"name": names[0], "lat": la, "lon": lo, "country": names[0], "kind": "country",
+                              "radius_km": r, "cc": cc})
+    world = [{"name": n, "lat": la, "lon": lo, "country": COUNTRY_DE.get(cc) or _country_name(cc), "kind": "place"}
+             for n, la, lo, cc, _sr, pop in sorted(_world(), key=lambda r: -r[5]) if _fold(n).startswith(q)][:limit]
+    local = [{"name": n, "lat": la, "lon": lo, "country": COUNTRY_DE.get(cc, cc), "kind": "place"}
+             for _, n, la, lo, cc in sorted(starts)[:limit] + sorted(contains)[:limit]]
+    seen, out = set(), []
+    for h in countries + regions + world + local:  # exact names first, no doubles
+        k = (_fold(h["name"]), round(h["lat"], 1), round(h["lon"], 1))
+        if k not in seen:
+            seen.add(k)
+            out.append(h)
+    out.sort(key=lambda h: 0 if _fold(h["name"]) == q else 1)
     return out[:limit]
+
+
+COUNTRIES = Path(__file__).with_name("data") / "countries.json.gz"
+
+
+@lru_cache(maxsize=1)
+def _countries() -> list:
+    """[iso, [names], lat, lon, radius km] – Natural Earth countries (public domain)."""
+    try:
+        return json.loads(gzip.decompress(COUNTRIES.read_bytes()))
+    except (OSError, ValueError):
+        return []
+
+
+def _country_name(cc: str) -> str:
+    for c, names, *_ in _countries():
+        if c == cc:
+            return names[0]
+    return cc
 
 
 WORLD = Path(__file__).with_name("data") / "world_cities.json.gz"

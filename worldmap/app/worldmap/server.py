@@ -21,7 +21,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from . import asking, places
+from . import airports, asking, places
 from .atlas import Atlas
 from .db import CONFIDENCE
 from .engine import Engine
@@ -98,6 +98,12 @@ def validate_trip(data: dict, partial: bool) -> dict:
             if len(v) > limit:
                 raise ValueError(f"{k} is too long (max {limit})")
             out[k] = v
+    for k in ("ap_from", "ap_to"):
+        if k in data:
+            code = str(data[k] or "").strip().upper()
+            if code and not (len(code) == 3 and code.isalpha() and airports.by_iata(code)):
+                raise ValueError(f"unknown airport code: {code[:8]}")
+            out[k] = code
     if "confidence" in data:
         if data["confidence"] not in CONFIDENCE:
             raise ValueError("invalid confidence")
@@ -447,6 +453,17 @@ def make_handler(app: App):
                 return self._send(HTTPStatus.OK, app.style.get())
             if path == "/api/notify_services":
                 return self._send(HTTPStatus.OK, notify_services(eng.ha))
+            if path == "/api/airports":  # airports of your own flights first, any IATA code on request
+                code = q.get("code", [""])[0].strip().upper()[:3]
+                if code:
+                    ap = airports.by_iata(code)
+                    return self._send(HTTPStatus.OK, {"code": ap[0], "name": ap[1]} if ap else {})
+                try:
+                    used = json.loads(gzip.decompress(app.atlas.get("core"))).get("airports", {})
+                except (ValueError, OSError):
+                    used = {}
+                return self._send(HTTPStatus.OK, sorted(({"code": c, "name": v[2]} for c, v in used.items()),
+                                                        key=lambda x: x["code"]))
             if path == "/api/places":
                 return self._send(HTTPStatus.OK, places.search(q.get("q", [""])[0]))
             if path == "/api/connectors":

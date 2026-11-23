@@ -89,6 +89,13 @@ def test_trip_crud_and_validation(server):
     for b in bad:
         assert call(url + "/api/trips", "POST", b)[0] == 400, b
     assert call(url + f"/api/trips/{t['id']}", "PATCH", {"end_date": "2000-01-01"})[0] == 400
+    # airports of a trip: any known IATA code, nothing else
+    st, raw, _ = call(url + f"/api/trips/{t['id']}", "PATCH", {"ap_from": "zrh", "ap_to": " BIA"})
+    assert st == 200 and (js(raw)["ap_from"], js(raw)["ap_to"]) == ("ZRH", "BIA")
+    for code in ("XQZ", "ZR", "<a>"):
+        assert call(url + f"/api/trips/{t['id']}", "PATCH", {"ap_to": code})[0] == 400, code
+    assert js(call(url + "/api/airports?code=nbo")[1])["code"] == "NBO"
+    assert js(call(url + "/api/places?q=Kenia")[1])[0]["kind"] == "country"   # countries can be picked by hand
     assert call(url + "/api/trips", "POST", b"{}", ctype="text/plain")[0] == 400  # CSRF guard
     assert call(url + "/api/trips/9999", "PATCH", {"note": "x"})[0] == 404
     assert call(url + f"/api/trips/{t['id']}", "DELETE")[0] == 200

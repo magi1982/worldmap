@@ -101,11 +101,14 @@ MIGRATIONS = (
     ("trips", "approx", "INTEGER NOT NULL DEFAULT 0"),
     ("trips", "status", "TEXT NOT NULL DEFAULT 'trip'"),
     ("questions", "trip_ids", "TEXT"),
+    ("trips", "ap_from", "TEXT"),   # IATA code set by hand: airport the flights start from (home side)
+    ("trips", "ap_to", "TEXT"),     # … and the airport at the destination
 )
 
 TRIP_FIELDS = (
     "start_date", "end_date", "destination", "country", "who", "confidence", "nights",
     "max_km", "lat", "lon", "transport", "reason", "note", "source", "locked", "radius_km", "approx", "status",
+    "ap_from", "ap_to",
 )
 CONFIDENCE = ("tief", "mittel", "hoch", "bestätigt")
 

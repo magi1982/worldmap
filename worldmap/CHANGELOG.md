@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.8.0 – 2026-11-23
+
+### Added
+- **Airports per trip**: in the trip list a new column "Airports" sets the departure and arrival airport of a trip's
+  flights (outbound and return). The airports of your own flights are offered, any international IATA code works.
+- **Trips without GPS follow real roads and railways**: an offline network of the world's main roads, ferries and
+  railways (Natural Earth, public domain, ~2 MB) ships with the add-on. By car the way follows the motorways, by train
+  the railways, ferries and the Channel Tunnel where needed. Straight lines are left for planes only.
+- Long GPS gaps (no signal for a while) are drawn along the main roads / railways too instead of a dotted straight line.
+- Adding a trip by hand: whole countries ("Kenia", "Thailand") and big cities all over the world ("Nairobi") can be
+  picked as destination.
+
+### Fixed
+- A trip corrected by hand to "car" or "train" no longer shows a flight from fast GPS points (e.g. to Pula), and a
+  trip entered by hand wins over a detected one on the same days.
+- Country-sized estimated areas (e.g. "France & Spain") are no longer drawn as a huge circle.
+
 ## 0.7.1 – 2026-11-23
 
 ### Fixed
