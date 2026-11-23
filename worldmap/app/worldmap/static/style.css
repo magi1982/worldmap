@@ -220,3 +220,8 @@ body.embed-new{background:transparent}
 .lrow input,.lrow select{width:100%;min-width:0}
 .rng b.wide-b{min-width:74px}
 #cTrip .rng{grid-template-columns:130px 1fr 70px}
+.pal{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px;margin-top:8px}
+.pal button{border:1.5px solid var(--line);background:var(--card);border-radius:12px;padding:8px 10px;cursor:pointer;display:flex;flex-direction:column;gap:6px;align-items:flex-start;font-size:13px;font-weight:600;color:var(--ink)}
+.pal button span{display:flex;gap:3px}.pal button i{width:16px;height:16px;border-radius:50%;display:block}
+.pal button.on{border-color:var(--neon3);box-shadow:0 0 0 2px rgba(139,61,255,.18)}
+.mode-row .seg2 button{padding:6px 7px}

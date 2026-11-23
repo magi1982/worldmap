@@ -27,6 +27,22 @@ def warm(engine: Engine) -> None:
         log.debug("map data ready in %.1f s", time.time() - t0)
 
 
+def route_worker(engine: Engine, stop: threading.Event) -> None:
+    """Lay all open gaps onto the rail/road network in small batches; the map is refreshed after each batch."""
+    while not stop.is_set():
+        engine.routes_wanted.wait(3600)
+        engine.routes_wanted.clear()
+        try:
+            while not stop.is_set():
+                n = engine.fill_routes(budget_s=180)
+                if n:
+                    warm(engine)
+                if not n or not engine.route_progress.get("todo"):
+                    break
+        except Exception:  # noqa: BLE001 - keep the add-on alive
+            log.exception("routing failed")
+
+
 def scheduler(engine: Engine, stop: threading.Event) -> None:
     s = engine.s
     try:
@@ -34,8 +50,7 @@ def scheduler(engine: Engine, stop: threading.Event) -> None:
             log.info("history backfill: %d new points", engine.backfill_history())
         log.info("rebuild: %s", engine.rebuild())
         warm(engine)
-        if engine.fill_routes():  # lay new gaps onto the rail/road network, then refresh the map
-            warm(engine)
+        engine.routes_wanted.set()  # lay new gaps onto the rail/road network in the background
     except Exception:  # noqa: BLE001 - keep the add-on alive
         log.exception("startup sync failed")
     last_rebuild = time.time()
@@ -46,7 +61,7 @@ def scheduler(engine: Engine, stop: threading.Event) -> None:
                 engine.poll_once()
             if time.time() - last_rebuild > 3600:
                 engine.rebuild()
-                engine.fill_routes()
+                engine.routes_wanted.set()
                 last_rebuild = time.time()
             warm(engine)
             engine.notify_open()
@@ -68,6 +83,7 @@ def main() -> None:
         engine.ingress_url = sup.ingress_path()
     stop = threading.Event()
     threading.Thread(target=scheduler, args=(engine, stop), daemon=True, name="scheduler").start()
+    threading.Thread(target=route_worker, args=(engine, stop), daemon=True, name="routes").start()
     httpd = serve(engine, port=int(os.environ.get("WORLDMAP_PORT", "8099")))
     try:  # local live source for phones; reachable only if port 8098 is enabled in the add-on network settings
         ot = serve_owntracks(engine, port=int(os.environ.get("WORLDMAP_OWNTRACKS_PORT", "8098")))

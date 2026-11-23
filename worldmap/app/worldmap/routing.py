@@ -47,7 +47,7 @@ def great_circle(a: tuple, b: tuple, n: int = 32) -> list[list[float]]:
     return out
 
 
-def fill_gaps(db, matcher=None, limit: int = 200_000, budget_s: float | None = None) -> int:
+def fill_gaps(db, matcher=None, limit: int = 200_000, budget_s: float | None = None, progress: dict | None = None) -> int:
     """Create missing segments: flight arcs and rail/road paths on the network (``matcher``).
 
     Everything is computed locally. Gaps without a plausible path are stored as mode ``none``
@@ -70,6 +70,9 @@ def fill_gaps(db, matcher=None, limit: int = 200_000, budget_s: float | None = N
     if matcher is not None:  # neighbouring gaps share cached region graphs
         gaps.sort(key=lambda g: (g[0], matcher.region_bbox((g[1]["lat"], g[1]["lon"]), (g[2]["lat"], g[2]["lon"]))))
     new = 0
+    if progress is not None:
+        progress["todo"] = len(gaps)
+        progress["done_total"] = len(done)
     for mode, a, b, d in gaps:
         if new >= limit or (t_end and time.monotonic() > t_end):
             break

@@ -36,3 +36,12 @@ def test_versions_save_and_restore(tmp_path):
 def test_corrupt_file_falls_back(tmp_path):
     (tmp_path / "style.json").write_text("{not json")
     assert S.StyleStore(str(tmp_path)).get()["style"] == S.DEFAULT
+
+
+def test_new_style_options():
+    s = S.validate({"map": {"palette": "pastel", "basemap": "paper"}, "modes": {"road": {"dash": "dashdot"}},
+                    "anim": {"on": False, "speed": 99, "size": "x"}, "timelapse": {"cinema": False, "glow": "no"}})
+    assert s["map"]["palette"] == "pastel" and s["map"]["basemap"] == "paper" and s["modes"]["road"]["dash"] == "dashdot"
+    assert s["anim"]["on"] is False and s["anim"]["speed"] == 4.0 and s["anim"]["size"] == 1.0
+    assert s["timelapse"] == {"cinema": False, "skip_everyday": True, "glow": True}
+    assert S.validate({"map": {"palette": "<x>"}})["map"]["palette"] == "neon"

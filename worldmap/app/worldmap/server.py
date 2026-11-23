@@ -409,7 +409,8 @@ def make_handler(app: App):
             if path == "/api/questions":
                 return self._send(HTTPStatus.OK, eng.db.open_questions())
             if path == "/api/stats":
-                return self._send(HTTPStatus.OK, eng.stats())
+                return self._send(HTTPStatus.OK, {**eng.stats(), "routes": eng.route_progress,
+                                                  "routing": eng.s.routing})
             if path == "/api/config":
                 return self._send(HTTPStatus.OK, {
                     "persons": eng.s.labels, "who_options": eng.s.who_options, "colors": eng.s.colors(),
@@ -532,7 +533,7 @@ def make_handler(app: App):
                 if m:
                     self._json()
                     what = m.group(1)
-                    fn = {"ha": eng.backfill_history, "routes": eng.fill_routes, "rebuild": eng.rebuild}[what]
+                    fn = {"ha": eng.backfill_history, "routes": lambda: eng.routes_wanted.set() or "started", "rebuild": eng.rebuild}[what]
                     started = app.run_bg(what, fn)
                     return self._send(HTTPStatus.ACCEPTED if started else HTTPStatus.CONFLICT,
                                       {"started": started, "state": app.sync_state})
@@ -632,6 +633,7 @@ def make_handler(app: App):
             if dry:
                 return self._send(HTTPStatus.OK, summary)
             summary["new_points"] = eng.import_points(res.points) if res.points else 0
+            eng.routes_wanted.set()
             if res.trips:
                 summary.update(upsert_trips(eng.db, res.trips))
             with eng.db.tx() as c:
@@ -678,6 +680,7 @@ def make_handler(app: App):
             if dry:
                 return self._send(HTTPStatus.OK, summary)
             new = eng.import_points(res.points)
+            eng.routes_wanted.set()
             with eng.db.tx() as c:
                 c.execute("INSERT INTO imports (filename, format, points) VALUES (?, ?, ?)", (filename, res.format, new))
             summary["new_points"] = new

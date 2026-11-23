@@ -42,9 +42,16 @@ Ideen werden zuerst hier gesammelt. Code entsteht erst nach einem ausdrückliche
 
 - Map style editor with live preview and versions, transport picker in the trip list, clearer question settings.
 
+## Done in 0.6.0 (not released yet)
+
+- Animated map (planes, trains, cars), cinema time-lapse with trip cards, colour palettes, base map colours, more line types,
+  sticky header on phones, smooth level-of-detail fades, continuous rail/road matching with progress.
+
 ## Next update – waiting for "mach es" / Nächstes Update – wartet auf „mach es“
 
 - [ ] Export/import of a map style as a small JSON file (share a style).
+- [ ] Time-lapse as a video file (WebM) to share.
+- [ ] Reload new rail/road lines on the open map without reopening it.
 - [ ] Every fix gets a new version number (so Home Assistant always offers it as an update).
 
 ## Next

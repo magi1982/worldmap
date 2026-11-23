@@ -28,6 +28,7 @@ class Engine:
         self.home: tuple[float, float] | None = None
         self.ingress_url = "/hassio/ingress/worldmap"
         self.matcher = None
+        self.routes_wanted = threading.Event()
         self.tile_dir = "/data/tiles"
         if settings.home_lat is not None and settings.home_lon is not None:
             self.home = (float(settings.home_lat), float(settings.home_lon))
@@ -283,6 +284,8 @@ class Engine:
         self.db.set_meta("last_notify", str(time.time()))
         return len(qs)
 
+    route_progress: dict = {}
+
     def fill_routes(self, budget_s: float = 1200) -> int:
         """Lay gaps onto the real network (tiles) and/or OSRM, within a time budget."""
         if self.s.routing == "off":
@@ -291,7 +294,14 @@ class Engine:
             from .netmatch import Matcher, OpenFreeMapTiles
 
             self.matcher = Matcher(OpenFreeMapTiles(self.tile_dir))
-        n = routing.fill_gaps(self.db, self.matcher, budget_s=budget_s)
+        prog: dict = {}
+        self.route_progress = {**self.route_progress, "running": True}
+        n = 0
+        try:
+            n = routing.fill_gaps(self.db, self.matcher, budget_s=budget_s, progress=prog)
+        finally:
+            self.route_progress = {"running": False, "todo": max(0, prog.get("todo", 0) - n),
+                                   "segments": prog.get("done_total", 0) + n, "ts": int(time.time())}
         log.info("routing: %d new segments %s", n, dict(self.matcher.stats))
         if n:
             self.touch()

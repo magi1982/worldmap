@@ -19,7 +19,9 @@ import time
 from pathlib import Path
 
 MODES = ("road", "rail", "fly", "ferry", "foot")
-DASHES = ("solid", "dashed", "dotted")
+DASHES = ("solid", "dashed", "dotted", "longdash", "dashdot", "sparse")
+PALETTES = ("neon", "classic", "pastel", "earth", "contrast", "mono")
+BASEMAPS = ("standard", "paper", "mono")
 COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 MAX_VERSIONS = 20
 
@@ -32,7 +34,9 @@ DEFAULT: dict = {
         "foot": {"color": "#FF8A00", "dash": "solid", "width": 1.0},
     },
     "areas": {"show": True, "opacity": 1.0, "size": 1.0, "outline": True},
-    "map": {"rivers": True, "provinces": True, "labels": "normal", "theme": "auto"},
+    "map": {"rivers": True, "provinces": True, "labels": "normal", "theme": "auto", "palette": "neon", "basemap": "standard"},
+    "anim": {"on": True, "planes": True, "vehicles": True, "hide_line": True, "speed": 1.0, "size": 1.0},
+    "timelapse": {"cinema": True, "skip_everyday": True, "glow": True},
 }
 
 
@@ -77,6 +81,20 @@ def validate(raw) -> dict:
         b["labels"] = mp["labels"]
     if mp.get("theme") in ("auto", "light", "dark"):
         b["theme"] = mp["theme"]
+    if mp.get("palette") in PALETTES:
+        b["palette"] = mp["palette"]
+    if mp.get("basemap") in BASEMAPS:
+        b["basemap"] = mp["basemap"]
+    an = raw.get("anim") if isinstance(raw.get("anim"), dict) else {}
+    c = out["anim"]
+    for k in ("on", "planes", "vehicles", "hide_line"):
+        c[k] = _bool(an.get(k), c[k])
+    c["speed"] = _clamp(an.get("speed", c["speed"]), 0.25, 4.0, c["speed"])
+    c["size"] = _clamp(an.get("size", c["size"]), 0.5, 2.0, c["size"])
+    tl = raw.get("timelapse") if isinstance(raw.get("timelapse"), dict) else {}
+    d = out["timelapse"]
+    for k in ("cinema", "skip_everyday", "glow"):
+        d[k] = _bool(tl.get(k), d[k])
     return out
 
 

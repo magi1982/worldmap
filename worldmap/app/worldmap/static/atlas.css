@@ -169,3 +169,37 @@ input[type=range]{width:100%;accent-color:var(--acc);min-height:30px}
 [data-theme=dark] .tabs{background:var(--soft)}
 [data-theme=dark] .chip{background:var(--paper)}
 #ztheme{font-size:17px}
+#cva{position:absolute;inset:0;pointer-events:none;z-index:1}
+#cva[hidden]{display:none}
+.aswitch{display:inline-flex;align-items:center;gap:7px;cursor:pointer;font-size:11px;font-weight:800;letter-spacing:.08em;color:var(--mute);user-select:none}
+.aswitch input{position:absolute;opacity:0;width:1px;height:1px}
+.aswitch span{width:32px;height:19px;border-radius:10px;background:var(--line);position:relative;transition:background .15s;flex:none}
+.aswitch span::after{content:"";position:absolute;left:2px;top:2px;width:15px;height:15px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.25);transition:transform .15s}
+.aswitch input:checked+span{background:var(--acc)}
+.aswitch input:checked+span::after{transform:translateX(13px)}
+.aswitch input:focus-visible+span{outline:2px solid var(--acc);outline-offset:2px}
+.wb-t{align-items:center}
+.wb-t .r{display:flex;gap:14px;align-items:center}
+/* phone: header (map choice) stays on top while scrolling, map sticks right below it */
+@media (max-width:900px){
+ .top{position:sticky;top:0;z-index:7;padding:8px 10px;gap:6px 10px}
+ .brand{order:0}.acts{order:1}.tabs{order:2}
+ .brand img{width:24px;height:24px}
+ .acts .ico{width:38px;height:38px;border-radius:12px}
+ .tabs{padding:3px;border-radius:12px}
+ .tabs button{min-height:34px;padding:6px 8px}
+ .mapwrap{top:var(--th,0px);height:calc(56dvh - var(--th,0px) / 3)}
+}
+/* time-lapse: trip title card */
+.ztitle{position:absolute;left:18px;bottom:22px;z-index:3;pointer-events:none;background:rgba(13,14,28,.82);color:#fff;border-radius:16px;padding:12px 16px 13px;max-width:min(380px,70%);opacity:0;transform:translateY(8px);backdrop-filter:blur(6px)}
+.ztitle.show{animation:ztin 3.2s ease forwards}
+@keyframes ztin{0%{opacity:0;transform:translateY(8px)}10%{opacity:1;transform:none}80%{opacity:1;transform:none}100%{opacity:0;transform:translateY(-4px)}}
+@media (prefers-reduced-motion:reduce){.ztitle.show{animation:none;opacity:1;transform:none}}
+.zt-w{font-size:11px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;opacity:.85;display:flex;gap:7px;align-items:center}
+.zt-w i{width:10px;height:10px;border-radius:50%;display:inline-block}
+.zt-n{font-size:24px;font-weight:900;letter-spacing:-.01em;margin-top:3px;line-height:1.1}
+.zt-d{font-size:13px;opacity:.8;margin-top:4px}
+@media (max-width:900px){.ztitle{left:10px;bottom:46px}.zt-n{font-size:19px}}
+.rbar{height:8px;border-radius:5px;background:var(--soft);overflow:hidden;margin:4px 0 8px}
+.rbar i{display:block;height:100%;background:linear-gradient(90deg,#12A84F,#0A7CFF);border-radius:5px;transition:width .4s}
+.card.route p{margin:0;font-size:12.5px;color:var(--mute);line-height:1.45}

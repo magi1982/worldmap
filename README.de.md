@@ -25,7 +25,8 @@ auf einer schnellen, schönen Karte mit fünf Ansichten. Alles läuft im Add-on,
 | 📡 **Live ohne Cloud** | Positionen aus `person.*`- / `device_tracker.*`-Entitäten und ein eingebauter **OwnTracks**-Empfang: das Handy sammelt unterwegs und schickt alles, sobald es wieder im Heimnetz ist – ohne Nabu Casa, ohne offenen Port ins Internet. |
 | ✍️ **Reisen von Hand** | Der „+“-Knopf fragt kurz nach (wohin, wann, wie lange, wer, womit, wie gross war die Gegend) – für alte Reisen ohne Daten. |
 | 🔔 **Benachrichtigungen** | Eines deiner Handys wählen (wird automatisch gefunden) oder Hinweis in Home Assistant, wie oft (sofort, täglich, wöchentlich), Test senden. |
-| 🎨 **Kartenstil mit Versionen** | Farbe, Linientyp und Dicke pro Verkehrsmittel, Flächen und Grundkarte – mit Live-Vorschau. Jedes Speichern ist eine Version, zu der du zurück kannst. |
+| ✨ **Animierte Karte** | Kleine Flugzeuge in der Farbe der Reise fliegen die Flugbögen ab, Züge und Autos fahren Reisen ins Ausland nach. Ein Schalter auf jeder Karte, flüssige 60 fps. |
+| 🎨 **Kartenstil mit Versionen** | Farbpaletten (Neon, Klassisch, Pastell …), sechs Linientypen, Dicke pro Verkehrsmittel, Flächen, Grundkarte, Animation und Zeitraffer – mit Live-Vorschau. Jedes Speichern ist eine Version, zu der du zurück kannst. |
 | 🌙 **Hell & dunkel** | Folgt dem System oder dem ☾/☀-Knopf auf der Karte; Seen, Grenzen und Küsten bleiben auch im Dunkeln sichtbar. |
 | 📊 **Sensoren** | `sensor.worldmap_km_this_year`, `sensor.worldmap_trips`, `sensor.worldmap_countries`, `sensor.worldmap_open_questions`, `sensor.worldmap_last_trip`. |
 

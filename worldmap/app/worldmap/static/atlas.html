@@ -24,6 +24,7 @@
 <div class="app">
  <div class="mapwrap" id="wrap">
   <canvas id="cv"></canvas>
+  <canvas id="cva" hidden aria-hidden="true"></canvas>
   <div class="ctrl">
    <button id="zin" aria-label="Hineinzoomen">+</button><button id="zout" aria-label="Herauszoomen">−</button>
    <button class="txt" id="zhome" aria-label="Zur Heimat">⌂</button><button class="txt" id="zch">CH</button><button class="txt" id="zeu">EU</button><button class="txt" id="ztheme" aria-label="Hell / dunkel" title="Hell / dunkel">◐</button>
@@ -31,6 +32,7 @@
   <div class="legend" id="legend"></div>
   <div class="scale" id="scale"><span></span><i></i></div>
   <div class="hud" id="hud"><b id="hudd"></b><span id="huds"></span></div>
+  <div class="ztitle" id="ztitle" aria-live="polite"></div>
   <div class="detail" id="detail"></div>
   <div class="tip" id="tip"></div>
   <div class="load" id="load">Karte wird geladen …</div>
@@ -68,6 +70,7 @@
    </div>
    <div class="sec">Zahlen</div>
    <div class="card"><div class="stats" id="s-stats"></div><div id="s-split" style="margin-top:14px"></div></div>
+   <div class="card route" id="s-route" hidden></div>
    <div class="card"><div class="ct">KILOMETER PRO JAHR <small>Jahr antippen · nochmals = alle</small></div><div class="years" id="s-years"></div></div>
    <details class="note"><summary>So liest du die Karte</summary><span id="s-note"></span></details>
   </section>
@@ -109,6 +112,7 @@
     <div class="zline"><canvas id="z-line" aria-label="Zeitleiste: Kilometer pro Woche und Reisen"></canvas></div>
     <div class="ct" style="margin-top:12px">TEMPO <div class="seg" id="z-speed"><button data-v="1">1 Tag/s</button><button data-v="7" class="on">1 Woche/s</button><button data-v="30">1 Monat/s</button><button data-v="120">4 Monate/s</button></div></div>
     <div class="ct" style="margin-top:10px">KAMERA <div class="seg" id="z-cam"><button data-v="follow" class="on">folgt mir</button><button data-v="fixed">fest</button></div></div>
+    <div class="ct" style="margin-top:10px">LOOK <div class="seg" id="z-look"><button data-v="cine" class="on">Kino</button><button data-v="map">Karte</button></div></div>
     <div class="ct" style="margin-top:10px">SPUR <div class="seg" id="z-trail"><button data-v="all" class="on">alles behalten</button><button data-v="month">nur 30 Tage</button></div></div>
    </div>
    <div class="sec">Zahlen</div>

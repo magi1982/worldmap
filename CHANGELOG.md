@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.6.0 – 2026-11-23
+
+### Added
+- **Animated map**: small planes in the colour of the trip fly back and forth on the flight arcs (the line under the plane
+  fades out), trains and cars travel along trips abroad. Switch "Animation" on top of every map; runs on its own layer at
+  60 fps and pauses when the page is hidden. Off for "reduce motion".
+- **Time-lapse rebuilt**: cinema look (dark map, glowing trails, only big place names), a title card for every trip
+  (who, where, when, how), the current car or train is drawn instead of a dot, calm camera at home, everyday life plays
+  up to 6× faster. Quick switch Cinema / Map in the panel.
+- Map style: colour palettes for persons and groups (neon, classic, pastel, earth tones, contrast, tone in tone),
+  base map colours (standard, paper, grey), three more line types (long dash, dash-dot, sparse dots), settings for the
+  animation (planes, vehicles, hide line, speed, size) and the time-lapse.
+- Rail/road network: computed continuously in the background after an import, with progress shown in the Tracks map.
+
+### Changed
+- Phone: the header with the map choice stays on top while scrolling, the map sits right below it.
+- New levels of detail fade in smoothly when zooming instead of popping.
+- Place names without district suffixes ("Zürich" instead of "Zürich (Kreis 11) / …").
+
 ## 0.5.3 – 2026-11-23
 
 ### Fixed
