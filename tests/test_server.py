@@ -1,5 +1,6 @@
 import gzip
 import json
+import re
 import threading
 import urllib.error
 import urllib.request
@@ -42,6 +43,12 @@ def test_static_and_headers(server):
     url, _ = server
     st, raw, h = call(url + "/")
     assert st == 200 and b"atlas.js" in raw  # the maps are the start page
+    # after an update the browser must load the new files at once (no Ctrl+F5)
+    v = re.search(rb"atlas\.js\?v=([0-9a-f]{10})", raw).group(1).decode()
+    assert h["Cache-Control"] == "no-store" and b"__WMV__" not in raw
+    st, js_raw, h2 = call(url + "/atlas.js?v=" + v)
+    assert "immutable" in h2["Cache-Control"] and b"base.json?v=" + v.encode() in js_raw
+    assert call(url + "/atlas.js?v=old")[2]["Cache-Control"] == "no-cache"
     st, raw, h = call(url + "/app.html")
     assert st == 200 and b"Worldmap" in raw
     assert "default-src 'self'" in h["Content-Security-Policy"]

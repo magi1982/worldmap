@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.3 – 2026-11-23
+
+### Fixed
+- After an update the browser loads the new version at once (no Ctrl+F5 needed): pages are never cached, scripts and
+  data files carry a version fingerprint.
+
 ## 0.6.2 – 2026-11-23
 
 ### Fixed

@@ -6,7 +6,9 @@ authenticated the user. Everything else is refused.
 from __future__ import annotations
 
 import csv
+import functools
 import gzip
+import hashlib
 import io
 import json
 import logging
@@ -52,6 +54,18 @@ SECURITY_HEADERS = {
     "Cache-Control": "no-store",
 }
 _STATIC_CACHE: dict = {}
+
+
+@functools.lru_cache(maxsize=1)
+def asset_version() -> str:
+    """Short fingerprint of all static files: changes with every add-on update, so browsers never keep old files."""
+    h = hashlib.sha256()
+    for name in sorted({n for n, _ in STATIC_FILES.values()}):
+        try:
+            h.update((STATIC / name).read_bytes())
+        except OSError:
+            pass
+    return h.hexdigest()[:10]
 FILENAME_RE = re.compile(r"[^\w.\-]+")
 MAX_JSON = 256 * 1024
 CONNECTOR_KEYS = ("persons", "groups", "owntracks", "notify_service", "notify_mode", "who_options", "school_holidays",
@@ -346,10 +360,10 @@ def make_handler(app: App):
             if self.command != "HEAD":
                 self.wfile.write(raw)
 
-        def _static(self, path: str):
+        def _static(self, path: str, versioned: bool = False):
             name, ctype = STATIC_FILES[path]
             if name not in _STATIC_CACHE:
-                raw = (STATIC / name).read_bytes()
+                raw = (STATIC / name).read_bytes().replace(b"__WMV__", asset_version().encode())
                 _STATIC_CACHE[name] = (raw, gzip.compress(raw, 9))
             raw, gz = _STATIC_CACHE[name]
             use_gz = "gzip" in (self.headers.get("Accept-Encoding") or "")
@@ -360,8 +374,9 @@ def make_handler(app: App):
             for k, v in SECURITY_HEADERS.items():
                 if k != "Cache-Control":
                     self.send_header(k, v)
-            # data file changes only with a new add-on version; HTML must revalidate
-            self.send_header("Cache-Control", "max-age=86400" if name in ("base.json", "regions.json") else "no-cache")
+            # files asked for with ?v=<fingerprint> never change; pages are always fetched fresh, so an update shows at once
+            self.send_header("Cache-Control", "public, max-age=31536000, immutable" if versioned
+                             else "no-store" if name.endswith(".html") else "no-cache")
             if use_gz:
                 self.send_header("Content-Encoding", "gzip")
             self.send_header("Vary", "Accept-Encoding")
@@ -409,7 +424,7 @@ def make_handler(app: App):
                 return
             path, q = self._route()
             if path in STATIC_FILES:
-                return self._static(path)
+                return self._static(path, versioned=q.get("v") == [asset_version()])
             if path == "/api/trips":
                 return self._send(HTTPStatus.OK, eng.db.trips(include_ignored=q.get("all", ["0"])[0] == "1"))
             if path == "/api/questions":
