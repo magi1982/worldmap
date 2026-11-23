@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.10.1 – 2026-11-23
+
+### Changed
+- Brings together 0.7.2 (made in parallel) and 0.8.0–0.10.0. Estimated car routes now use both: the offline world
+  road network always, refined with the detailed OpenFreeMap roads when they can be loaded (otherwise the offline
+  route stays). Legs of trips with several stops get the same refinement. Airports set by hand still win; an island
+  without a big airport flies to the big one nearby and goes on by ferry or road.
+
 ## 0.10.0 – 2026-11-23
 
 ### Added
@@ -51,6 +59,29 @@
 - A trip corrected by hand to "car" or "train" no longer shows a flight from fast GPS points (e.g. to Pula), and a
   trip entered by hand wins over a detected one on the same days.
 - Country-sized estimated areas (e.g. "France & Spain") are no longer drawn as a huge circle.
+## 0.7.2 – 2026-11-23
+
+### Added
+- **"Where exactly?" question** for trips where only the country is known ("Greece", "France & Spain"): type a
+  town, island or region (or "don't remember" / "round trip"), and the trip moves to the right place on the map.
+  More holiday regions are known (Costa Dorada, Costa Blanca, Costa del Sol, Santorini, Naxos, Paros, Corfu, Zakynthos,
+  Chalkidiki, Peloponnese).
+
+### Changed
+- **Estimated car routes follow real roads**: trips without GPS by car now go over motorways and main roads
+  (OpenFreeMap tiles at zoom 7 for the long way, the detailed zoom-12 network to and from the motorway) instead of a
+  slightly bent line over a land grid. Routes are computed once and cached (`est-roads.json.gz`); while tiles are not
+  loaded yet the rough estimate is shown and the map is built again later. With routing "off" nothing is downloaded.
+- **Lines never move**: with the animation on, flight lines stay on the map like all other lines; only planes, trains,
+  cars and ferries move. "Hide the line under the vehicle" now puts a small halo under planes too instead of cutting a
+  moving gap into the line.
+
+### Fixed
+- A trip with **only a country** as destination no longer gets a point in the middle of the country (the middle of
+  Greece is the Cyclades, the middle of "France & Spain" somewhere in Spain). The import no longer stores such a point,
+  and points stored by older versions are recognised and dropped.
+- **Islands without a big airport** (La Gomera): the plane now lands at the big airport nearby (Tenerife South) and the
+  way goes on by ferry and road, instead of a flight straight onto the island.
 
 ## 0.7.1 – 2026-11-23
 

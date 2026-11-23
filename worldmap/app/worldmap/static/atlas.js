@@ -275,7 +275,7 @@ function drawR(){
  // flights
  const TP=ST('trips'),AH=TP.arc_height??1,LWm=TP.line_width??1;
  drawEst(RC.gr,2.2/S*LWm);
- if(!(AN.on&&ST('anim').planes))for(const e of RC.pairs){const [A,Bg]=e.k.split('>');const [x1,y1]=gpos(A),[x2,y2]=gpos(Bg);const a=arcPts(x1,y1,x2,y2,(A=='home'?.2:.18)*AH);strokeArc(a,R.color=='w'?WHO.filter(w=>e.ws.has(w)).map(w=>WCOL[w]):[MCOL.fly],2.4*LWm,8,6)}
+ /* lines always stay on the map; the animation only moves the vehicles */for(const e of RC.pairs){const [A,Bg]=e.k.split('>');const [x1,y1]=gpos(A),[x2,y2]=gpos(Bg);const a=arcPts(x1,y1,x2,y2,(A=='home'?.2:.18)*AH);strokeArc(a,R.color=='w'?WHO.filter(w=>e.ws.has(w)).map(w=>WCOL[w]):[MCOL.fly],2.4*LWm,8,6)}
  endWorld();placed.length=0;usedNames.clear();
  for(const t of RC.on){if(!t.st)continue;t.st.forEach(([la,lo,nm],k)=>{const [x,y]=toS(MX(lo),MY(la));if(x<-20||y<-20||x>V.W+20||y>V.H+20)return;const c=WCOL[t.w]||MC.strong;ctx.beginPath();ctx.arc(x,y,3.6,0,7);ctx.fillStyle=MC.ring;ctx.fill();ctx.beginPath();ctx.arc(x,y,2.6,0,7);ctx.fillStyle=c;ctx.fill();if(k>0&&V.S>12000)lbl(nm,x+6,y+4,11,600,MC.text)})}
  homeMark();if(TP.airports!==false)apMarks(RC.pairs.flatMap(e=>e.k.split(">")));const DS=TP.dot_size??1,LS=TP.label_size??1,LM=TP.labels||'normal';
@@ -356,7 +356,7 @@ function contentS(bb){
  drawGaps(g=>SP.modes.has(TCLS[g[1]])&&dayOk(g[0])&&gapSel(g)?colS(keyS({d:g[0],c:g[1]})):null,lw,bb)}
 function drawS(){
  TKEY='S'+SP.ver+'_'+STV;drawTiles(contentS);worldT();const S=V.S;
- ctx.globalAlpha=S>40000?.4:.75;if(!(AN.on&&ST('anim').planes))for(const [a,c] of SP.fl)strokeArc(a,[c],S>40000?1.3:1.8,7,5);
+ ctx.globalAlpha=S>40000?.4:.75;for(const [a,c] of SP.fl)strokeArc(a,[c],S>40000?1.3:1.8,7,5);
  ctx.globalAlpha=1;endWorld();placed.length=0;usedNames.clear();homeMark();if(SP.modes.has('fly')&&ST('tracks').airports!==false)apMarks((SP.flKeys=SP.flKeys||D.flights.flatMap(f=>[f[5]?'ap:'+f[5]:'',f[6]?'ap:'+f[6]:''])).filter(Boolean));drawPlaceLabels();
 }
 function sideS(){
@@ -651,18 +651,13 @@ function animFrame(ts){
  AN.raf=0;if(!AN.on||document.hidden)return;
  const A=ST('anim'),t=ts/1000*(A.speed||1),tp=ts/1000,sz=(A.size||1)*1.25*(V.W<600?.9:1);
  actx.setTransform(V.dpr,0,0,V.dpr,0,0);actx.clearRect(0,0,V.W,V.H);actx.lineCap='round';actx.lineJoin='round';
- const fw=2.4*SM('fly').width,fd=dashArr('fly'),N=56;
  for(const A2 of AN.arcs){const a=A2.a;const P=[toS(a[0],a[1]),toS(a[2],a[3]),toS(a[4],a[5])];
   const x0=Math.min(P[0][0],P[1][0],P[2][0]),x1=Math.max(P[0][0],P[1][0],P[2][0]),y0=Math.min(P[0][1],P[1][1],P[2][1]),y1=Math.max(P[0][1],P[1][1],P[2][1]);
   if(x1<-20||y1<-20||x0>V.W+20||y0>V.H+20)continue;
   const len=Math.hypot(P[2][0]-P[0][0],P[2][1]-P[0][1]);/* every plane flies the same speed: time by km, not by screen size */const per=Math.max(.8,A2.km/(380*(A.plane_speed||1)));const raw=tp/per+A2.ph;const u=pingpong(raw),back=(raw%2)>=1;
   const at=s=>{const v=1-s;return [v*v*P[0][0]+2*v*s*P[1][0]+s*s*P[2][0],v*v*P[0][1]+2*v*s*P[1][1]+s*s*P[2][1]]};
-  const gap=A.hide_line?Math.min(.12,22/Math.max(1,len)):0;
-  actx.setLineDash(fd);actx.lineWidth=fw;actx.globalAlpha=len<60?.55:.9;
-  A2.cols.forEach((c,ci)=>{actx.strokeStyle=c;actx.lineDashOffset=-ci*(fd.length?fd[0]+fd[1]:0);actx.beginPath();let pen=false;for(let k=0;k<=N;k++){const s=k/N;const near=gap&&Math.abs(s-u)<gap;if(near){pen=false;continue}const [px,py]=at(s);pen?actx.lineTo(px,py):actx.moveTo(px,py);pen=true}actx.stroke()});
-  actx.setLineDash([]);actx.globalAlpha=1;
   if(len<40)continue;
-  A2.cols.forEach((c,ci)=>{const uu=Math.max(0,Math.min(1,u-(back?-1:1)*ci*Math.min(.08,14/len)));const [px,py]=at(uu),[qx,qy]=at(Math.min(1,uu+.01)),[rx,ry]=at(Math.max(0,uu-.01));let ang=Math.atan2(qy-ry,qx-rx);if(back)ang+=Math.PI;drawPlane(actx,px,py,ang,c,sz)});
+  A2.cols.forEach((c,ci)=>{const uu=Math.max(0,Math.min(1,u-(back?-1:1)*ci*Math.min(.08,14/len)));const [px,py]=at(uu),[qx,qy]=at(Math.min(1,uu+.01)),[rx,ry]=at(Math.max(0,uu-.01));let ang=Math.atan2(qy-ry,qx-rx);if(back)ang+=Math.PI;if(A.hide_line){actx.globalAlpha=.85;actx.fillStyle=MC.land;actx.beginPath();actx.arc(px,py,9*sz,0,7);actx.fill();actx.globalAlpha=1}drawPlane(actx,px,py,ang,c,sz)});
  }
  for(const v of AN.cars){const b=v.bb;const [sx0,sy0]=toS(b[0],b[1]),[sx1,sy1]=toS(b[2],b[3]);if(sx1<-20||sy1<-20||sx0>V.W+20||sy0>V.H+20)continue;
   const lenpx=v.len*V.S;if(lenpx<40)continue;const lkm=v.len*40075*Math.cos(IY((b[1]+b[3])/2)*Math.PI/180);const per=Math.max(2.5,lkm/(v.m=='ferry'?45:v.m=='rail'?110:90));const raw=t/per+v.ph,u=pingpong(raw),back=(raw%2)>=1;

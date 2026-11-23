@@ -6,6 +6,8 @@
   question is never asked again and future trips there are filled in automatically.
 * Besides the people and groups there are answers for "no trip (everyday life)",
   "merge with the trip before" and "ask me one by one".
+* Trips where only the country is known ("Griechenland", "Frankreich & Spanien") get a *place* question:
+  the answer is a town, island or region, typed in freely; it puts the trip on the map.
 """
 from __future__ import annotations
 
@@ -18,6 +20,8 @@ from .geo import haversine_km
 NO_TRIP = "Keine Reise (Alltag)"
 MERGE = "Mit Reise davor zusammenlegen"
 SPLIT = "Einzeln fragen"
+PLACE_UNKNOWN = "Weiss ich nicht mehr"
+PLACE_ROUND = "Rundreise durchs Land"
 GROUP_KM = 15.0
 RULE_KM = 15.0
 
@@ -51,6 +55,28 @@ def rule_for(rules: list[dict], lat: float | None, lon: float | None, start: str
 
 def who_options(settings) -> list[str]:
     return qn.options(settings.labels, settings.who_options)
+
+
+def place_unclear(t: dict) -> bool:
+    """Only the country (or nothing) is known – no coordinates, or the middle of the country stored by 0.7.1."""
+    from .importers.triplist import geocode
+
+    if t["source"] == "manual" or t["status"] != "trip":
+        return False
+    hit = geocode(t["destination"] or "", t["country"] or "")
+    if t["lat"] is None or t["lon"] is None:
+        return not hit or hit[3] == "country"
+    return bool(hit) and hit[3] == "country" and haversine_km(t["lat"], t["lon"], hit[0], hit[1]) < 3
+
+
+def place_text(t: dict) -> str:
+    n = t["nights"] or 0
+    where = t["destination"] or t["country"] or "ein unbekanntes Ziel"
+    if t["country"] and t["country"] not in where:
+        where += f", {t['country']}"
+    return (f"{qn.fmt_range(t['start_date'], t['end_date'])} · {'Tagesausflug' if n == 0 else f'{n} Nächte' if n != 1 else '1 Nacht'}"
+            f" · {where}. Wo genau wart ihr? Ort, Insel oder Region eintippen – dann kommt die Reise an die richtige Stelle"
+            " auf der Karte.")
 
 
 def build(db, settings) -> int:
@@ -91,6 +117,11 @@ def build(db, settings) -> int:
             db.add_question(first["id"], "who", single_text(first, sug), opts, sug,
                             notified=1 if ("who", str(first["id"])) in notified else 0)
         n += 1
+    for t in trips:  # where exactly? (only the country is known)
+        if not t["locked"] and place_unclear(t):
+            db.add_question(t["id"], "place", place_text(t), [PLACE_ROUND, PLACE_UNKNOWN], None,
+                            notified=1 if ("place", str(t["id"])) in notified else 0)
+            n += 1
     return n
 
 
@@ -132,6 +163,8 @@ def answer(db, qid: int, ans: str, remember: bool = True) -> dict:
         raise LookupError("question not found")
     q = rows[0]
     options = json.loads(q["options"])
+    if q["kind"] == "place":
+        return _answer_place(db, q, ans)
     if ans not in options:
         raise ValueError("answer is not one of the options")
     ids = json.loads(q["trip_ids"]) if q["trip_ids"] else [q["trip_id"]]
@@ -166,4 +199,33 @@ def answer(db, qid: int, ans: str, remember: bool = True) -> dict:
         action = "ignore" if ans == NO_TRIP else "who"
         label = f"{trips[0]['destination'] or 'Ort'} {KIND_TEXT[kind]}".strip()
         out["rule"] = db.add_rule(round(lat, 4), round(lon, 4), RULE_KM, kind, action, "" if action == "ignore" else ans, label)
+    return out
+
+
+def _answer_place(db, q: dict, ans: str) -> dict:
+    """A typed place puts the trip on the map; the two buttons keep it without a point and stop asking."""
+    from .importers.triplist import geocode
+
+    ans = " ".join(str(ans or "").split())[:120]
+    t = db.trip(q["trip_id"])
+    if not t:
+        raise LookupError("trip not found")
+    out = {"trips": 1, "rule": None}
+    if ans in (PLACE_UNKNOWN, PLACE_ROUND):
+        db.upsert_trip({"locked": 1}, t["id"])  # keep it as it is, without a point; do not ask again
+    else:
+        if len(ans) < 2:
+            raise ValueError("Bitte einen Ort eintippen")
+        hit = geocode(ans, t["country"] or "")
+        if not hit or hit[3] != "place":  # the country column may be wrong or empty ("Frankreich & Spanien")
+            hit = geocode(ans, "")
+        if not hit or hit[3] != "place":
+            raise ValueError(f"«{ans}» nicht gefunden – bitte Stadt, Insel oder Region anders schreiben")
+        dest = t["destination"] or ""
+        new = ans if not dest or dest == (t["country"] or "") or geocode(dest, t["country"] or "") else f"{dest} ({ans})"
+        db.upsert_trip({"lat": round(hit[0], 4), "lon": round(hit[1], 4), "radius_km": hit[2], "approx": 1,
+                        "destination": new[:120], "locked": 1}, t["id"])
+        out["place"] = [round(hit[0], 4), round(hit[1], 4)]
+    with db.tx() as c:
+        c.execute("UPDATE questions SET answer = ?, answered_at = strftime('%s','now') WHERE id = ?", (ans, q["id"]))
     return out

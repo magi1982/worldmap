@@ -59,8 +59,12 @@ def _fold(s: str) -> str:
 
 
 def geocode(name: str, country: str = "", home: tuple | None = None,
-            max_km: float | None = None) -> tuple[float, float, float | None] | None:
-    """(lat, lon, radius_km) for a free-text destination like "Mallorca (Porto Cristo)".
+            max_km: float | None = None) -> tuple[float, float, float | None, str] | None:
+    """(lat, lon, radius_km, kind) for a free-text destination like "Mallorca (Porto Cristo)".
+
+    ``kind`` is "place" (a town, region or airport town) or "country" – then only the country is known and the
+    coordinates are just its middle. A country is never a place on the map: the middle of Greece is the Cyclades,
+    the middle of "France & Spain" is somewhere in Spain.
 
     With ``home`` and ``max_km`` (how far the trip went) the place that fits the distance wins:
     Brühl near Cologne instead of Brühl near Mannheim, London in England instead of London in Canada.
@@ -99,22 +103,22 @@ def geocode(name: str, country: str = "", home: tuple | None = None,
             h = (exact or [x for x in hits if x.get("kind") == "region" and _fold(x["name"]) == _fold(part)] or [None])[0]
         else:
             h = (exact or hits or [None])[0]
-        if h:
-            return h["lat"], h["lon"], h.get("radius_km")
+        if h:  # a country found by name is still only a country, not a place on the map
+            return h["lat"], h["lon"], h.get("radius_km"), "country" if h.get("kind") == "country" else "place"
     for part in parts:  # a holiday town with its own airport ("Marsa Alam")
         ap = airports.by_city(part.strip(" )·"))
         if ap:
-            return ap[2], ap[3], None
+            return ap[2], ap[3], None, "place"
     for part in parts:  # a country as destination ("Kenia", "Kroatien")
         pc = COUNTRY_CC.get(part.strip(" )·").lower())
         if pc and pc != cc:
             box = places.country_box(pc)
             if box:
-                return (box[0] + box[2]) / 2, (box[1] + box[3]) / 2, None
+                return (box[0] + box[2]) / 2, (box[1] + box[3]) / 2, None, "country"
     if cc:  # at least the country
         box = places.country_box(cc)
         if box:
-            return (box[0] + box[2]) / 2, (box[1] + box[3]) / 2, None
+            return (box[0] + box[2]) / 2, (box[1] + box[3]) / 2, None, "country"
     return None
 
 
@@ -163,7 +167,7 @@ def parse_rows(rows: list) -> tuple[dict, list[dict], int]:
             t["lat"], t["lon"] = lat, lon
         except (TypeError, ValueError):
             g = geocode(dest, t["country"])
-            if g:
+            if g and g[3] == "place":  # only the country known: no point (it would be the middle of the country)
                 t["lat"], t["lon"] = round(g[0], 4), round(g[1], 4)
                 if g[2]:
                     t["radius_km"] = g[2]

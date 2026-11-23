@@ -55,6 +55,12 @@ REGIONS = [
     ("Westküste Schweden", 58.00, 11.60, "Schweden", 110), ("Cornwall", 50.40, -4.90, "England", 60),
     ("Schottland", 56.80, -4.20, "Schottland", 180), ("Lappland", 67.50, 25.50, "Finnland", 250),
     ("Malediven", 3.20, 73.20, "Malediven", 120), ("Rotes Meer (Ägypten)", 26.50, 34.00, "Ägypten", 120),
+    # 0.7.2: more holiday regions, so a "where exactly?" answer is found
+    ("Costa Dorada", 41.10, 1.10, "Spanien", 45), ("Costa Blanca", 38.50, -0.30, "Spanien", 60),
+    ("Costa del Sol", 36.55, -4.70, "Spanien", 60), ("Santorini", 36.40, 25.43, "Griechenland", 12),
+    ("Naxos", 37.05, 25.45, "Griechenland", 15), ("Paros", 37.08, 25.15, "Griechenland", 10),
+    ("Korfu", 39.60, 19.85, "Griechenland", 25), ("Zakynthos", 37.78, 20.85, "Griechenland", 15),
+    ("Chalkidiki", 40.25, 23.50, "Griechenland", 50), ("Peloponnes", 37.50, 22.30, "Griechenland", 90),
 ]
 
 

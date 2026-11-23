@@ -46,6 +46,12 @@ def route_worker(engine: Engine, stop: threading.Event) -> None:
                         break
         except Exception:  # noqa: BLE001 - keep the add-on alive
             log.exception("routing failed")
+        try:  # estimated car routes of trips without GPS on real roads (0.7.2)
+            atlas = getattr(engine, "atlas", None)
+            if atlas is not None and atlas.fill_roads(budget_s=600):
+                warm(engine)
+        except Exception:  # noqa: BLE001 - keep the add-on alive
+            log.exception("road routes failed")
 
 
 def scheduler(engine: Engine, stop: threading.Event) -> None:

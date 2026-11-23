@@ -247,6 +247,9 @@ function renderQuestions() {
   if (!st.questions.length) { list.innerHTML = `<div class="card"><h3>Alles beantwortet ✓</h3><p class="small">Neue Fragen erscheinen, sobald neue Reisen erkannt werden.</p>${EMBED ? '<div class="opts"><button class="primary" id="qdone">Zur Karte</button></div>' : ''}</div>`; const b = $('qdone'); if (b) b.onclick = () => notifyParent('close'); return; }
   list.innerHTML = `<p class="lead">${st.questions.length} ${st.questions.length === 1 ? 'Frage' : 'Fragen'} · Ähnliches ist zusammengefasst – eine Antwort gilt für alle.</p>` + st.questions.map((q) => {
     const group = q.trip_ids.length > 1;
+    if (q.kind === 'place') return `<div class="card q" data-q="${q.id}"><h3>📍 ${esc(q.destination || 'Reise')}</h3><p>${esc(q.text)}</p>
+    <div class="opts"><input class="qplace" maxlength="120" placeholder="z. B. Santorini, Costa Brava, Salou" aria-label="Ort, Insel oder Region"><button class="primary" data-place="1">Speichern</button></div>
+    <div class="opts">${q.options.map((o) => `<button data-a="${esc(o)}" data-c="#8A82AA" class="meta">${esc(o)}</button>`).join('')}</div></div>`;
     return `<div class="card q" data-q="${q.id}"><h3>${group ? `<span class="status">${q.trip_ids.length}×</span>` : ''}${esc(q.destination || 'Reise')}</h3><p>${esc(q.text)}</p>
     <div class="opts">${q.options.map((o) => `<button data-a="${esc(o)}" data-c="${/^(Keine Reise|Mit Reise|Einzeln)/.test(o) ? '#8A82AA' : colorOf(o)}" class="${o === q.suggestion ? 'sug' : ''} ${/^(Keine Reise|Mit Reise|Einzeln)/.test(o) ? 'meta' : ''}">${esc(o)}</button>`).join('')}</div>
     <label class="check small"><input type="checkbox" class="remember" ${group ? 'checked' : ''}> für diesen Ort merken (künftig nicht mehr fragen)</label></div>`;
@@ -254,14 +257,19 @@ function renderQuestions() {
   paint(list);
 }
 $('qlist').addEventListener('click', async (e) => {
-  const b = e.target.closest('button[data-a]'); if (!b) return;
+  const b = e.target.closest('button[data-a],button[data-place]'); if (!b) return;
   const card = b.closest('[data-q]'); const id = card.dataset.q;
+  const answer = b.dataset.place ? card.querySelector('.qplace').value.trim() : b.dataset.a;
+  if (!answer) { toast('Bitte einen Ort eintippen'); return; }
+  const rem = card.querySelector('.remember');
   try {
-    const r = await post(`api/questions/${id}/answer`, {answer: b.dataset.a, remember: card.querySelector('.remember').checked});
+    const r = await post(`api/questions/${id}/answer`, {answer, remember: rem ? rem.checked : false});
     toast(r.split ? 'Einzeln gefragt' : r.merged_into ? 'Zusammengelegt' : `Gespeichert${r.trips > 1 ? ` für ${r.trips} Reisen` : ''}${r.rule ? ' · Regel gemerkt' : ''}`);
     notifyParent('changed'); refresh();
   } catch (err) { toast(err.message); }
 });
+
+$('qlist').addEventListener('keydown', (e) => { if (e.key === 'Enter' && e.target.classList.contains('qplace')) { e.preventDefault(); e.target.closest('[data-q]').querySelector('button[data-place]').click(); } });
 
 /* ================================================================ IMPORT */
 const drop = $('drop');

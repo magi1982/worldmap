@@ -292,3 +292,4 @@ body.embed-new{background:transparent}
 .wsw-w{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:0 4px}
 .wsw-w .wsw{min-width:0}.wsw-w .wit{grid-column:1/-1}
 .wsw{line-height:1.2}
+.q .qplace{flex:1;min-width:200px}
