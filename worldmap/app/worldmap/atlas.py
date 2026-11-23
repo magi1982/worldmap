@@ -23,7 +23,7 @@ from zoneinfo import ZoneInfo
 
 from . import places
 from .geo import haversine_km, simplify
-from .modes import mode_of_pair, mode_of_text, modes_of_transport  # noqa: F401 - re-exported for tests
+from .modes import estimate_km, mode_of_pair, mode_of_text, modes_of_transport  # noqa: F401 - re-exported for tests
 from .timeparse import local_date
 
 log = logging.getLogger(__name__)
@@ -270,8 +270,7 @@ class Atlas:
             dist = t["max_km"] if t["max_km"] is not None else haversine_km(home[0], home[1], lat, lon)
             fl = []
             if not k:  # no GPS: estimate the distance there and back
-                main = modes[0]
-                k = {main: round(2 * dist * (1.0 if main == "fly" else 1.25))}
+                k = estimate_km(dist, modes, t["nights"] or 0)
                 if "fly" in modes and t["lat"] is not None:
                     fl = [[[home[0], home[1]], [lat, lon]], [[lat, lon], [home[0], home[1]]]]
                 if t["radius_km"]:
@@ -289,7 +288,7 @@ class Atlas:
 
         groups = _groups(out_trips, home)
         place_list = self._places(pts, trip_rows, tid_of_day, home, tz, p_idx)
-        reg = self._reg(pts, place_list, tz, p_idx)
+        reg = self._reg(pts, place_list, tz, p_idx, [t for t in out_trips if t["approx"] or t["fixed"]])
         labels = _labels(cells, pts)
         who = self.who_list(trip_rows)
         years = sorted({t["y"] for t in out_trips} | {int(d[0][:4]) for d in days[:1]} | {int(d[0][:4]) for d in days[-1:]})
@@ -425,7 +424,7 @@ class Atlas:
                 best = rid  # coastline simplified away: take the region whose box is next to the point
         return best
 
-    def _reg(self, pts, place_list, tz, p_idx):
+    def _reg(self, pts, place_list, tz, p_idx, est_trips=()):
         first: dict = {}
         days: dict = defaultdict(set)
         cache: dict = {}
@@ -441,7 +440,21 @@ class Atlas:
             days[k].add(day)
             if k not in first or day < first[k]:
                 first[k] = day
-        stayed = set()
+        # trips without GPS (by hand, trip lists): their destination region counts too
+        groups = {g["name"]: g["members"] for g in self.engine.s.groups}
+        for t in est_trips:
+            rid = self.region_at(*t["p"])
+            if rid is None:
+                continue
+            who = [t["w"]] if t["w"] in p_idx else groups.get(t["w"]) or [None]
+            day = t["a"]
+            for w in who:
+                k = (rid, p_idx.get(w, -1))
+                if k in first and len(days[k]) > 0 and first[k] <= day:
+                    continue
+                first[k] = min(first.get(k, day), day)
+                days[k].update(f"{day}#{i}" for i in range((t["n"] or 0) + 1))
+        stayed = {self.region_at(*t["p"]) for t in est_trips}
         for pl in place_list:
             rid = self.region_at(pl[0], pl[1])
             if rid is not None:

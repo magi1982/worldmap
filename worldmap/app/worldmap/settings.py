@@ -88,7 +88,8 @@ def from_dict(raw: dict) -> Settings:
         s.groups = groups[:20]
         s.who_options = [g["name"] for g in s.groups]
     else:  # older configuration: plain group names
-        s.groups = [{"name": n, "members": [], "extra": 0, "color": ""} for n in s.who_options]
+        s.groups = [{"name": n, "members": [], "extra": 0, "color": ""} for n in s.who_options if n not in labels]
+        s.who_options = [g["name"] for g in s.groups]
     kws = {}
     if isinstance(s.hint_keywords, list):  # HA options UI: ["keyword=who", ...]
         for item in s.hint_keywords:

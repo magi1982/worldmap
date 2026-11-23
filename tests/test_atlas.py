@@ -105,7 +105,8 @@ def test_groups_settings():
     assert s.groups[0] == {"name": "Paar", "members": ["Alex", "Sam"], "extra": 2, "color": "#00FF00"}
     assert s.groups[1]["color"] == "" and s.who_options == ["Paar", "bad"]
     assert s.colors() == {"Alex": "#FF00AA", "Paar": "#00FF00"}
-    old = from_dict({"who_options": ["Familie"]})
+    old = from_dict({"who_options": ["Familie", "Alex"], "persons": [{"label": "Alex"}], "routing": "osrm"})
+    assert old.routing == "tiles" and [g["name"] for g in old.groups] == ["Familie"]
     assert old.groups == [{"name": "Familie", "members": [], "extra": 0, "color": ""}]
 
 
@@ -141,3 +142,26 @@ def test_gps_jumps_are_not_flights():
     a = {"ts": 0, "lat": 47.0, "lon": 8.0, "hint": None}
     assert A.mode_of_pair(a, {"ts": 20, "lat": 47.02, "lon": 8.0, "hint": None}, 2.2) == "jump"
     assert A.mode_of_pair(a, {"ts": 3600, "lat": 48.0, "lon": 8.0, "hint": None}, 111) == "road"
+
+
+def test_estimate_km_without_gps():
+    from worldmap.modes import estimate_km
+    car = estimate_km(400, ["road"], 6)
+    assert 1000 < car["road"] < 1300          # 2 x 400 x 1.25 + a week of local driving
+    fly = estimate_km(2000, ["fly", "road"], 13)
+    assert fly["fly"] == 4000 and 100 < fly["road"] < 500
+    assert estimate_km(80, ["fly"], 0) == {"road": 235}  # too short to fly: by car
+    ship = estimate_km(500, ["road", "ferry"], 7)
+    assert ship["ferry"] == 250 and ship["road"] > 1250
+    assert estimate_km(0, [], 0) == {"road": 35}
+
+
+def test_regions_from_trips_without_gps(engine, tmp_path):
+    at = A.Atlas(engine, str(tmp_path))
+    engine.db.upsert_trip({"start_date": "2012-06-20", "end_date": "2012-06-27", "destination": "Sample Island", "who": "Alex",
+                           "confidence": "bestätigt", "nights": 7, "lat": 35.24, "lon": 24.90, "radius_km": 40, "approx": 1,
+                           "transport": "Flug", "source": "manual", "locked": 1})
+    engine.touch()
+    reg = load(at, "reg")
+    crete = at.region_at(35.24, 24.90)
+    assert any(r[0] == crete and r[1] == 0 and r[2] == "2012-06-20" and r[3] == 8 and r[4] == 1 for r in reg)

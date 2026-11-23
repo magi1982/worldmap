@@ -68,7 +68,7 @@ schema:
   routine_days: int(0,3650)
   poll_interval_min: int(1,60)
   history_days_on_start: int(0,30)
-  routing: list(tiles|off)
+  routing: list(tiles|off|osrm)
   owntracks:
     - user: match(^[a-z0-9_.-]{2,32}$)
       password: password

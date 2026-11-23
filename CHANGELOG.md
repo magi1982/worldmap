@@ -23,6 +23,9 @@
 - Regions view (states, provinces, cantons worldwide, Natural Earth) replaces the Swiss municipalities view.
 - Descriptions moved behind small (i) buttons in the maps and settings; the map side panel is split into clear sections.
 - Empty map explains what to do next (import, people & groups).
+- Trips without GPS (by hand or from trip lists) get offline kilometre estimates per transport (detour factors, airport
+  transfers, driving on the spot) and count for the regions view.
+- Older configurations keep working (`routing: osrm` is read as `tiles`, plain group names become groups).
 
 ### Changed
 - Routing works fully locally on the OpenStreetMap network; the OSRM option was removed.

@@ -48,3 +48,30 @@ def mode_of_pair(a: dict, b: dict, dist_km: float) -> str:
     if speed < 7:
         return "foot"
     return "road"
+
+
+DETOUR = {"road": 1.25, "rail": 1.2, "ferry": 1.15, "foot": 1.3, "fly": 1.0}
+LOCAL_KM_PER_DAY = {"road": 35, "rail": 10, "ferry": 5, "foot": 6, "fly": 0}
+
+
+def estimate_km(dist_km: float, modes: list[str], nights: int) -> dict:
+    """Kilometres of a trip without GPS (entered by hand or from a trip list), worked out offline.
+
+    * the main way there and back: straight-line distance x a detour factor (roads and rails are not straight);
+    * flights: the flight there and back plus the way to and from the airport by car or train;
+    * on the spot: a few kilometres per day (car trips drive more than train trips).
+    """
+    modes = [m for m in modes if m in DETOUR] or ["road"]
+    dist_km = max(0.0, float(dist_km or 0))
+    days = max(1, int(nights or 0) + 1)
+    out: dict = {}
+    if "fly" in modes and dist_km >= 150:
+        out["fly"] = 2 * dist_km
+        ground = next((m for m in modes if m != "fly"), "road")
+        out[ground] = out.get(ground, 0) + 2 * min(60.0, max(20.0, dist_km * 0.03)) + LOCAL_KM_PER_DAY[ground] * days * 0.5
+    else:
+        main = next((m for m in modes if m != "fly"), "road")
+        out[main] = 2 * dist_km * DETOUR[main] + LOCAL_KM_PER_DAY[main] * days
+        if "ferry" in modes and main != "ferry":
+            out["ferry"] = min(2 * dist_km * 0.25, 400.0)  # a crossing, there and back
+    return {m: round(v) for m, v in out.items() if v >= 1}
