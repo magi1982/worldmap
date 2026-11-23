@@ -79,7 +79,13 @@ Ideen werden zuerst hier gesammelt. Code entsteht erst nach einem ausdrückliche
 - [ ] Wizard: "Wie heisst die Reise?" + stations; the transport step disappears (it is in the stations).
 - [ ] Import (CSV/Excel trip lists with Ziel/Land/Verkehrsmittel) and export map to name + stations; the Worldmap
       package keeps working with old files. Dashboard, film titles and map labels use the name.
-- [ ] Tests for migration, import of old lists, seaplane route; run on a copy of the private test data.
+- [ ] **Imports fill in the stations** when the data allows it: Google Timeline (Takeout and phone export), OwnTracks
+      and Home Assistant positions, photo CSV, GPX/KML. The places where you slept or stayed (≥ 1 night or several
+      hours) become stations in order, with the transport found on the way there (flight → airport station at the
+      real airport, ferry → Schiff, train, car, foot). Google's own place names are used when the export has them,
+      else the nearest town. Short stops on the way (petrol, lunch) are not stations. Stations you edited by hand are
+      never overwritten by a later import.
+- [ ] Tests for migration, import of old lists, seaplane route, stations from a sample timeline; run on a copy of the private test data.
 
 ### Stations with airports – one picker for everything (done in 0.11.0)
 - [x] One search per station finds **places and airports** by city, airport name or code: "Dubai" shows
