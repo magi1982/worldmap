@@ -269,3 +269,9 @@ Ideen werden zuerst hier gesammelt. Code entsteht erst nach einem ausdrückliche
   Küchen-Tablet · eigene CO₂-Faktoren als Einstellung · Kacheln per Ziehen umsortieren · Dashboard-Wahl pro Gerät im
   Add-on statt nur im Browser speichern.
 - Animations-Ideen (A1–A10) warten noch auf Feedback.
+
+## Ideen Runde 2 (25.11.)
+- Abgelehnt: 1 Heute vor X Jahren, 2 Reisetagebuch, 4 Geplante Reisen, 7 Jahres-Video, 8 Sammelalbum, 9 HA-Sensoren, 10 Sicher teilen
+- 3 Reiseideen (Ja): eigener Bereich, nicht in der Reiseliste; Ort, wer, Jahreszeit, Notiz; automatisch abgehakt bei Reise im Umkreis (30 km, einstellbar); Dashboard-Kachel „Noch offen“
+- 5 3D-Globus (Vorschau): Punkte-Globus, Tag/Nacht, Bögen nach Jahr, Flugzeug auf gewählter Route; Zoom passt sich an (regionale Daten → näher)
+- 6 Poster (Vorschau): Neon/Papier/SW, A3/A2/50×50, Welt/Europa (automatisch), Beschriftung ohne Überlappung, Zahlen + Länder
