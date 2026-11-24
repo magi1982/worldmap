@@ -152,6 +152,17 @@ def main(out: str) -> None:
                     "reason": "von Hand erfasst", "locked": 1,
                     "legs": legs(("Kiel", "Deutschland", 54.32, 10.14, "Auto"), ("Oslo", "Norwegen", 59.91, 10.75, "Schiff"),
                                  ("Bergen", "Norwegen", 60.39, 5.32, "Auto"))})
+    stops = [{"name": "Malé Velana", "country": "Malediven", "lat": 4.19, "lon": 73.53, "transport": "Flug", "ap": "MLE", "n": 1},
+             {"name": "Baa-Atoll", "country": "Malediven", "lat": 5.12, "lon": 73.07, "transport": "Wasserflugzeug", "n": 9}]
+    db.upsert_trip({"start_date": "2021-11-06", "end_date": "2021-11-16", "destination": "Malediven",
+                    "country": "Malediven", "who": "Paar", "confidence": "bestätigt", "nights": 10, "approx": 0,
+                    "transport": "Flug · Wasserflugzeug", "source": "manual", "reason": "von Hand erfasst", "locked": 1,
+                    "legs": _json.dumps(stops)})
+    db.upsert_trip({"start_date": "2022-07-09", "end_date": "2022-07-23", "destination": "Frankreich-Rundreise",
+                    "country": "Frankreich", "who": "Familie", "confidence": "bestätigt", "nights": 14, "approx": 0,
+                    "transport": "Auto", "source": "manual", "reason": "von Hand erfasst", "locked": 1,
+                    "legs": legs(("Lyon", "Frankreich", 45.76, 4.84, "Auto"), ("Bordeaux", "Frankreich", 44.84, -0.58, "Auto"),
+                                 ("Biarritz", "Frankreich", 43.48, -1.56, "Auto"))})
     db.upsert_trip({"start_date": "2008-08-01", "end_date": "2008-08-20", "destination": "Kenia",
                     "country": "Kenia", "who": "Sam", "confidence": "mittel", "nights": 19, "transport": "Flug",
                     "source": "manual", "reason": "von Hand erfasst", "locked": 1})  # only a country: shows up as "ungenau"

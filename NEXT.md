@@ -64,6 +64,13 @@ Ideen werden zuerst hier gesammelt. Code entsteht erst nach einem ausdrückliche
 
 ## Next update – waiting for "mach es" / Nächstes Update – wartet auf „mach es“
 
+### Found while taking the README screenshots (waiting for "mach es")
+- [ ] Trip list: the km column is empty for trips entered by hand (e.g. a round trip with stations), so they sort last
+      with "km absteigend" – the dashboard already knows their km.
+- [ ] Regions map: a trip entered by hand far away (Australia, 2017) is coloured like the first year of the GPS data
+      (2023) instead of its own year; check which regions the stations of hand trips count.
+- [ ] Stations popup: on a narrow row the × (remove) button wraps to its own line.
+
 ### Real routes for trips entered by hand (done in 0.13.0)
 - [x] Car / camper / bus legs of trips without GPS asked once from a routing service, stored, dashed estimate
 - [x] Option `route_service`: `osm` (FOSSGIS, default), `google` (Routes API), `offline`; fallback to the built-in network
