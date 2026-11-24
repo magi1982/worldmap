@@ -64,6 +64,18 @@ Ideen werden zuerst hier gesammelt. Code entsteht erst nach einem ausdrückliche
 
 ## Next update – waiting for "mach es" / Nächstes Update – wartet auf „mach es“
 
+### 10 ideas (24.11., waiting for "mach es" per idea)
+- [ ] 1 "Heute vor X Jahren": dashboard tile + wall tablet + optional notification, sensor (S)
+- [ ] 2 Travel diary per trip: day by day place, km, transport, historical weather (Open-Meteo, cached), note per day (M)
+- [ ] 3 Bucket list with automatic tick when first visited, "still open" tile (M)
+- [ ] 4 Planned trips: status "geplant", dashed route, km/time/CO2, countdown sensor, school-holiday check (M)
+- [ ] 5 3D globe (canvas, no library) with day/night and flight arcs, wall-tablet spin (M)
+- [ ] 6 Poster to print (A3/A2, PNG/PDF made in the browser, templates world/Europe/year/person) (L)
+- [ ] 7 Year story video 9:16 / 16:9 via MediaRecorder, home never shown (L)
+- [ ] 8 Album per person: country stickers, region progress, badges, printable page (S)
+- [ ] 9 Home Assistant sensors: on a trip, current country, day x of y, return in z days + blueprints (S)
+- [ ] 10 Share safely: one offline HTML file without home/work/everyday life, simplified tracks, preview (M)
+
 ### Security gate: open alerts turn the checks red (waiting for "mach es")
 - [ ] New job "Security alerts" in codeql.yml after the analysis (also weekly): lists the open **code scanning**
       and **Dependabot** alerts of the repo with the workflow token (`security-events: read`) and fails when one is
