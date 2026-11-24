@@ -93,7 +93,20 @@ const WM_SPEC = [
 const WM_MODES = [['road', '🚗', 'Auto'], ['rail', '🚆', 'Zug & ÖV'], ['fly', '✈️', 'Flug'], ['ferry', '⛴️', 'Schiff'], ['foot', '🚶', 'Zu Fuss']];
 
 const wmGet = (o, k) => k.split('.').reduce((a, x) => (a == null ? a : a[x]), o);
-function wmSet(o, k, v) { const ks = k.split('.'); let a = o; for (let i = 0; i < ks.length - 1; i++) a = a[ks[i]]; a[ks[ks.length - 1]] = v; }
+/* only known style keys like "map.labels" – never __proto__, constructor or prototype (no prototype pollution) */
+const WM_BAD_KEY = new Set(['__proto__', 'constructor', 'prototype']);
+function wmSet(o, k, v) {
+  const ks = String(k).split('.');
+  if (!ks.length || ks.some((x) => !x || WM_BAD_KEY.has(x))) return;
+  let a = o;
+  for (let i = 0; i < ks.length - 1; i++) {
+    if (!Object.prototype.hasOwnProperty.call(a, ks[i]) || typeof a[ks[i]] !== 'object' || a[ks[i]] === null) return;
+    a = a[ks[i]];
+  }
+  const last = ks[ks.length - 1];
+  if (WM_BAD_KEY.has(last)) return;
+  Object.defineProperty(a, last, {value: v, writable: true, enumerable: true, configurable: true});
+}
 const wmEsc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
 function wmFmt(v, x) { const u = x[3]; return u === '%' ? Math.round(v * 100) + ' %' : u === '×' ? String(+(+v).toFixed(2)).replace('.', ',') + '×' : (Math.round(v * 10) / 10) + u; }
 

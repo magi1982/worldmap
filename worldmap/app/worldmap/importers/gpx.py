@@ -1,11 +1,13 @@
-"""GPX and KML (incl. Google ``gx:Track``) parsing with the stdlib XML parser.
+"""GPX and KML (incl. Google ``gx:Track``) parsing with defusedxml.
 
-External entities and DTDs are rejected before parsing (XXE / billion laughs).
+DTDs, entities and external references are refused twice: by a check of the text and by defusedxml
+(XXE / billion laughs).
 """
 from __future__ import annotations
 
 import re
-import xml.etree.ElementTree as ET  # nosec B405 - input is checked for DTD/entities first
+
+from defusedxml.ElementTree import fromstring as safe_fromstring
 
 from ..timeparse import parse_ts
 
@@ -19,7 +21,7 @@ def _local(tag: str) -> str:
 def parse_xml(text: str):
     if _FORBIDDEN.search(text):  # anywhere in the file, not only at the start
         raise ValueError("XML with DOCTYPE/ENTITY declarations is not accepted")
-    root = ET.fromstring(text)  # nosec B314 - DTD/entities rejected above
+    root = safe_fromstring(text, forbid_dtd=True, forbid_entities=True, forbid_external=True)
     kind = _local(root.tag).lower()
     if kind == "gpx":
         return "gpx", list(_gpx(root))

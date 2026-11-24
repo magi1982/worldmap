@@ -12,7 +12,7 @@ import re
 from ..timeparse import parse_ts
 
 SRC = "google"
-_LATLNG = re.compile(r"(-?\d+(?:\.\d+)?)\s*°?\s*,\s*(-?\d+(?:\.\d+)?)")
+_LATLNG = re.compile(r"(-?\d{1,3}(?:\.\d{1,12})?)\s*(?:°\s*)?,\s*(-?\d{1,3}(?:\.\d{1,12})?)")  # bounded: linear time
 
 
 def _latlng(value):
@@ -28,7 +28,7 @@ def _latlng(value):
             if k in value:
                 return _latlng(value[k])
         return None
-    m = _LATLNG.search(str(value))
+    m = _LATLNG.search(str(value)[:200])
     if not m:
         return None
     return float(m.group(1)), float(m.group(2))

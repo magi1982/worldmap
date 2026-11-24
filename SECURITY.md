@@ -10,7 +10,9 @@ Do not open a public issue. You will get an answer within 7 days.
 - The web UI is only reachable through Home Assistant Ingress; the server accepts connections from the Ingress proxy only (`172.30.32.2`).
 - No secrets in the repository. The add-on uses the `SUPERVISOR_TOKEN` provided at runtime.
 - All database access is parameterised; all user input is validated and size-limited.
-- XML imports reject DTDs and entities (XXE); CSV exports neutralise spreadsheet formulas.
+- XML imports (GPX/KML) are parsed with defusedxml and reject DTDs, entities and external references (XXE, billion laughs); CSV exports neutralise spreadsheet formulas.
+- Google Maps short links are resolved by asking one fixed address (`https://maps.app.goo.gl/<id>` or `https://goo.gl/maps/<id>`, rebuilt from constants, the id checked); the place is read from where it points, nothing else is fetched.
+- Text parsing uses regular expressions with bounded or unambiguous repetition (no ReDoS); the map-style editor ignores `__proto__`/`constructor`/`prototype` keys.
 - Strict Content-Security-Policy, no inline scripts, all API text is escaped in the UI.
 - The optional OwnTracks endpoint (port 8098, disabled unless mapped) accepts only `POST` with HTTP Basic auth, compares credentials in constant time, slows down failed attempts and locks an address out for 15 minutes after 10 wrong passwords in 10 minutes. Use it in your local network only (or behind a VPN) – Basic auth is not encrypted on plain HTTP.
 - Both servers close connections that stall (no hanging threads); extra headers: Permissions-Policy, Cross-Origin-Opener/Resource-Policy.

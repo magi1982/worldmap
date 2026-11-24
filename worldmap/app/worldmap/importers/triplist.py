@@ -113,7 +113,8 @@ def geocode(name: str, country: str = "", home: tuple | None = None,
     cc = COUNTRY_CC.get((country or "").strip().lower())
     cname = places.COUNTRY_DE.get(cc, country or "")
     parts = [name]
-    parts += [p for p in re.split(r"\s+[–-]\s+|\s*[(),/&]\s*|\s+bei\s+|\s+und\s+", name) if p]
+    flat = " ".join(name.split())[:120]  # one space between words: the split below has no ambiguous whitespace
+    parts += [p.strip() for p in re.split(r" [–-] |[(),/&]| bei | und ", flat) if p.strip()]
     words = [w for w in re.split(r"[\s(),/&–-]+", name) if len(w) >= 4 and w[:1].isupper()]
     fits = None
     if home and max_km and max_km > 0:
@@ -178,12 +179,15 @@ def stations_text(legs: list) -> str:
 def parse_stations(text: str, country: str = "") -> list[dict]:
     """A "Stationen" cell back into stops; places are looked up offline, unknown ones keep only their name."""
     out: list[dict] = []
-    for part in re.split(r"\s*(?:→|->|>)\s*", text or "")[:20]:
+    for part in re.split(r"→|->|>", (text or "")[:4000])[:20]:
         part = part.strip()
         if not part:
             continue
-        m = re.match(r"^(.*?)\s*[\[(]([^\])]*)[\])]\s*$", part)
-        name, tr = (m.group(1).strip(), m.group(2).strip()) if m else (part, "")
+        name, tr = part, ""
+        if part[-1] in ")]":  # "Teneriffa (Flug · Auto)" or "[…]": the last bracket holds the transport
+            i = max(part.rfind("("), part.rfind("["))
+            if i > 0:
+                name, tr = part[:i].strip(), part[i + 1:-1].strip()
         parts = [w.strip() for w in tr.split("·") if w.strip() in TRANSPORT_WORDS]
         tr = " · ".join(parts) or "Auto"
         code = re.match(r"^✈\s*([A-Za-z]{3})$", name)

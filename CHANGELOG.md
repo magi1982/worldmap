@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.15.1 – 2026-11-24
+
+### Security (CodeQL findings)
+- Google Maps short links: only a fixed short-link address is ever requested, rebuilt from constants with a checked
+  id; the place is read from the redirect without following it (server-side request forgery).
+- GPX/KML are parsed with defusedxml (new dependency) in addition to the DTD/entity check (XML entity expansion).
+- Regular expressions in trip-list stations, place names and Google coordinates rewritten without ambiguous
+  repetition, inputs capped (polynomial ReDoS).
+- Trip wizard: values from date and number fields are checked and escaped before they are shown (DOM text as HTML).
+- Map-style editor: setting a style key can no longer touch `__proto__`, `constructor` or `prototype`
+  (prototype pollution).
+
 ## 0.15.0 – 2026-11-24
 
 ### Added

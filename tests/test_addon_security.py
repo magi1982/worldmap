@@ -75,5 +75,27 @@ def test_google_links_are_only_followed_over_https(monkeypatch):
             return FakeResp("http://www.google.com/maps/place/x")   # a hop down to plain http
 
     monkeypatch.setattr(urllib.request, "build_opener", lambda *a: Opener())
-    assert geosearch.resolve_gmaps("http://maps.app.goo.gl/abc") is None
-    assert seen == ["https://maps.app.goo.gl/abc"]                    # upgraded before the first request
+    assert geosearch.resolve_gmaps("http://maps.app.goo.gl/abcd") is None
+    assert seen == ["https://maps.app.goo.gl/abcd"]                   # rebuilt as https before the request
+    seen.clear()
+    for bad in ("https://maps.app.goo.gl/abcd/../x", "https://user:pw" + "@evil.example/abcd",
+                "https://evil.example/maps.app.goo.gl/abcd", "https://maps.app.goo.gl/a%2Fb", "https://www.google.com/maps"):
+        assert geosearch.resolve_gmaps(bad) is None
+    assert seen == []                                                   # nothing else is ever requested
+
+
+def test_google_short_link_reads_the_place_from_where_it_points(monkeypatch):
+    import urllib.error
+    import urllib.request
+
+    from worldmap import geosearch
+
+    class Opener:
+        def open(self, req, timeout=None):
+            assert req.full_url == "https://maps.app.goo.gl/AbC123"
+            raise urllib.error.HTTPError(req.full_url, 302, "Found",
+                                         {"Location": "https://www.google.com/maps/place/Testort/@46.95,7.44,15z"}, None)
+
+    monkeypatch.setattr(urllib.request, "build_opener", lambda *a: Opener())
+    hit = geosearch.resolve_gmaps("https://maps.app.goo.gl/AbC123?g_st=ic")
+    assert hit and abs(hit["lat"] - 46.95) < 1e-6 and hit["name"] == "Testort"

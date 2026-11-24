@@ -737,12 +737,12 @@ function wizard() {
   const body = () => {
     switch (KEY[w.step]) {
       case 'where': return `<label class="field">Name der Reise<input id="wname" value="${esc(w.name)}" maxlength="120" placeholder="z. B. Sommerferien Korsika – leer: aus den Stationen"></label><div id="wse"></div>`;
-      case 'when': return `<div class="prow"><label class="field">Jahr<input id="wy" type="number" min="1950" max="2100" value="${w.year}"></label><label class="field">Monat (falls bekannt)<select id="wm">${months.map((m, i) => `<option value="${i || ''}" ${String(i || '') === String(w.month) ? 'selected' : ''}>${m || 'weiss nicht'}</option>`).join('')}</select></label></div>
-        <p class="small">Genaue Daten bekannt?</p><div class="prow"><label class="field">Von<input id="wst" type="date" value="${w.start}"></label><label class="field">Bis<input id="wen" type="date" value="${w.end}"></label></div>`;
-      case 'long': return `<div class="choice">${[[0, 'Tagesausflug'], [2, 'Wochenende'], [7, '1 Woche'], [14, '2 Wochen'], [21, '3 Wochen']].map(([n, l]) => `<button data-n="${n}" class="${w.nights === n ? 'on' : ''}">${l}</button>`).join('')}</div><label class="field">Nächte<input id="wn" type="number" min="0" max="365" value="${w.nights}"></label>${w.start ? '<p class="small">Aus den Daten berechnet.</p>' : ''}`;
+      case 'when': return `<div class="prow"><label class="field">Jahr<input id="wy" type="number" min="1950" max="2100" value="${Number(w.year) || ""}"></label><label class="field">Monat (falls bekannt)<select id="wm">${months.map((m, i) => `<option value="${i || ''}" ${String(i || '') === String(w.month) ? 'selected' : ''}>${m || 'weiss nicht'}</option>`).join('')}</select></label></div>
+        <p class="small">Genaue Daten bekannt?</p><div class="prow"><label class="field">Von<input id="wst" type="date" value="${esc(w.start)}"></label><label class="field">Bis<input id="wen" type="date" value="${esc(w.end)}"></label></div>`;
+      case 'long': return `<div class="choice">${[[0, 'Tagesausflug'], [2, 'Wochenende'], [7, '1 Woche'], [14, '2 Wochen'], [21, '3 Wochen']].map(([n, l]) => `<button data-n="${n}" class="${w.nights === n ? 'on' : ''}">${l}</button>`).join('')}</div><label class="field">Nächte<input id="wn" type="number" min="0" max="365" value="${Number(w.nights) || 0}"></label>${w.start ? '<p class="small">Aus den Daten berechnet.</p>' : ''}`;
       case 'who': return `<div class="choice">${whoList().map((o) => `<button data-who="${esc(o)}" class="${o === w.who ? 'on' : ''}">${esc(o)}</button>`).join('')}</div><input id="wwho" placeholder="oder eigene Angabe" value="${esc(whoList().includes(w.who) ? '' : w.who)}" maxlength="60">`;
       case 'area': { const reg = w.place?.radius_km; return `<div class="choice">${[[3, 'Ein Ort'], [15, 'Umgebung'], [reg || 50, reg ? `ganz ${esc(w.place.name)}` : 'Region'], [150, 'Rundreise']].map(([r, l]) => `<button data-r="${r}" class="${w.area === r ? 'on' : ''}">${l} · ${r} km</button>`).join('')}</div><p class="small">Ohne GPS-Daten zeigt die Karte eine gestrichelte Fläche – lieber zu klein als zu gross.</p>`; }
-      default: { const [s, e, n, ap] = dates(); return `<p><b>${esc(w.name || stopsToTrip(w.stops).destination)}</b></p><p>${w.stops.map((x) => `${TICON[x.transport] || ''} ${stopLabel(x)}`).join(' → ') || '?'}</p><p>${w.start ? fmtWhen({start_date: s, end_date: e}) : (w.month ? MONTHS[+w.month] + ' ' : '') + w.year} · ${n} Nächte${ap ? ' · <span class="status">nur ' + (w.month ? 'Monat' : 'Jahr') + ' bekannt</span>' : ''}</p><p>${esc(w.who || 'wer offen')} · Fläche ${w.area ?? 0} km</p><label class="field">Notiz<textarea id="wnote" rows="2" maxlength="1000">${esc(w.note)}</textarea></label>`; }
+      default: { const [s, e, n, ap] = dates(); return `<p><b>${esc(w.name || stopsToTrip(w.stops).destination)}</b></p><p>${w.stops.map((x) => `${TICON[x.transport] || ''} ${stopLabel(x)}`).join(' → ') || '?'}</p><p>${w.start ? fmtWhen({start_date: s, end_date: e}) : (w.month ? MONTHS[+w.month] + ' ' : '') + w.year} · ${n} Nächte${ap ? ' · <span class="status">nur ' + (w.month ? 'Monat' : 'Jahr') + ' bekannt</span>' : ''}</p><p>${esc(w.who || 'wer offen')} · Fläche ${Number(w.area) || 0} km</p><label class="field">Notiz<textarea id="wnote" rows="2" maxlength="1000">${esc(w.note)}</textarea></label>`; }
     }
   };
   const render = () => {
@@ -752,7 +752,7 @@ function wizard() {
   };
   const collect = () => {
     if (w.step === 0 && $('wname')) w.name = $('wname').value.trim();
-    if (w.step === 1) { w.year = +$('wy').value || w.year; w.month = $('wm').value; w.start = $('wst').value; w.end = $('wen').value; if (w.start && w.end && w.end < w.start) [w.start, w.end] = [w.end, w.start]; if (w.start) w.year = +w.start.slice(0, 4); }
+    if (w.step === 1) { w.year = +$('wy').value || w.year; w.month = $('wm').value; const iso = (v) => (/^\d{4}-\d{2}-\d{2}$/.test(v) ? v : ''); w.start = iso($('wst').value); w.end = iso($('wen').value); if (w.start && w.end && w.end < w.start) [w.start, w.end] = [w.end, w.start]; if (w.start) w.year = +w.start.slice(0, 4); }
     if (w.step === 2) w.nights = Math.max(0, +$('wn').value || 0);
     if (w.step === 3 && $('wwho').value.trim()) w.who = $('wwho').value.trim();
     if (KEY[w.step] === 'check') w.note = $('wnote').value;
@@ -777,7 +777,7 @@ function wizard() {
     if (w.step === 0) { stopsEditor($('wse'), w.stops, () => { w.place = w.stops.find((x) => !x.ap) || w.stops[0] || null; w.area = null; }, {dep: w.ap_from || '', onDep: (c) => { w.ap_from = c; }}); $('wse').querySelector('.sq').focus(); }
     wb.querySelectorAll('[data-n]').forEach((b) => (b.onclick = () => { w.nights = +b.dataset.n; render(); }));
     wb.querySelectorAll('[data-who]').forEach((b) => (b.onclick = () => { w.who = b.dataset.who; render(); }));
-    wb.querySelectorAll('[data-r]').forEach((b) => (b.onclick = () => { w.area = +b.dataset.r; render(); }));
+    wb.querySelectorAll('[data-r]').forEach((b) => (b.onclick = () => { w.area = Number(b.dataset.r) || 0; render(); }));
   };
   let saved = false;
   d.onclose = () => { if (EMBED) notifyParent('close'); };

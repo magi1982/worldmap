@@ -149,36 +149,53 @@ def parse_gmaps(url: str) -> dict | None:
                  "Google-Maps-Link")
 
 
+# short links that may be followed: the request goes to one of these fixed addresses, never to what was typed
+SHORT_HOSTS = {"maps.app.goo.gl": "https://maps.app.goo.gl/", "goo.gl": "https://goo.gl/maps/"}
+_SHORT_ID = re.compile(r"[A-Za-z0-9_-]{4,64}")
+
+
+def _short_url(url: str) -> str | None:
+    """https://maps.app.goo.gl/<id> or https://goo.gl/maps/<id>, rebuilt from constants – or None."""
+    try:
+        u = urllib.parse.urlparse(url)
+    except ValueError:
+        return None
+    host = (u.hostname or "").lower()
+    parts = [p for p in (u.path or "").split("/") if p]
+    if host == "goo.gl" and parts[:1] == ["maps"]:
+        parts = parts[1:]
+    if host not in SHORT_HOSTS or len(parts) != 1 or not _SHORT_ID.fullmatch(parts[0]):
+        return None
+    return SHORT_HOSTS[host] + parts[0]
+
+
 def resolve_gmaps(url: str) -> dict | None:
-    """Like parse_gmaps; short links (maps.app.goo.gl) are followed – only to Google hosts."""
+    """Like parse_gmaps; a short link (maps.app.goo.gl/…) is asked once at Google and the place is read from where
+    it points. Only the fixed Google short-link addresses are ever requested, only https, nothing else is followed."""
     url = (url or "").strip()[:2000]
     if not is_gmaps(url):
         return None
     hit = parse_gmaps(url)
     if hit:
         return hit
-    if url.lower().startswith("http://"):
-        url = "https://" + url[7:]  # only ever encrypted
+    short = _short_url(url)
+    if not short:
+        return None
     try:
-        for _ in range(4):  # follow redirects by hand so every hop is checked
-            req = urllib.request.Request(url, method="HEAD", headers={"User-Agent": UA})
-            opener = urllib.request.build_opener(_NoRedirect)
-            try:
-                r = opener.open(req, timeout=TIMEOUT)
-                url = r.geturl()
-            except urllib.error.HTTPError as e:
-                loc = e.headers.get("Location")
-                if not loc:
-                    return None
-                url = urllib.parse.urljoin(url, loc)
-            if not is_gmaps(url) or not url.lower().startswith("https://"):
-                return None  # a hop to another site or to plain http: stop
-            hit = parse_gmaps(url)
-            if hit:
-                return hit
+        req = urllib.request.Request(short, method="HEAD", headers={"User-Agent": UA})
+        opener = urllib.request.build_opener(_NoRedirect)
+        try:
+            r = opener.open(req, timeout=TIMEOUT)  # nosec B310 – fixed https host from SHORT_HOSTS
+            target = r.geturl()
+        except urllib.error.HTTPError as e:
+            target = e.headers.get("Location") or ""
+        target = urllib.parse.urljoin(short, target)
+        if not target.lower().startswith("https://") or not is_gmaps(target):
+            return None  # points to another site or to plain http: not used
+        # the place is in the address itself (also inside a consent page's "continue=" parameter)
+        return parse_gmaps(target) or parse_gmaps(urllib.parse.unquote(target))
     except (OSError, ValueError):
         return None
-    return None
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
