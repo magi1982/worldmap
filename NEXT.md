@@ -73,6 +73,10 @@ Ideen werden zuerst hier gesammelt. Code entsteht erst nach einem ausdrückliche
 - [ ] Apple: also read `.xmp` sidecar files (Mac Photos "Export IPTC as XMP" – locations added by hand), Live Photo
       pairs (HEIC + MOV) count once; README chapter "Apple users: Windows / Mac / iPhone only" with the ways to get
       the originals into a folder Home Assistant can see.
+- [ ] Apple "Takeout": the ZIP parts from privacy.apple.com (Request a copy of your data › iCloud Photos) can be
+      dropped into Import or into a folder under /share – read the EXIF of each photo inside the ZIP without
+      unpacking it to disk, keep nothing but place + time. Big parts (up to 25 GB): folder way preferred over upload.
+      README: step-by-step like the Google Timeline export.
 - [ ] To test: upload photos straight from the iPhone in the app (photo picker) – read only GPS + time in the browser
       and send just those; check whether iOS keeps the location in that case.
 - [ ] Settings page "Fotos": pick folders, assign each folder to a person or group (or "who was there" stays a
