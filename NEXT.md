@@ -64,6 +64,19 @@ Ideen werden zuerst hier gesammelt. Code entsteht erst nach einem ausdrückliche
 
 ## Next update – waiting for "mach es" / Nächstes Update – wartet auf „mach es“
 
+### Real routes for trips entered by hand (waiting for "mach es")
+- [ ] Trips without GPS (entered by hand, or only stations): every car / camper / bus leg is asked once from a
+      routing service and the real way is stored with the trip as an estimate (dashed like now). Flights stay arcs
+      between airports; ships stay ferry lines; trains use the service's rail profile where it has one.
+- [ ] New option `route_service`: `offline` (built-in network, as now), `osm` (OpenStreetMap routing by FOSSGIS,
+      free, light use only) or `google` (Google Routes API with the existing key; 10,000 free requests a month).
+      Default `osm`. Falls back to the built-in network when the service fails or answers too long a way.
+- [ ] Asked only once per leg (cached in the database, also across restarts and updates), at most 1 request a second,
+      never for GPS-recorded trips. A button "Route neu berechnen" in the stations popup.
+- [ ] Privacy: the start "home" is sent rounded to ~2 km (the motorway entrance, not your street); only coordinates
+      are sent, never names. Documented in SECURITY.md / README.
+- [ ] Tests with mocked services (answer, error, too-long route, cache), no network in CI.
+
 ### Trips = name + stations (done in 0.12.0)
 - [x] A trip has a **name** you choose ("Sommerferien Korsika"); *where* is only ever given as **stations**
       (places or airports, each with its own transport). The columns "Ziel", "Land" and "Verkehrsmittel" in the trip
