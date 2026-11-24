@@ -64,6 +64,20 @@ Ideen werden zuerst hier gesammelt. Code entsteht erst nach einem ausdrückliche
 
 ## Next update – waiting for "mach es" / Nächstes Update – wartet auf „mach es“
 
+### Photos as a location source – for every user (waiting for "mach es")
+- [ ] Scan photo folders for where and when each photo was taken (EXIF GPS + time). Only the metadata is read; photos
+      are never copied, changed or sent anywhere. Read-only access to `/media` and `/share` (add-on `map`), so
+      everything works that Home Assistant can mount there: a NAS share (Settings › System › Storage › network
+      storage), a folder synced by iCloud for Windows / a Mac, Synology Photos, Google Photos Takeout, camera cards.
+- [ ] JPG, HEIC (iPhone), PNG, ARW/CR2/NEF (EXIF only, no decoding). Videos (MOV/MP4 location) later.
+- [ ] Settings page "Fotos": pick folders, assign each folder to a person or group (or "who was there" stays a
+      question), scan now / every night, only new or changed files (cache of path + size + time).
+- [ ] Photos become points with source `photo` (an extra "was really there" hint for stations and questions),
+      not a GPS track on their own; photos without GPS are skipped.
+- [ ] Not planned: logging in to iCloud directly with Apple ID + password + 2FA inside the add-on (unofficial web API,
+      breaks with Advanced Data Protection, the password would have to be stored).
+- [ ] Tests with invented sample images (generated EXIF), privacy check: no real photos in the repo.
+
 ### Found while taking the README screenshots (waiting for "mach es")
 - [ ] Trip list: the km column is empty for trips entered by hand (e.g. a round trip with stations), so they sort last
       with "km absteigend" – the dashboard already knows their km.
