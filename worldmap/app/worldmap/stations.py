@@ -111,6 +111,8 @@ def from_points(points: list[dict], start: str, end: str, tz: str, home: tuple[f
             words = ["Auto"]  # too far to have walked: the recording is just thin
         name, country = _name(st["lat"], st["lon"])
         ap = airports.snap(landed[0], landed[1]) if landed else None
+        if ap and haversine_km(ap[2], ap[3], landed[0], landed[1]) > 12:
+            ap = None  # the first point after landing is not at an airport: which one would only be a guess
         if ap and haversine_km(ap[2], ap[3], st["lat"], st["lon"]) > AIRPORT_OWN_KM:
             out.append({"name": ap[1], "country": "", "lat": ap[2], "lon": ap[3], "transport": "Flug",
                         "ap": ap[0], "auto": 1, "gps": 1})

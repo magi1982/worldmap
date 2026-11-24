@@ -6,12 +6,13 @@ import logging
 import threading
 import time
 from collections import defaultdict
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 from . import asking, places, questions, routing, stations, trips
 from .db import Database
 from .geo import haversine_km, simplify
 from .ha import HomeAssistant, position_from_state
+from .modes import drop_spikes
 from .settings import Settings
 from .timeparse import local_date
 
@@ -35,6 +36,29 @@ class Engine:
             self.home = (float(settings.home_lat), float(settings.home_lon))
 
     # ---------------------------------------------------------------- home
+    def clean_points(self) -> list[dict]:
+        """All points without lone stray ones (a wrong photo GPS, one Google point at home mid-holiday)."""
+        pts = self.db.points()
+        tz = self.s.timezone
+        spots: dict = {}
+        for t in self.db.trips():  # a point inside a trip that really went there is never stray
+            if t["lat"] is None or not t["start_date"] or not t["end_date"]:
+                continue
+            d0, d1 = date.fromisoformat(t["start_date"]), date.fromisoformat(t["end_date"])
+            if (d1 - d0).days > 120:
+                continue
+            for k in range((d1 - d0).days + 1):
+                spots.setdefault((d0 + timedelta(days=k)).isoformat(), []).append((t["lat"], t["lon"]))
+
+        def keep(p):
+            return any(haversine_km(la, lo, p["lat"], p["lon"]) < 150
+                       for la, lo in spots.get(local_date(p["ts"], tz), ()))
+
+        out = drop_spikes(pts, keep)
+        if len(out) != len(pts):
+            log.info("ignored %d stray point(s) far off the way", len(pts) - len(out))
+        return out
+
     def resolve_home(self) -> tuple[float, float] | None:
         if self.home:
             return self.home
@@ -68,7 +92,7 @@ class Engine:
         if not home:
             return {"error": "home position unknown – set home_lat/home_lon or a zone"}
         with self._lock:
-            pts = self.db.points()
+            pts = self.clean_points()
             tz = self.s.timezone
             routine = trips.routine_cells(pts, tz, self.s.routine_days) if self.s.routine_days else set()
             days = trips.days_away(pts, home, self.s.min_trip_km, tz, routine)

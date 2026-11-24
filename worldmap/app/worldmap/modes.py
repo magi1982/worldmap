@@ -1,6 +1,8 @@
 """Transport mode of a movement – from Google activity names, typed words or speed."""
 from __future__ import annotations
 
+from .geo import haversine_km
+
 FLIGHT_KMH = 220.0
 MIN_FLIGHT_KM = 150.0
 # nothing on the ground is faster: a "train" at 400 km/h was a plane (Google labels flights as trains at times)
@@ -80,3 +82,58 @@ def estimate_km(dist_km: float, modes: list[str], nights: int) -> dict:
         if "ferry" in modes and main != "ferry":
             out["ferry"] = min(2 * dist_km * 0.25, 400.0)  # a crossing, there and back
     return {m: round(v) for m, v in out.items() if v >= 1}
+
+
+SPIKE_KM = 300.0        # a jump at least this far …
+SPIKE_BACK = 0.15       # … that comes back to (almost) where it started …
+SPIKE_RUN = 2           # … made of at most this many points …
+SPIKE_SPAN_S = 4 * 86400  # … within a few days
+
+
+def drop_spikes(points: list[dict], keep=None) -> list[dict]:
+    """Remove lone stray points: A → far away → back to A, without anything on the way.
+
+    Typical sources: a photo with a wrong or copied GPS tag, or a single Google point "at home" in the middle of a
+    holiday – both would draw two flights that never happened. Removed only when the jump is impossible
+    (faster than a plane) or when nothing says it was a trip (no "flying" hint, no trip there). ``keep(point)`` can
+    protect a point (e.g. one inside a trip that really went there). Points must be sorted by person and time.
+    """
+    out: list[dict] = []
+    n = len(points)
+    i = 0
+    while i < n:
+        p = points[i]
+        dropped = False
+        if out and out[-1]["person"] == p["person"]:
+            a = out[-1]
+            for run in range(1, SPIKE_RUN + 1):
+                if i + run >= n:
+                    break
+                c = points[i + run]
+                seq = points[i:i + run]
+                if c["person"] != p["person"] or any(x["person"] != p["person"] for x in seq):
+                    break
+                if c["ts"] - a["ts"] > SPIKE_SPAN_S:
+                    break
+                d_in = haversine_km(a["lat"], a["lon"], p["lat"], p["lon"])
+                d_out = haversine_km(seq[-1]["lat"], seq[-1]["lon"], c["lat"], c["lon"])
+                d_ac = haversine_km(a["lat"], a["lon"], c["lat"], c["lon"])
+                if min(d_in, d_out) < SPIKE_KM or d_ac > SPIKE_BACK * min(d_in, d_out):
+                    continue
+                spread = max(haversine_km(p["lat"], p["lon"], x["lat"], x["lon"]) for x in seq)
+                if spread > 50:
+                    continue
+                v_in = d_in / max((p["ts"] - a["ts"]) / 3600, 1e-3)
+                v_out = d_out / max((c["ts"] - seq[-1]["ts"]) / 3600, 1e-3)
+                hinted = any(mode_of_text(x.get("hint")) for x in [a, *seq, c])
+                impossible = max(v_in, v_out) > 1100
+                if keep and any(keep(x) for x in seq) and not impossible:
+                    continue
+                if impossible or not hinted:
+                    i += run
+                    dropped = True
+                    break
+        if not dropped:
+            out.append(p)
+            i += 1
+    return out

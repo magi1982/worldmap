@@ -21,7 +21,11 @@ WEIGHTS = {
     "road": {"0": 0.62, "1": 0.8, "2": 1.0, "f": 1.6, "t": 0.8},
     "rail": {"a": 1.0, "t": 0.9, "f": 1.7, "0": 2.6, "1": 3.0, "2": 3.4},
 }
-STITCH_KM = 2.5      # loose ends closer than this are joined (simplified data, borders)
+STITCH_KM = 6.0      # loose ends closer than this are joined (simplified data: junctions, borders)
+DENSE_KM = 2.0       # roads get a point at least this often, so a loose end finds the road it meets
+# longer than this × the straight way (+ km): the coarse network lacks a road there (trains go around more)
+MAX_DETOUR = {"road": 2.0, "rail": 2.2}  # mountains (Alps) need up to ~1.9×: below that the way is real
+DETOUR_KM = 20.0
 SNAP_KM = 25.0       # start / destination may be this far from the network (else: the land grid decides)
 _lock = threading.Lock()
 
@@ -67,7 +71,18 @@ class _Graph:
             w = weights[code]
             prev = None
             for k in range(0, len(c) - 1, 2):
-                i = nid((c[k], c[k + 1]))
+                p = (c[k], c[k + 1])
+                if prev is not None:  # long straight pieces get extra points, so loose ends find a road nearby
+                    q = self.coord[prev]
+                    steps = int(_km(q, p, self.kx) / DENSE_KM)
+                    for s_ in range(1, steps + 1):
+                        f = s_ / (steps + 1)
+                        m = nid((round(q[0] + (p[0] - q[0]) * f, 5), round(q[1] + (p[1] - q[1]) * f, 5)))
+                        d = _km(self.coord[prev], self.coord[m], self.kx)
+                        self.adj[prev].append((m, d * w, code))
+                        self.adj[m].append((prev, d * w, code))
+                        prev = m
+                i = nid(p)
                 if prev is not None and prev != i:
                     d = _km(self.coord[prev], self.coord[i], self.kx)
                     self.adj[prev].append((i, d * w, code))
@@ -83,8 +98,9 @@ class _Graph:
                 continue
             reach = 25.0 if nb[0][2] in ("f", "t") else STITCH_KM  # ferry piers lie a bit away from the roads
             best, bd = None, reach
+            own = self._line_of(e)
             for j in self._near(self.coord[e], reach):
-                if j == e or j == nb[0][0] or (reach > STITCH_KM and all(x[2] in ("f", "t") for x in self.adj[j])):
+                if j in own or (reach > STITCH_KM and all(x[2] in ("f", "t") for x in self.adj[j])):
                     continue
                 d = _km(self.coord[e], self.coord[j], self.kx)
                 if d < bd:
@@ -92,6 +108,20 @@ class _Graph:
             if best is not None:
                 self.adj[e].append((best, bd * 1.2, "2"))
                 self.adj[best].append((e, bd * 1.2, "2"))
+
+    def _line_of(self, e, limit=400):
+        """Nodes of the same line near e (walking along degree-2 nodes): a loose end never joins itself."""
+        seen = {e}
+        st = [e]
+        while st and len(seen) < limit:
+            u = st.pop()
+            for v, _c, _code in self.adj[u]:
+                if v not in seen and len(self.adj[v]) <= 2:
+                    seen.add(v)
+                    st.append(v)
+                elif v not in seen:
+                    seen.add(v)
+        return seen
 
     def _near(self, p, radius_km):
         r = int(radius_km / (self.cell * KY)) + 1
@@ -189,9 +219,10 @@ def route(kind: str, a: tuple, b: tuple) -> list | None:
     if not res:
         return None
     path, codes = res
-    total = sum(_km(p, q, g.kx) for p, q in zip(path, path[1:], strict=False))
-    if total > straight * 2.6 + 120:  # a detour like that is not a plausible way
-        return None
+    total = sum(_km(p, q, g.kx) for p, q in zip([tuple(a)] + path, path + [tuple(b)], strict=False))
+    ferry = sum(_km(p, q, g.kx) for p, q, c in zip(path, path[1:], codes[1:], strict=False) if c == "f")
+    if total - ferry > (straight - ferry) * MAX_DETOUR[kind] + DETOUR_KM:
+        return None  # the coarse network has no direct road there (hundreds of km around): not a plausible way
     runs: list = []
     cur = None
     pts = [tuple(a)] + path + [tuple(b)]

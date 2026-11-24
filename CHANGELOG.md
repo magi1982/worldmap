@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.12.6 – 2026-11-24
+
+### Fixed
+- **Lone stray points** (a photo with a wrong GPS tag, a single Google point at home in the middle of a holiday) no
+  longer draw flights that never happened: a point far away that comes straight back, with nothing on the way, is
+  ignored for the map and for trip detection – unless it is impossible anyway, only when no "flying" hint and no
+  trip there speak for it.
+- **Huge detours on estimated roads**: the offline road network has small holes at junctions; loose road ends are now
+  joined to the nearest point *on* another road (not only its corners), so motorways connect (Zürich → Bern on the
+  A1, not over the Klausen pass; no loop far north on the way to the Atlantic coast). A way longer than 2× the
+  straight line (+20 km) – where the coarse data simply lacks the road – is not drawn; mountain routes (Gotthard,
+  Brenner) stay.
+- **Flight ends recorded only after landing** (first point at home, nearer to another airport) use the airport the
+  same trip really flew from (out from ZRH, back to ZRH – not to FDH).
+- Airports guessed from GPS stations no longer override recorded flights (Paris stays CDG), and a GPS station only
+  gets an airport when the landing point is really at the airport.
+
 ## 0.12.5 – 2026-11-23
 
 ### Added

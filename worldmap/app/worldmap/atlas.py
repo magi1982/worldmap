@@ -96,6 +96,9 @@ def wd(day: str) -> str:
     return f"{WD[d.weekday()]} {d:%d.%m.%Y}"
 
 
+GUESS_KM = 12.0  # a flight end recorded further than this from the airport: the airport is a guess
+
+
 class Atlas:
     def __init__(self, engine, cache_dir: str | None = None):
         self.engine = engine
@@ -269,7 +272,7 @@ class Atlas:
         tz = s.timezone
         home = eng.resolve_home() or (47.0, 8.0)
         trips_db = eng.db.trips()
-        pts = eng.db.points()
+        pts = eng.clean_points()
         segs = {(x["person"], x["t0"], x["t1"]): x for x in eng.db.segments()}
 
         # ---- days
@@ -438,13 +441,17 @@ class Atlas:
                 cur_key = None
                 b_ap = airports.snap(p["lat"], p["lon"])
                 b_pt = [b_ap[2], b_ap[3]] if b_ap else [round(p["lat"], 4), round(p["lon"], 4)]
+                b_off = haversine_km(p["lat"], p["lon"], b_ap[2], b_ap[3]) if b_ap else None
                 if air:  # one flight recorded in pieces (ZRH → over the Alps → HER): extend it, no stopovers
                     f = flights[air["i"]]
-                    f[2], f[6] = b_pt, b_ap[0] if b_ap else ""
+                    f[2], f[6], f[7][1] = b_pt, b_ap[0] if b_ap else "", b_off
                 else:
                     a_ap = airports.snap(prev["lat"], prev["lon"])
+                    a_off = haversine_km(prev["lat"], prev["lon"], a_ap[2], a_ap[3]) if a_ap else None
+                    # [7]: how far the recorded point was from the airport – far means the airport is a guess
                     flights.append([day, [a_ap[2], a_ap[3]] if a_ap else [round(prev["lat"], 4), round(prev["lon"], 4)],
-                                    b_pt, round(tod(prev["ts"]), 4), pi, a_ap[0] if a_ap else "", b_ap[0] if b_ap else ""])
+                                    b_pt, round(tod(prev["ts"]), 4), pi, a_ap[0] if a_ap else "", b_ap[0] if b_ap else "",
+                                    [a_off, b_off]])
                 # a next piece that starts right here belongs to this flight (sparse points while flying)
                 air = {"i": air["i"] if air else len(flights) - 1, "ts": p["ts"], "person": p["person"]}
                 prev = p
@@ -479,15 +486,36 @@ class Atlas:
                 continue
             t = trip_rows[tid]
             fa = airports.by_iata(t["ap_from"] or "")
-            ta = airports.by_iata(t["ap_to"] or "") or next(  # the airport stop of the trip ("✈ HER, then 🚗")
-                (airports.by_iata(x["ap"]) for x in _legs(t["legs"]) if x.get("ap")), None)
+            ta = airports.by_iata(t["ap_to"] or "") or next(  # the airport stop you set ("✈ HER, then 🚗")
+                (airports.by_iata(x["ap"]) for x in _legs(t["legs"]) if x.get("ap") and not x.get("gps")), None)
             if not (fa or ta):
                 continue
             near_a = haversine_km(home[0], home[1], *f[1]) <= haversine_km(home[0], home[1], *f[2])
             for end, code_i, is_home in ((1, 5, near_a), (2, 6, not near_a)):
                 ap = fa if is_home else ta
                 if ap:
-                    f[end], f[code_i] = [ap[2], ap[3]], ap[0]
+                    f[end], f[code_i], f[7][end - 1] = [ap[2], ap[3]], ap[0], 0.0
+        # an end recorded only later, away from any airport (first point at home after landing), is a guess: the
+        # airport the trip or you really used nearby wins (out from ZRH, back to ZRH – not to the nearest one, FDH)
+        sure: dict = {}
+        for f in flights:
+            for k, (code_i, pt_i) in enumerate(((5, 1), (6, 2))):
+                tid = tid_of_day.get(f[0], -1)
+                if tid >= 0 and f[code_i] and f[7][k] is not None and f[7][k] <= GUESS_KM:
+                    sure.setdefault(tid, []).append((f[code_i], f[pt_i]))
+        for f in flights:
+            for k, (code_i, pt_i) in enumerate(((5, 1), (6, 2))):
+                if not f[code_i] or f[7][k] is None or f[7][k] <= GUESS_KM:
+                    continue
+                pool = sure.get(tid_of_day.get(f[0], -1), [])  # only airports this same trip really used
+                near = Counter(c for c, pt in pool if haversine_km(*f[pt_i], *pt) <= 120)
+                if near:
+                    ap = airports.by_iata(near.most_common(1)[0][0])
+                    if ap:
+                        f[pt_i], f[code_i] = [ap[2], ap[3]], ap[0]
+        for f in flights:
+            del f[7:]
+        flights[:] = [f for f in flights if not (f[5] and f[5] == f[6])]
         for f in flights:
             for code in (f[5], f[6]):
                 ap = airports.by_iata(code) if code else None
@@ -568,7 +596,8 @@ class Atlas:
                 fl = [[f[1], f[2], f[5], f[6]] for f in flights if t["start_date"] <= f[0] <= t["end_date"]]
                 if not fl and i in fly_only and not nopos and dist >= MIN_FLIGHT_KM:  # flown, but not recorded
                     d_ap = airports.by_iata(t["ap_to"] or "") or next(
-                        (airports.by_iata(x["ap"]) for x in legs if x.get("ap")), None) or airports.snap(lat, lon, 60, 0)
+                        (airports.by_iata(x["ap"]) for x in legs if x.get("ap") and not x.get("gps")), None) \
+                        or airports.snap(lat, lon, 60, 0)
                     o_ap = airports.by_iata(t["ap_from"] or "") or h_ap
                     if d_ap and o_ap and d_ap[0] != o_ap[0]:
                         ha, da = [o_ap[2], o_ap[3]], [d_ap[2], d_ap[3]]
