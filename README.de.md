@@ -75,7 +75,8 @@ Alles lässt sich in der App (⚙️ **Einstellungen**) oder in der Add-on-Konfi
 | `work_lat` / `work_lon` / `work_radius_m` | – / – / 300 | Arbeit; leer = automatisch erkannt |
 | `show_work` | false | Arbeit auf der Karte zeigen |
 | `place_search` | osm | Ortssuche beim Erfassen: `offline`, `osm` (OpenStreetMap, gratis) oder `google` (braucht `google_maps_api_key`) – gesendet wird nur das Suchwort |
-| `google_maps_api_key` | "" | eigener Schlüssel für die Google Places API (New), nur für `place_search: google` |
+| `route_service` | osm | echte Strassen für Auto-, Wohnmobil- und Busetappen von Reisen ohne GPS (von Hand erfasst oder nur Stationen): `osm` (OpenStreetMap-Routing-Server von FOSSGIS, gratis, für leichte Nutzung), `google` (Google Routes API, braucht `google_maps_api_key` mit der Routes API; 10'000 Anfragen pro Monat gratis) oder `offline` (eingebautes Netz, nichts wird gesendet). Jede Etappe wird einmal angefragt und gespeichert; gesendet werden nur Start und Ziel, auf ~2 km gerundet. Flüge bleiben Bögen. Auch in der App unter Verbindungen › Geschätzte Routen, mit dem Knopf „Routen neu berechnen“ |
+| `google_maps_api_key` | "" | eigener Google-Schlüssel: Places API (New) für `place_search: google`, Routes API für `route_service: google` |
 | `home_airport` | "" | IATA-Code des Heimatflughafens (z. B. ZRH); leer = der Flughafen, von dem die meisten aufgezeichneten Flüge starten |
 | `min_trip_km` | 30 | mit Übernachtung zählt es ab dieser Entfernung als Reise |
 | `min_day_trip_km` | 100 | ein Tagesausflug ohne Übernachtung zählt ab dieser Entfernung als Reise |
@@ -111,6 +112,6 @@ Ideen und Planung stehen in [NEXT.md](NEXT.md).
 Karten- und Ortsdaten: [Natural Earth](https://www.naturalearthdata.com/) (gemeinfrei, auch die Regionen und Städtenamen in anderen Sprachen),
 Flughäfen: [OurAirports](https://ourairports.com/data/) (gemeinfrei), Hauptstrassen, Fähren und Bahnlinien: Natural Earth (gemeinfrei),
 Ortsnamen: [GeoNames](https://www.geonames.org/) (CC BY 4.0). Bahn- und Strassennetz: © [OpenStreetMap](https://www.openstreetmap.org/copyright)-Mitwirkende
-via [OpenFreeMap](https://openfreemap.org/).
+via [OpenFreeMap](https://openfreemap.org/); geschätzte Routen: OpenStreetMap-Routing von [FOSSGIS](https://routing.openstreetmap.de/) (© OpenStreetMap-Mitwirkende) oder Google.
 
 Lizenz: MIT

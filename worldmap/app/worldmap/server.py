@@ -22,7 +22,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from . import airports, asking, geosearch, places
+from . import airports, asking, geosearch, places, routeservice
 from .atlas import Atlas
 from .db import CONFIDENCE
 from .engine import Engine
@@ -85,7 +85,7 @@ def asset_version() -> str:
 FILENAME_RE = re.compile(r"[^\w.\-]+")
 MAX_JSON = 256 * 1024
 CONNECTOR_KEYS = ("persons", "groups", "owntracks", "notify_service", "notify_mode", "who_options", "school_holidays",
-                  "routing", "min_trip_km", "min_day_trip_km", "ask_below", "hint_keywords", "routine_days", "home_lat", "home_lon",
+                  "routing", "route_service", "min_trip_km", "min_day_trip_km", "ask_below", "hint_keywords", "routine_days", "home_lat", "home_lon",
                   "home_radius_m", "work_lat", "work_lon", "work_radius_m", "show_work", "home_airport")
 TEXT_LIMITS = {"destination": 120, "country": 60, "who": 60, "transport": 80, "reason": 300, "note": 1000, "source": 80}
 
@@ -309,6 +309,10 @@ def validate_connectors(data: dict) -> dict:
             if v not in ("tiles", "off"):
                 raise ValueError("invalid routing")
             out[k] = v
+        elif k == "route_service":
+            if v not in ("offline", "osm", "google"):
+                raise ValueError("invalid route_service")
+            out[k] = v
         elif k == "ask_below":
             if v not in ("mittel", "hoch", "bestätigt"):
                 raise ValueError("invalid ask_below")
@@ -379,6 +383,22 @@ class App:
 def make_handler(app: App):
     eng = app.engine
 
+    def est_routes() -> int:
+        """How many estimated routes of the active service are stored."""
+        try:
+            cache = app.atlas._roads()
+        except Exception:  # noqa: BLE001 - only a number on the settings page
+            return 0
+        svc = routeservice.active(eng.s)
+        return sum(1 for k, v in cache.items() if isinstance(v, list) and (k.startswith(svc + ":") or (svc == "offline" and ":" not in k)))
+
+    def redo_roads() -> str:
+        """Forget the estimated routes and ask them again (button "Routen neu berechnen")."""
+        app.atlas.reset_roads()
+        app.atlas.get("core")  # queues every leg again
+        eng.routes_wanted.set()
+        return "started"
+
     def connectors_status() -> dict:
         last = {r["person"]: r["t"] for r in eng.db.query("SELECT person, MAX(ts) AS t FROM points GROUP BY person")}
         by_src = {r["source"]: r["n"] for r in eng.db.query("SELECT source, COUNT(*) AS n FROM points GROUP BY source")}
@@ -393,6 +413,8 @@ def make_handler(app: App):
             "segments": {r["mode"]: r["n"] for r in eng.db.query("SELECT mode, COUNT(*) AS n FROM segments GROUP BY mode")},
             "notify_service": eng.s.notify_service, "notify_mode": eng.s.notify_mode,
             "who_options": eng.s.who_options, "groups": eng.s.groups, "school_holidays": eng.s.school_holidays,
+            "route_service": eng.s.route_service, "google_key": bool(eng.s.google_maps_api_key),
+            "est_routes": est_routes(),
             "routing": eng.s.routing, "min_trip_km": eng.s.min_trip_km, "min_day_trip_km": eng.s.min_day_trip_km, "ask_below": eng.s.ask_below,
             "routine_days": eng.s.routine_days,
             "home": {"zone": eng.s.home_zone, "lat": eng.s.home_lat, "lon": eng.s.home_lon, "radius_m": eng.s.home_radius_m,
@@ -650,11 +672,13 @@ def make_handler(app: App):
                     eng.s = from_dict(opts)
                     app.changed()
                     return self._send(HTTPStatus.OK, connectors_status())
-                m = re.fullmatch(r"/api/sync/(ha|routes|rebuild)", path)
+                m = re.fullmatch(r"/api/sync/(ha|routes|roads|rebuild)", path)
                 if m:
                     self._json()
                     what = m.group(1)
-                    fn = {"ha": eng.backfill_history, "routes": lambda: eng.routes_wanted.set() or "started", "rebuild": eng.rebuild}[what]
+                    fn = {"ha": eng.backfill_history, "routes": lambda: eng.routes_wanted.set() or "started",
+                          "roads": redo_roads,
+                          "rebuild": eng.rebuild}[what]
                     started = app.run_bg(what, fn)
                     return self._send(HTTPStatus.ACCEPTED if started else HTTPStatus.CONFLICT,
                                       {"started": started, "state": app.sync_state})

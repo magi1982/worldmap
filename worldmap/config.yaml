@@ -1,5 +1,5 @@
 name: Worldmap
-version: "0.12.6"
+version: "0.13.0"
 slug: worldmap
 description: Your trips on a map – from Home Assistant, OwnTracks and Google exports, with smart questions. Works offline.
 url: https://github.com/magi1982/worldmap
@@ -35,6 +35,7 @@ options:
   poll_interval_min: 5
   history_days_on_start: 10
   routing: tiles
+  route_service: osm
   place_search: osm
   google_maps_api_key: ""
   owntracks: []
@@ -75,6 +76,7 @@ schema:
   poll_interval_min: int(1,60)
   history_days_on_start: int(0,30)
   routing: list(tiles|off|osrm)
+  route_service: list(offline|osm|google)
   place_search: list(offline|osm|google)
   google_maps_api_key: password?
   owntracks:

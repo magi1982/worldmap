@@ -513,7 +513,20 @@ async function loadConnectors() {
     <p class="small">Lücken zwischen GPS-Punkten werden auf echte Bahnlinien und Strassen gelegt – direkt im Add-on, ohne Routing-Dienst. Das Netz kommt aus OpenStreetMap-Kartenkacheln, die einmal per Kachelnummer geladen und dauerhaft gespeichert werden (keine Positionen werden gesendet). Danach läuft es offline.</p>
     <p class="small keep">${c.tiles.toLocaleString('de-CH')} Kacheln gespeichert · ${(c.segments.rail || 0).toLocaleString('de-CH')} Bahn- und ${(c.segments.road || 0).toLocaleString('de-CH')} Strassenabschnitte · ${(c.segments.none || 0).toLocaleString('de-CH')} offen gelassen</p>
     <label class="field">Netz verwenden<select id="routing"><option value="tiles" ${c.routing === 'tiles' ? 'selected' : ''}>ja</option><option value="off" ${c.routing === 'off' ? 'selected' : ''}>nein</option></select></label>
-    <div class="opts"><button class="primary" id="saveR">Speichern</button><button class="btn" data-sync="routes">Jetzt berechnen</button></div></div>`;
+    <div class="opts"><button class="primary" id="saveR">Speichern</button><button class="btn" data-sync="routes">Jetzt berechnen</button></div></div>
+  <div class="card" id="cEst"><h3>🚗 Geschätzte Routen <span class="status ${c.route_service !== 'offline' ? 'ok' : ''}">${({osm: 'OpenStreetMap', google: 'Google', offline: 'offline'})[c.route_service] || 'offline'}</span></h3>
+    <p class="small">Für Reisen ohne GPS-Spur (von Hand erfasst oder nur Stationen) wird jede Auto-, Wohnmobil- und Busetappe einmal bei einem Routendienst angefragt und als gestrichelte Schätzung gespeichert. Flüge bleiben Bögen, Schiffe Fährlinien. Gesendet werden nur Start und Ziel, auf etwa 2 km gerundet – nie Namen, Daten oder Personen.</p>
+    <p class="small keep">${(c.est_routes || 0).toLocaleString('de-CH')} Routen gespeichert</p>
+    <label class="field">Routendienst<select id="routeSvc">
+      <option value="osm" ${c.route_service === 'osm' ? 'selected' : ''}>OpenStreetMap (gratis, FOSSGIS)</option>
+      <option value="google" ${c.route_service === 'google' ? 'selected' : ''} ${c.google_key ? '' : 'disabled'}>Google Maps${c.google_key ? '' : ' (Schlüssel fehlt)'}</option>
+      <option value="offline" ${c.route_service === 'offline' ? 'selected' : ''}>offline (eingebautes Netz)</option></select></label>
+    <details class="help"><summary>Welcher Dienst?</summary><ul class="small">
+      <li><b>OpenStreetMap</b>: der Routing-Server des Vereins FOSSGIS, gratis für leichte Nutzung. Jede Etappe wird nur einmal gefragt, höchstens eine Anfrage pro Sekunde.</li>
+      <li><b>Google Maps</b>: braucht den Google-Schlüssel in den Add-on-Einstellungen mit aktivierter „Routes API“. Google rechnet 10'000 Anfragen im Monat gratis ab.</li>
+      <li><b>offline</b>: nichts verlässt das Add-on; die Route folgt dem groben eingebauten Strassennetz.</li>
+      <li>Antwortet der Dienst nicht oder mit einem riesigen Umweg, gilt die Offline-Schätzung und es wird später nochmals gefragt.</li></ul></details>
+    <div class="opts"><button class="primary" id="saveEst">Speichern</button><button class="btn" data-sync="roads">Routen neu berechnen</button></div></div>`;
   $('addOT').onclick = () => $('otlist').insertAdjacentHTML('beforeend', otRow());
   box.querySelectorAll('#otlist').forEach((l) => l.addEventListener('click', (e) => { if (e.target.closest('.rm')) e.target.closest('.prow').remove(); }));
   $('saveOT').onclick = () => {
@@ -523,6 +536,7 @@ async function loadConnectors() {
     save({owntracks: rows.map((o) => (o.password ? o : {...o, keep_password: true}))}, loadConnectors);
   };
   $('saveR').onclick = () => save({routing: $('routing').value}, loadConnectors);
+  $('saveEst').onclick = () => save({route_service: $('routeSvc').value}, loadConnectors);
   syncButtons(box); infoize(box);
   box.querySelectorAll('[data-goto]').forEach((b) => (b.onclick = () => showTab(b.dataset.goto)));
 }

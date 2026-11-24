@@ -24,7 +24,7 @@ from functools import lru_cache
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from . import airports, places
+from . import airports, places, routeservice
 from .geo import haversine_km, simplify
 from .modes import MIN_FLIGHT_KM, estimate_km, mode_of_pair, mode_of_text, modes_of_transport  # noqa: F401 - re-exported for tests
 from .timeparse import local_date
@@ -97,6 +97,7 @@ def wd(day: str) -> str:
 
 
 GUESS_KM = 12.0  # a flight end recorded further than this from the airport: the airport is a guess
+FAIL_RETRY_S = 3600  # a failed online route is asked again after an hour
 
 
 class Atlas:
@@ -113,7 +114,7 @@ class Atlas:
             db.scalar("SELECT COUNT(*) FROM points"), db.scalar("SELECT MAX(id) FROM points"),
             db.scalar("SELECT COUNT(*) FROM trips"), db.scalar("SELECT MAX(updated_at) FROM trips"),
             db.scalar("SELECT SUM(id) FROM trips"), db.scalar("SELECT COUNT(*) FROM segments"),
-            json.dumps([self.engine.s.labels, self.engine.s.who_options, self.engine.home]),
+            json.dumps([self.engine.s.labels, self.engine.s.who_options, self.engine.home, routeservice.active(self.engine.s)]),
         )
         # stable across restarts, and new with every add-on version (new code = new map data)
         return "a3-" + hashlib.sha256((json.dumps(parts, default=str) + _code_version()).encode()).hexdigest()[:16]
@@ -197,9 +198,25 @@ class Atlas:
             except OSError as exc:
                 log.warning("road cache not written: %s", exc)
 
-    @staticmethod
-    def _road_key(p, q) -> str:
-        return f"{p[0]:.2f},{p[1]:.2f}>{q[0]:.2f},{q[1]:.2f}"
+    def _service(self) -> str:
+        return routeservice.active(self.engine.s)
+
+    def _road_key(self, p, q) -> str:
+        key = f"{p[0]:.2f},{p[1]:.2f}>{q[0]:.2f},{q[1]:.2f}"
+        svc = self._service()
+        return key if svc == "offline" else f"{svc}:{key}"  # each service keeps its own answers
+
+    def reset_roads(self) -> int:
+        """Forget the estimated routes ("Routen neu berechnen"); they are asked again in the background."""
+        cache = self._roads()
+        n = len(cache)
+        cache.clear()
+        self.__dict__["_road_fail"] = {}
+        self._road_dirty = True
+        self._save_roads()
+        with self._lock:
+            self._mem, self._force = {}, True
+        return n
 
     def _road_path(self, p, q):
         """Road path p → q from the cache: list of [lat, lon], "none", or None (queued for ``fill_roads``).
@@ -210,27 +227,48 @@ class Atlas:
         key = self._road_key(p, q)
         if key in cache:
             return cache[key]
+        if self.__dict__.get("_road_fail", {}).get(key, 0) > time.monotonic():
+            return "none"  # the service failed a moment ago: offline estimate for now, ask again later
         self.__dict__.setdefault("_road_todo", {})[key] = (tuple(p), tuple(q))
         self._roads_pending = True
         return None
 
     def fill_roads(self, budget_s: float = 300) -> int:
         """Compute queued road routes (background thread). Returns how many are new; then the map is rebuilt."""
-        router = self._router()
+        svc = self._service()
+        router = self._router() if svc == "offline" else None
         todo = self.__dict__.get("_road_todo") or {}
-        if router is None or not todo:
+        if (router is None and svc == "offline") or not todo:
             return 0
-        cache, n, t0 = self._roads(), 0, time.monotonic()
+        cache, n, t0, errors = self._roads(), 0, time.monotonic(), 0
+        fail = self.__dict__.setdefault("_road_fail", {})
         for key, (p, q) in list(todo.items()):
             if time.monotonic() - t0 > budget_s:
                 break
-            try:
-                got = router.route(p, q)
-            except Exception as exc:  # noqa: BLE001 - a broken tile must never break the map
-                log.warning("road route failed: %s", exc)
-                got = "none"
-            if got is None:  # tiles not available right now: try again later
-                break
+            if svc != "offline":
+                try:
+                    got = routeservice.route(svc, p, q, self.engine.s.google_maps_api_key)
+                    errors = 0
+                except routeservice.RouteError as exc:  # never contains the key
+                    errors += 1
+                    log.warning("route service: %s", exc)
+                    fail[key] = time.monotonic() + FAIL_RETRY_S
+                    todo.pop(key, None)
+                    n += 1  # the map is built again with the offline estimate
+                    if errors >= 3:  # service down: offline estimates everywhere, ask again in an hour
+                        for k in list(todo):
+                            fail[k] = fail[key]
+                        todo.clear()
+                        break
+                    continue
+            else:
+                try:
+                    got = router.route(p, q)
+                except Exception as exc:  # noqa: BLE001 - a broken tile must never break the map
+                    log.warning("road route failed: %s", exc)
+                    got = "none"
+                if got is None:  # tiles not available right now: try again later
+                    break
             if isinstance(got, list):
                 got = [[round(a, 4), round(b, 4)] for a, b in simplify(got, 0.003)]
             cache[key] = got
@@ -247,7 +285,7 @@ class Atlas:
         """Estimated way for a trip without GPS. Cars follow roads (motorways, main roads); where there is no way by
         land a ferry; without road data the coarse land grid of ``ground_route``."""
         runs = self.ground_route(a, b, mode)
-        if mode != "road" or self._router() is None:
+        if mode != "road" or (self._service() == "offline" and self._router() is None):
             return runs
         out = []
         for sea, flat in runs:

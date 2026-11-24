@@ -39,7 +39,7 @@ def settings():
             {"entity": "person.sam", "label": "Sam"},
         ],
         "who_options": ["Paar", "Familie"],
-        "home_lat": HOME[0], "home_lon": HOME[1], "min_day_trip_km": 1,
+        "home_lat": HOME[0], "home_lon": HOME[1], "min_day_trip_km": 1, "route_service": "offline",
         "routing": "off",
         "school_holidays": ["2025-07-05..2025-08-10"],
     })
@@ -54,3 +54,13 @@ def engine(db, settings):
 def _no_supervisor(monkeypatch):
     monkeypatch.delenv("SUPERVISOR_TOKEN", raising=False)
     os.environ.pop("SUPERVISOR_TOKEN", None)
+
+
+@pytest.fixture(autouse=True)
+def _no_route_service(monkeypatch):
+    """Tests never reach the online routing services."""
+    from worldmap import routeservice
+
+    def blocked(*a, **k):
+        raise routeservice.RouteError("network blocked in tests")
+    monkeypatch.setattr(routeservice, "_call", blocked)

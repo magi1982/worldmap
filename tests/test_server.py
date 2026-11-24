@@ -164,12 +164,13 @@ def test_validators():
                               "owntracks": [{"user": "alex", "password": "secret-123", "label": "Alex"}],
                               "notify_service": "notify.mobile_app_x", "school_holidays": ["2025-07-05..2025-08-10"],
                               "unknown_key": "ignored"})
+    assert validate_connectors({"route_service": "google"}) == {"route_service": "google"}
     assert "unknown_key" not in ok and ok["owntracks"][0]["user"] == "alex" and "entity" not in ok["persons"][1]
     for bad in ({"persons": [{"entity": "light.x", "label": "A"}]},
                 {"persons": [{"entity": "person.a", "label": "<b>"}]},
                 {"owntracks": [{"user": "Alex Smith", "password": "secret-123", "label": "Alex"}]},
                 {"owntracks": [{"user": "alex", "password": "short", "label": "Alex"}]},
-                {"notify_service": "shell_command.x"}, {"routing": "maybe"},
+                {"notify_service": "shell_command.x"}, {"routing": "maybe"}, {"route_service": "http://evil"},
                 {"school_holidays": ["July"]}):
         with pytest.raises(ValueError):
             validate_connectors(bad)
@@ -202,6 +203,9 @@ def test_settings_endpoints(server):
     assert js(call(url + "/api/notify_services")[1]) == []  # no Home Assistant in tests
     assert call(url + "/api/notify_test", "POST", {})[0] == 503
     assert call(url + "/api/sync/photos", "POST", {})[0] == 404
+    con = js(call(url + "/api/connectors")[1])
+    assert con["route_service"] == "offline" and con["google_key"] is False and "google_maps_api_key" not in con
+    assert call(url + "/api/sync/roads", "POST", {})[0] in (202, 409)   # "Routen neu berechnen"
 
 
 def test_validate_groups_home_work():

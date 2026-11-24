@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.13.0 – 2026-11-24
+
+### Added
+- **Real roads for trips entered by hand**: every car / camper / bus leg of a trip without GPS is asked once from a
+  routing service and the real way is drawn as a dashed estimate. New option `route_service` (also in the app under
+  Connections › Estimated routes): `osm` (default – the free OpenStreetMap routing server of FOSSGIS), `google`
+  (Google Routes API with your key; 10,000 free requests a month) or `offline`. Flights stay arcs between airports,
+  ships stay ferry lines, trains keep the built-in estimate.
+- Button **"Routen neu berechnen"** to ask all estimated routes again.
+
+### Privacy & security
+- Only start and end of a leg are sent, rounded to about 2 km; never names, dates or people. https only to the two
+  routing hosts, at most one request a second, each leg once (stored, also across restarts). The Google key is sent
+  in a header and never logged.
+- When the service fails or answers a far detour, the offline estimate is shown and the leg is asked again an hour later.
+
 ## 0.12.6 – 2026-11-24
 
 ### Fixed

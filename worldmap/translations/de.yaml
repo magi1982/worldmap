@@ -61,12 +61,15 @@ configuration:
   history_days_on_start:
     name: Verlauf beim Start (Tage)
     description: Positionen aus dem Home-Assistant-Recorder beim Start.
+  route_service:
+    name: Routen für Reisen ohne GPS
+    description: osm = jede Auto-, Wohnmobil- und Busetappe einer von Hand erfassten Reise wird einmal beim kostenlosen OpenStreetMap-Routing-Server von FOSSGIS (routing.openstreetmap.de) angefragt. google = Google Routes API (braucht deinen API-Schlüssel mit aktivierter Routes API; 10'000 Anfragen pro Monat gratis). offline = nur das eingebaute Strassennetz, nichts wird gesendet. Gesendet werden nur Start und Ziel, auf etwa 2 km gerundet – nie Namen, Daten oder Personen. Flüge bleiben Bögen.
   place_search:
     name: Ortssuche beim Erfassen einer Reise
     description: offline = nur die eingebaute Liste (Europa genau, grosse Städte und Länder weltweit). osm = zusätzlich OpenStreetMap (gratis, das Suchwort geht an nominatim.openstreetmap.org). google = Google Maps (braucht einen eigenen API-Schlüssel mit „Places API“; das Suchwort geht an Google).
   google_maps_api_key:
     name: Google-Maps-API-Schlüssel (optional)
-    description: Nur für die Ortssuche „google“. In der Google Cloud Console mit der „Places API (New)“ erstellen. Er bleibt im Add-on und wird in der App nie angezeigt.
+    description: Für Ortssuche und Routen „google“. In der Google Cloud Console mit der „Places API (New)“ und für Routen der „Routes API“ erstellen. Er bleibt im Add-on und wird in der App nie angezeigt.
   routing:
     name: Bahn- und Strassennetz
     description: >-

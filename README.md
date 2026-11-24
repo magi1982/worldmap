@@ -75,7 +75,8 @@ Everything can be set in the app (⚙️ **Settings**) or in the add-on configur
 | `work_lat` / `work_lon` / `work_radius_m` | – / – / 300 | workplace; empty = detected automatically |
 | `show_work` | false | show the workplace on the map |
 | `place_search` | osm | place search when adding a trip: `offline`, `osm` (OpenStreetMap, free) or `google` (needs `google_maps_api_key`) – only the search word is sent |
-| `google_maps_api_key` | "" | your own Google Places API (New) key, only for `place_search: google` |
+| `route_service` | osm | real roads for car / camper / bus legs of trips without GPS (entered by hand or only stations): `osm` (OpenStreetMap routing server of FOSSGIS, free, light use), `google` (Google Routes API, needs `google_maps_api_key` with the Routes API; 10,000 free requests a month) or `offline` (built-in network, nothing sent). Each leg is asked once and stored; only start and end rounded to ~2 km are sent. Flights stay arcs. Also in the app under Connections › Estimated routes, with a button "Routen neu berechnen" |
+| `google_maps_api_key` | "" | your own Google key: Places API (New) for `place_search: google`, Routes API for `route_service: google` |
 | `home_airport` | "" | IATA code of your home airport (e.g. ZRH); empty = the airport most recorded flights start from |
 | `min_trip_km` | 30 | with a night away, a trip starts at this distance |
 | `min_day_trip_km` | 100 | a day out without a night away counts as a trip from this distance |
@@ -111,6 +112,6 @@ Ideas and the roadmap live in [NEXT.md](NEXT.md).
 Map and place data: [Natural Earth](https://www.naturalearthdata.com/) (public domain, including the regions and city names in other languages),
 airports: [OurAirports](https://ourairports.com/data/) (public domain), main roads, ferries and railways: Natural Earth (public domain),
 place names: [GeoNames](https://www.geonames.org/) (CC BY 4.0). Rail and road network: © [OpenStreetMap](https://www.openstreetmap.org/copyright)
-contributors via [OpenFreeMap](https://openfreemap.org/).
+contributors via [OpenFreeMap](https://openfreemap.org/); estimated routes: OpenStreetMap routing by [FOSSGIS](https://routing.openstreetmap.de/) (© OpenStreetMap contributors) or Google.
 
 License: MIT
