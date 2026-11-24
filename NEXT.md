@@ -275,3 +275,9 @@ Ideen werden zuerst hier gesammelt. Code entsteht erst nach einem ausdrückliche
 - 3 Reiseideen (Ja): eigener Bereich, nicht in der Reiseliste; Ort, wer, Jahreszeit, Notiz; automatisch abgehakt bei Reise im Umkreis (30 km, einstellbar); Dashboard-Kachel „Noch offen“
 - 5 3D-Globus (Vorschau): Punkte-Globus, Tag/Nacht, Bögen nach Jahr, Flugzeug auf gewählter Route; Zoom passt sich an (regionale Daten → näher)
 - 6 Poster (Vorschau): Neon/Papier/SW, A3/A2/50×50, Welt/Europa (automatisch), Beschriftung ohne Überlappung, Zahlen + Länder
+
+### Feedback Runde 2 (25.11.)
+- 3 Reiseideen: **Ja** (wie Vorschau)
+- 5 3D-Globus: Verbessern – Ziehen fühlt sich seitenverkehrt an (Globus muss der Hand folgen); richtig reinzoomen; echte Karte statt Punkte, immer im gewählten Kartenstil (Hell/Dunkel/Neon/Miniwelt …); Vollbild-Knopf; Screenshot-Knopf mit Teilen
+- 6 Poster: Verbessern – viel zu wenig Details; für A2 so detailreich wie die Karte selbst (Tracks, Stationen, Regionen, Länderfarben, Beschriftungen) in Druckauflösung
+- Neu: Kartenstil „Miniwelt“ (Gelände aus Landumrissen: Wiesen, Wälder, Wüste, Gebirge mit Schnee, flaches/tiefes Meer; Wolken, Wellen, Flugzeuge; Nacht mit leuchtenden Orten; Minimap) – Vorschau geschickt, Antwort offen
