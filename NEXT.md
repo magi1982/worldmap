@@ -82,7 +82,26 @@ Ideen werden zuerst hier gesammelt. Code entsteht erst nach einem ausdrückliche
       points, field list, a short invented example) and a copy button – paste it into any AI together with your
       own file, get back a `*.worldmap.json` to drop in here. Also a download "Beispiel.worldmap.json" (sample data).
       Hint: only share what you are fine giving to that AI service.
-- [ ] Tests (date parsing of all forms, sorting, migration, package round trip), README EN/DE, changelog.
+- [ ] Wording & design: buttons get short, telling names; every longer explanation moves behind an "i" info button
+      that gently pulses (stops after it was opened once, respects "reduce motion") so you see there is help.
+- [ ] Overview "So kommen Daten in Worldmap" also lists:
+      - **Von Hand**: "Reise von Hand" wizard and editing in the trip list (with vague dates).
+      - **Home Assistant Companion app**: sends GPS only while Home Assistant is reachable – on the road that needs
+        remote access, i.e. Home Assistant Cloud (Nabu Casa) or your own VPN / domain; it does not keep positions
+        while offline.
+      - **OwnTracks**: collects positions on the phone and sends them when you are home again (no Nabu Casa, no open
+        port) – step by step with URL, user, password.
+      - **Photo galleries with exiftool**: one ready command (`exiftool -csv -n -r -GPSLatitude -GPSLongitude
+        -DateTimeOriginal <folder> > fotos.csv`, Windows/Mac/Linux) and drop the CSV here.
+      - **Ask Claude**: e.g. "list GPS and date of all photos in my iCloud Photos folder on Windows (or the Photos
+        library on the Mac) as CSV" – with folder access in the Claude desktop app – then drop the CSV here.
+- [ ] Review of ALL settings pages (people, map style, trips, data & import, connections, notifications, questions &
+      rules): one consistent layout, plain German, short labels, info buttons, no duplicate or dead options.
+- [ ] Import quality check: run every importer against the sample files and against malformed / mixed files
+      (wrong date formats, comma vs. dot, swapped lat/lon, empty rows, duplicates, time zones, HEIC exiftool
+      output, huge files); clear summary after each import ("1234 Punkte, 12 Reisen, 3 Zeilen übersprungen: …").
+- [ ] Tests (date parsing of all forms, sorting, migration, package round trip, importer edge cases), README EN/DE,
+      changelog.
 
 ### Photos as a location source – for every user (waiting for "mach es")
 - [ ] Scan photo folders for where and when each photo was taken (EXIF GPS + time). Only the metadata is read; photos
