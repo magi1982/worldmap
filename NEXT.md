@@ -64,6 +64,21 @@ Ideen werden zuerst hier gesammelt. Code entsteht erst nach einem ausdrückliche
 
 ## Next update – waiting for "mach es" / Nächstes Update – wartet auf „mach es“
 
+### Dashboard first, clearer choices, a real postcard (waiting for "mach es")
+- [ ] Tab order: **Dashboard first** in the bar (1 Dashboard, 2 Reisen, …), but Worldmap still **opens on the map**
+      (Reisen) – a remembered last tab is not used; number keys follow the new order.
+- [ ] Dashboard controls look different from the tab bar: the views (Übersicht, Jahresrückblick, Familie,
+      Entdecker, Wandtablet, Eigene) become small picture cards with an icon, a colour and one line; "Anzeigen für"
+      becomes round avatars in the person colours; "Kacheln" / "bearbeiten" become one clear "✏️ Anpassen" button.
+- [ ] **Reise-Postkarte, much better**: a real postcard look – front with the real map of the trip (coastlines,
+      the route as recorded or estimated: plane arcs, car/train lines, ship lines, stations with their icons),
+      big handwritten-style place name, a stamp with the country (colour, perforated edge) and a postmark with date
+      and place; flip it (tap) to the back: "Grüsse aus …", dates or "Juli 2009", nights, km per transport, who was
+      there, stations in order, address field with home. Swipe / arrows for the previous and next trip, "Zufall"
+      for a random memory, "Als Bild speichern" (PNG, made in the browser). Wall-tablet view turns it every 15 s.
+- [ ] Tests (tab order, postcard data for trips with stations / only a country / vague dates), README EN/DE,
+      new screenshots.
+
 ### Vague dates, "Daten & Import" tab, AI helper (done in 0.14.0)
 - [x] Trips can have a day, only a month or only a year ("summer 2009, don't know exactly"). New trip field
       `date_prec` = day | month | year; the trip list shows "13.–25.07.2009", "Juli 2009" or "2009". The date cell
