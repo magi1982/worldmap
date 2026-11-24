@@ -17,7 +17,7 @@ Ideen werden zuerst hier gesammelt. Code entsteht erst nach einem ausdrückliche
 - Add-on with Ingress UI: map, trip list, questions, import, connectors, "trip by hand" wizard.
 - Import with format detection: Google Timeline (Takeout, on-device Android/iOS), CSV/Excel with unknown columns (iCloud, exiftool, German headers), GPX, KML.
 - Live positions from `person.*` / `device_tracker.*`, history backfill from the recorder.
-- Photo EXIF scan of folders under `/media` and `/share`.
+- (Photo EXIF scan of folders: planned, not built – see "Photos as a location source" below.)
 - Trip detection, merging of people travelling together, who-suggestions with confidence.
 - Notifications (mobile app or persistent notification), sensors `sensor.worldmap_*`.
 - Gap routing via OSRM (optional) and flight arcs.
