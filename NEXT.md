@@ -64,6 +64,26 @@ Ideen werden zuerst hier gesammelt. Code entsteht erst nach einem ausdrückliche
 
 ## Next update – waiting for "mach es" / Nächstes Update – wartet auf „mach es“
 
+### Vague dates, "Daten & Import" tab, AI helper (waiting for "mach es")
+- [ ] Trips can have a day, only a month or only a year ("summer 2009, don't know exactly"). New trip field
+      `date_prec` = day | month | year; the trip list shows "13.–25.07.2009", "Juli 2009" or "2009". The date cell
+      accepts "13.07.2009", "07.2009", "Juli 2009" or "2009" (also as a range "2008–2009"); the wizard already asks
+      year / month and now stores the precision too. Map, film, dashboard and sorting use a representative date
+      (mid-month / mid-July), shown with "~". Migration: hand trips marked "approx" from the wizard get month/year
+      precision when their dates are the wizard placeholders; everything else stays "day". Worldmap package, CSV
+      export and the trip-list import carry the field.
+- [ ] "Import" and "Verbindungen" become one tab **"📦 Daten & Import"** (rarely used, so it explains itself):
+      1. "So kommen Daten in Worldmap" – short overview cards: Worldmap-Paket (the standard format of this map,
+         backup / move / import), Google Zeitachse (phone export), live from Home Assistant / OwnTracks, files
+         (GPX, KML, CSV/Excel trip lists, photo CSV), Apple users (no timeline export: OwnTracks, photos), and
+         "everything else: let an AI convert it" (below).
+      2. Drop zone + past imports (as now). 3. Connections (as now).
+- [ ] Small box **"Andere Daten? Mit einer KI umwandeln"**: a ready prompt with the Worldmap JSON format (trips +
+      points, field list, a short invented example) and a copy button – paste it into any AI together with your
+      own file, get back a `*.worldmap.json` to drop in here. Also a download "Beispiel.worldmap.json" (sample data).
+      Hint: only share what you are fine giving to that AI service.
+- [ ] Tests (date parsing of all forms, sorting, migration, package round trip), README EN/DE, changelog.
+
 ### Photos as a location source – for every user (waiting for "mach es")
 - [ ] Scan photo folders for where and when each photo was taken (EXIF GPS + time). Only the metadata is read; photos
       are never copied, changed or sent anywhere. Read-only access to `/media` and `/share` (add-on `map`), so
