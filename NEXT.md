@@ -281,3 +281,5 @@ Ideen werden zuerst hier gesammelt. Code entsteht erst nach einem ausdrückliche
 - 5 3D-Globus: Verbessern – Ziehen fühlt sich seitenverkehrt an (Globus muss der Hand folgen); richtig reinzoomen; echte Karte statt Punkte, immer im gewählten Kartenstil (Hell/Dunkel/Neon/Miniwelt …); Vollbild-Knopf; Screenshot-Knopf mit Teilen
 - 6 Poster: Verbessern – viel zu wenig Details; für A2 so detailreich wie die Karte selbst (Tracks, Stationen, Regionen, Länderfarben, Beschriftungen) in Druckauflösung
 - Neu: Kartenstil „Miniwelt“ (Gelände aus Landumrissen: Wiesen, Wälder, Wüste, Gebirge mit Schnee, flaches/tiefes Meer; Wolken, Wellen, Flugzeuge; Nacht mit leuchtenden Orten; Minimap) – Vorschau geschickt, Antwort offen
+- Miniwelt v1: Verbessern – zu weich, man sieht kaum, wo man war; Berge echter und detailreicher; Zoom muss gehen. Gewünscht: Catan-Stil, nur offline (kein Download von Reliefdaten)
+- Miniwelt v2 (Vorschau): Sechseck-Spielbrett, Felder teilen sich beim Zoomen (≈150 km bis ≈1 km), Gebirge von Hand nach echter Lage (>120 Züge), besuchte Felder mit goldenem Rand, Siedlung und Zähl-Chip, Zuhause als Stadt, Minimap, Vollbild, Karte folgt dem Finger
