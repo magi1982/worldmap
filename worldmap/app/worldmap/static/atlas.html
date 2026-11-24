@@ -13,7 +13,7 @@
 <header class="top">
  <a class="brand" href="./"><img src="logo.svg" alt="" width="26" height="26">Reisen <span id="brandyears"></span></a>
  <nav class="tabs" id="tabs" aria-label="Karten">
-  <button data-t="reisen" class="on"><i>1</i>Reisen</button><button data-t="spuren"><i>2</i>Spuren</button><button data-t="orte"><i>3</i>Orte &amp; Tage</button><button data-t="regionen"><i>4</i>Regionen</button><button data-t="zeit"><i>5</i>Reisefilm</button><button data-t="dash"><i>6</i>Dashboard</button>
+  <button data-t="dash"><i>1</i>Dashboard</button><button data-t="reisen" class="on"><i>2</i>Reisen</button><button data-t="spuren"><i>3</i>Spuren</button><button data-t="orte"><i>4</i>Orte &amp; Tage</button><button data-t="regionen"><i>5</i>Regionen</button><button data-t="zeit"><i>6</i>Reisefilm</button>
  </nav>
  <div class="acts">
   <button class="ico q" id="qbtn" hidden title="Offene Fragen" aria-label="Offene Fragen"><svg width="22" height="22" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5c5.2 0 9.5 3.9 9.5 8.7 0 4.8-4.3 8.7-9.5 8.7-1 0-2-.1-2.9-.4L4 21.5l1.3-4.2C3.6 15.7 2.5 13.5 2.5 11.2 2.5 6.4 6.8 2.5 12 2.5z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M9.6 9.1c.2-1.3 1.2-2.1 2.5-2.1 1.4 0 2.5.9 2.5 2.2 0 1.8-2.5 1.9-2.5 3.6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><circle cx="12.1" cy="15.4" r="1.2" fill="currentColor"/></svg><b id="qbadge"></b></button>
@@ -25,9 +25,10 @@
 <main class="dash" id="dash" hidden>
  <div class="dash-h">
   <div><div class="kicker">DASHBOARD · REISEN IN ZAHLEN</div><h1>Eure Reisen auf einen Blick</h1><div class="sub" id="dash-sub"></div></div>
-  <div class="dash-ctl"><div class="dash-presets" id="dash-presets" role="group" aria-label="Dashboard wählen"></div><button class="dbtn" id="dash-tiles" aria-haspopup="true">Kacheln</button><div class="dash-menu" id="dash-menu" hidden></div></div>
+  <div class="dash-ctl"><button class="dbtn dedit" id="dash-tiles" aria-haspopup="true">✏️ Anpassen</button><div class="dash-menu" id="dash-menu" hidden></div></div>
+  <div class="dash-row"><span class="dlab">Ansicht</span><div class="dash-presets" id="dash-presets" role="radiogroup" aria-label="Ansicht wählen"></div></div>
   <p class="dash-pdesc" id="dash-pdesc"></p>
-  <div id="dash-who"></div>
+  <div class="dash-row"><span class="dlab">Für wen</span><div id="dash-who"></div></div>
  </div>
  <div class="dash-b" id="dashb"></div>
 </main>

@@ -183,7 +183,8 @@ function flightSel(f){if(!SEL)return true;const pn=f[4]>=0?D.persons[f[4]]:null;
 function placeSel(p){if(!SEL||p[9]=='Zuhause')return true;if(p[8]>=0&&tripById[p[8]]&&tripById[p[8]].w==SEL)return true;return !isGroup(SEL)&&!!(p[10]&selMask())}
 function whoBar(){const ps=D.persons||[],gs=GCFG().map(g=>g.name);const box=$('whobar');
  if(!ps.length&&!gs.length){box.innerHTML='<div class="wb-empty">Noch keine Personen oder Gruppen. <a href="app.html#people">Einrichten</a></div>';return}
- const chip=(n,ico)=>`<button class="chip ${SEL==n?'on':''}" style="--c:${n?WCOL[n]||'#8B3DFF':MC.strong}" data-n="${esc(n||'')}" aria-pressed="${SEL==n}"><i></i>${ico}${esc(n||'Alle')}</button>`;
+ const ini=n=>n?String(n).trim().split(/\s+/).map(w=>w[0]).join('').slice(0,2).toUpperCase():'★';
+ const chip=(n,ico)=>`<button class="chip ${SEL==n?'on':''}" style="--c:${n?WCOL[n]||'#8B3DFF':MC.strong}" data-n="${esc(n||'')}" aria-pressed="${SEL==n}"><i></i><b class="av" aria-hidden="true">${esc(ini(n))}</b>${ico}<span class="cn">${esc(n||'Alle')}</span></button>`;
  box.innerHTML='<div class="wb-t">ANZEIGEN FÜR <span class="r"><label class="aswitch" title="Flugzeuge, Züge und Autos bewegen sich"><input type="checkbox" id="animT"'+(animWanted()?' checked':'')+'><span></span>ANIMATION</label><a href="app.html#people" title="Personen und Gruppen bearbeiten">bearbeiten</a></span></div><div class="chips">'+chip(null,'')+ps.map(n=>chip(n,'<span class="wi" aria-hidden="true">👤</span>')).join('')+gs.map(n=>chip(n,'<span class="wi" aria-hidden="true">👥</span>')).join('')+'</div>';
  box.querySelectorAll('.chip').forEach(b=>b.onclick=()=>setSel(b.dataset.n||null));const at=$('animT');if(at)at.onchange=()=>{try{localStorage.setItem('wm-anim',at.checked?'1':'0')}catch(e){}full();animRestart()}}
 function setSel(n){SEL=SEL==n?null:n;SELV++;
@@ -805,21 +806,22 @@ document.querySelectorAll('.panel').forEach(pn=>{const h=pn.querySelector('h1');
 const DASH={tiles:null,pc:null,year:null,preset:null,kt:0};
 /* five ready-made dashboards; "eigene" is the user's own choice of tiles */
 const DPRESETS=[
- ['all','Übersicht','Alles auf einer Seite.',null,{}],
- ['year','Jahresrückblick','Ein Jahr wählen – alle Kacheln zeigen nur dieses Jahr.',['kpi','calendar','records','postcard','passport','wheel','co2'],{year:1}],
- ['family','Familie','Wer war wann wo – und die Orte, an die ihr immer wieder geht.',['kpi','lanes','postcard','favs','passport'],{}],
- ['explorer','Entdecker','Wie viel Welt ihr schon gesehen habt – und was noch fehlt.',['earth','passport','blank','records','co2'],{}],
- ['kiosk','Wandtablet','Grosse Schrift für das Tablet am Kühlschrank; die Postkarte wechselt alle 15 Sekunden.',['kpi','postcard','earth','calendar'],{kiosk:1}],
+ ['all','Übersicht','Alles auf einer Seite.',null,{},'🗺️','#2D7BFF'],
+ ['year','Jahresrückblick','Ein Jahr wählen – alle Kacheln zeigen nur dieses Jahr.',['kpi','calendar','records','postcard','passport','wheel','co2'],{year:1},'📅','#FF2DAA'],
+ ['family','Familie','Wer war wann wo – und die Orte, an die ihr immer wieder geht.',['kpi','lanes','postcard','favs','passport'],{},'👨‍👩‍👧','#00C26E'],
+ ['explorer','Entdecker','Wie viel Welt ihr schon gesehen habt – und was noch fehlt.',['earth','passport','blank','records','co2'],{},'🧭','#FF8A00'],
+ ['kiosk','Wandtablet','Grosse Schrift für das Tablet am Kühlschrank; die Postkarte wechselt alle 15 Sekunden.',['postcard','kpi','earth','calendar'],{kiosk:1},'🖼️','#00B8C9'],
 ];
+const DOWN=['own','Eigene','Deine eigene Auswahl über „Anpassen“.',null,{},'✏️','#8B3DFF'];
 function dPreset(){if(DASH.preset)return DASH.preset;let v='all';try{v=localStorage.getItem('wm-dash-preset')||'all'}catch(e){}DASH.preset=DPRESETS.some(p=>p[0]==v)||v=='own'?v:'all';return DASH.preset}
 function dOpts(){const p=DPRESETS.find(x=>x[0]==dPreset());return p?p[4]:{}}
 function dOrder(){const p=DPRESETS.find(x=>x[0]==dPreset());if(p&&p[3])return p[3];const on=dTilesOn();return DTILES.map(t=>t[0]).filter(k=>p||on.has(k))}
 const DTILES=[
  ['kpi','Auf einen Blick','Die wichtigsten Zahlen der gewählten Person oder Gruppe.'],
+ ['postcard','Reise-Postkarte','Jede Reise als Postkarte mit der echten Karte, Route, Briefmarke und Poststempel. Antippen dreht sie um, Wischen oder ‹ › blättert, 🎲 zeigt eine zufällige Erinnerung, ⬇ speichert die Vorderseite als Bild.'],
  ['earth','Um die Erde','Alle Reise-Kilometer zusammen, gemessen am Erdumfang (40’075 km) und am Weg zum Mond (384’400 km). Alltag zählt nicht mit.'],
  ['records','Rekorde','Weiteste, längste und kilometerreichste Reise, längste Autofahrt und das Jahr mit den meisten Ländern. Antippen öffnet die Postkarte.'],
  ['passport','Länder-Pass','Ein Stempel pro Land, mit dem Jahr des ersten Besuchs. Je mehr Reisen, desto kräftiger der Stempel.'],
- ['postcard','Reise-Postkarte','Eine Reise als Postkarte: Route mit den Stationen, Daten, Verkehrsmittel und wer dabei war.'],
  ['calendar','Reise-Kalender','Alle Tage eines Jahres; farbig sind die Reisetage, nach Person oder Gruppe gefärbt.'],
  ['lanes','Familien-Zeitstrahl','Eine Spur pro Person über die Jahre. Gemeinsame Reisen verbinden die Spuren mit einer Linie.'],
  ['wheel','Reise-Rad','Wann im Jahr ihr reist: pro Monat die Reisenächte, nach dem wichtigsten Verkehrsmittel der Reise gefärbt.'],
@@ -873,24 +875,123 @@ function tPassport(T){const first={},cnt={};for(const t of T)for(const c of dCou
  return `<div class="dpass">${cs.map(c=>{const h=dHash(c),col=pal[h%pal.length],rot=(h%23)-11,op=Math.min(1,.55+cnt[c]*.12);
   return `<div class="dstamp" style="--c:${col};transform:rotate(${rot}deg);opacity:${op}" title="${esc(c)}: ${cnt[c]} ${cnt[c]==1?'Reise':'Reisen'}"><b>${esc(A3[c.toLowerCase()]||c.slice(0,3).toUpperCase())}</b><span>${esc(c)}</span><em>${first[c].slice(0,4)}</em></div>`}).join('')}</div>`}
 
+/* ---------------------------------------------------------------- the postcard
+   Front: the real map of the trip (land from the base map, the route as recorded or estimated), a stamp of the
+   country and a postmark. Back: greetings, dates, km per transport, who was there, stations. Tap to turn over. */
+const PCS={flip:false};
+const PC_HAND="'Segoe Script','Bradley Hand','Snell Roundhand','Apple Chancery','Comic Sans MS',cursive";
+function pcTrip(T){const t=T.find(x=>x.id==DASH.pc)||T[T.length-1];DASH.pc=t.id;return t}
+function pcCountry(t){return dCountries(t)[0]||''}
+const PC_A3={grossbritannien:'GBR','vereinigtes königreich':'GBR',england:'GBR',schottland:'GBR',wales:'GBR',usa:'USA','vereinigte staaten':'USA',holland:'NLD',niederlande:'NLD',tschechien:'CZE',russland:'RUS',südkorea:'KOR',vae:'ARE','vereinigte arabische emirate':'ARE'};
+function pcA3(c){const A3={...PC_A3};for(const k in (RG.countries||{}))A3[RG.countries[k].toLowerCase()]=k;return A3[c.toLowerCase()]||PC_A3[c.toLowerCase()]||c.slice(0,3).toUpperCase()}
+function pcStations(t){return t.st&&t.st.length?t.st.map(x=>({la:x[0],lo:x[1],n:x[3]?'✈ '+x[3]:x[2],ap:x[3]||''})):t.nopos?[]:[{la:t.p[0],lo:t.p[1],n:t.name}]}
 function tPostcard(T){if(!T.length)return '<div class="empty">Noch keine Reisen.</div>';
- const t=T.find(x=>x.id==DASH.pc)||T[T.length-1];DASH.pc=t.id;
- const pts=[[HOME[0],HOME[1],'Zuhause']].concat(t.st&&t.st.length?t.st.map(x=>[x[0],x[1],x[3]?'✈ '+x[3]:x[2]]):t.nopos?[]:[[t.p[0],t.p[1],t.name]]);
- let la0=90,la1=-90,lo0=180,lo1=-180;for(const [a,b] of pts){la0=Math.min(la0,a);la1=Math.max(la1,a);lo0=Math.min(lo0,b);lo1=Math.max(lo1,b)}
- const W=260,H=170,pad=22,kx=Math.cos((la0+la1)/2*Math.PI/180),sw=Math.max((lo1-lo0)*kx,.2),sh=Math.max(la1-la0,.2),s=Math.min((W-2*pad)/sw,(H-2*pad)/sh);
- const X=b=>W/2+((b-(lo0+lo1)/2)*kx)*s,Y=a=>H/2-(a-(la0+la1)/2)*s;
- const legs=(t.lg||[]);let path='';
- for(let i=1;i<pts.length;i++){const [a,b]=pts[i-1],[c,d]=pts[i];const m=legs[i-1]&&legs[i-1].m||dMain(t);const x1=X(b),y1=Y(a),x2=X(d),y2=Y(c);
-  const bend=m=='fly'?.25:0,mx=(x1+x2)/2-(y2-y1)*bend,my=(y1+y2)/2+(x2-x1)*bend;
-  path+=`<path d="M${x1.toFixed(1)} ${y1.toFixed(1)} Q${mx.toFixed(1)} ${my.toFixed(1)} ${x2.toFixed(1)} ${y2.toFixed(1)}" fill="none" stroke="${MCOL[m]||'#8B3DFF'}" stroke-width="3" stroke-linecap="round" ${m=='fly'?'stroke-dasharray="1 6"':''}/>`}
- const dots=pts.map(([a,b,n],i)=>`<circle cx="${X(b).toFixed(1)}" cy="${Y(a).toFixed(1)}" r="${i?5:4}" fill="${i?dCol(t.w):'var(--ink)'}" stroke="var(--paper)" stroke-width="2"/>${pts.length<=6?`<text x="${X(b).toFixed(1)}" y="${(Y(a)-9).toFixed(1)}" text-anchor="middle" font-size="10" font-weight="700" fill="var(--ink)">${esc(String(n).slice(0,18))}</text>`:''}`).join('');
+ const t=pcTrip(T),i=T.indexOf(t);
  const opts=[...T].reverse().map(x=>`<option value="${x.id}" ${x.id==t.id?'selected':''}>${x.y} · ${esc(x.name)}</option>`).join('');
- return `<select class="dsel" id="dpc-sel" aria-label="Reise wählen">${opts}</select>
- <div class="dpc"><div class="dpc-m"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Route ${esc(t.name)}"><rect width="${W}" height="${H}" rx="10" fill="var(--sea)"/>${path}${dots}</svg><div class="dpc-stamp" style="--c:${dCol(t.w)}">${t.y}</div></div>
- <div class="dpc-t"><h4>${esc(t.name)}</h4><p>${dRange(t)} · ${t.n||0} ${t.n==1?'Nacht':'Nächte'}</p>
-  <p>${esc(dCountries(t).join(', ')||'Land offen')}</p><p>${(t.m||[]).map(m=>`<span class="dpill" style="--c:${MCOL[m]}">${MNAME[m]}</span>`).join(' ')}</p>
-  <p><span class="dpill" style="--c:${dCol(t.w)}">${esc(t.w)}</span> · ${fmt(t.km||0)} km${t.approx||t.nopos?' · <span class="dmute">ungenau</span>':''}</p>
-  ${t.st&&(t.st.length>1||t.st.some(x=>x[3]))?`<p class="dmute">Stationen: ${t.st.map(x=>esc(x[3]?'✈ '+x[3]:x[2])).join(' → ')}</p>`:''}</div></div>`}
+ return `<div class="pcw" id="pcw">
+  <div class="pcard${PCS.flip?' flip':''}" id="pcard" tabindex="0" role="button" aria-label="Postkarte ${esc(t.name)} – antippen zum Umdrehen, wischen für die nächste Reise">
+   <div class="pcin"><div class="pcf"><canvas id="pccv" width="1200" height="800" role="img" aria-label="Karte der Reise ${esc(t.name)}"></canvas></div><div class="pcb">${pcBack(t)}</div></div></div>
+  <div class="pcnav"><button class="pcbtn" data-pc="prev" aria-label="Vorherige Reise" ${i<=0?'disabled':''}>‹</button>
+   <select class="dsel" id="dpc-sel" aria-label="Reise wählen">${opts}</select>
+   <button class="pcbtn" data-pc="next" aria-label="Nächste Reise" ${i>=T.length-1?'disabled':''}>›</button>
+   <span class="pcsp"></span><button class="pcbtn txt" data-pc="rnd" title="Eine zufällige Reise">🎲 Zufall</button><button class="pcbtn txt" data-pc="flip">↻ Umdrehen</button><button class="pcbtn txt" data-pc="png" title="Vorderseite als Bild speichern">⬇ Bild</button></div></div>`}
+function pcBack(t){const by=Object.entries(t.k||{}).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]);const st=pcStations(t);
+ const cs=dCountries(t),h=dHash(pcCountry(t)||t.name),pal=['#FF3D9A','#0A7CFF','#12A84F','#8B3DFF','#FF8A00','#00BFB3','#D23DB0'],col=pal[h%pal.length];
+ return `<div class="pcmsg"><p class="pchi">Grüsse aus ${esc(t.name)}!</p>
+  <p>${esc(dRange(t))} · ${t.n||0} ${t.n==1?'Nacht':'Nächte'}${cs.length?' · '+esc(cs.join(', ')):''}</p>
+  ${by.length?`<p>${by.map(([m,v])=>`${ICO[m]||''} ${MNAME[m]} ${fmt(v)} km`).join(' · ')}</p>`:''}
+  ${st.length>1?`<p>${st.map(x=>esc(x.n)).join(' → ')}</p>`:''}
+  <p>Dabei: ${esc(t.w)}</p><p class="pcsig">${fmt(t.km||0)} km – bis bald!</p></div>
+ <div class="pcadr"><div class="pcstamp" style="--c:${col}"><b>${esc(pcA3(pcCountry(t)||t.name))}</b><span>${t.y}</span></div>
+  <div class="pclines"><span>An</span><span>Zuhause</span><span>${esc((D.persons||[]).join(', ').slice(0,40)||'Worldmap')}</span><span>Worldmap ✉</span></div></div>`}
+function pcDraw(t){const cv=document.getElementById('pccv');if(!cv||!B)return;const g=cv.getContext('2d'),W=cv.width,H=cv.height,M=26;
+ const P=(la,lo)=>[MX(lo),MY(la)],st=pcStations(t),home=P(HOME[0],HOME[1]),lines=[],tracks=[];
+ for(const r of t.gr||[]){const f=r[1],a=[];for(let k=0;k+1<f.length;k+=2)a.push(P(f[k],f[k+1]));if(a.length>1)lines.push({m:r[2]||'road',a})}
+ if(TR){const ds=new Set();D.days.forEach((r,k)=>{if(r[6]==t.id)ds.add(k)});TR.forEach(l=>{if(ds.has(l.d)){const a=[];const q=l.lm;for(let k=0;k+1<q.length;k+=2)a.push([q[k],q[k+1]]);if(a.length>1)tracks.push(a)}})}
+ const seen=new Set(),fl=[];for(const f of t.fl||[]){const key=[f[0],f[1]].map(x=>x.join(',')).sort().join('|');if(seen.has(key))continue;seen.add(key);fl.push({a:P(f[0][0],f[0][1]),b:P(f[1][0],f[1][1]),sea:f[4]==1})}
+ /* what the card shows: the stations and ways there – home only when it is close enough not to shrink everything */
+ const box=[];st.forEach(x=>box.push(P(x.la,x.lo)));lines.forEach(l=>box.push(...l.a));tracks.forEach(a=>box.push(...a.filter((_,k)=>k%4==0)));
+ const far=st.length?Math.max(...st.map(x=>dHav(HOME[0],HOME[1],x.la,x.lo))):0;
+ if(far<1600||!box.length)box.push(home);fl.forEach(f=>{if(far<1600||(Math.hypot(f.a[0]-home[0],f.a[1]-home[1])>.004))box.push(f.a);if(far<1600||(Math.hypot(f.b[0]-home[0],f.b[1]-home[1])>.004))box.push(f.b)});
+ let x0=1,y0=1,x1=0,y1=0;for(const [x,y] of box){x0=Math.min(x0,x);x1=Math.max(x1,x);y0=Math.min(y0,y);y1=Math.max(y1,y)}
+ const sw=Math.max(x1-x0,.0035),sh=Math.max(y1-y0,.0035),cx=(x0+x1)/2,cy=(y0+y1)/2;
+ /* the route sits in the free part of the card: not under the stamp (top right) nor the lettering (bottom) */
+ const fx0=M+70,fy0=M+70,fx1=W-M-360,fy1=H-M-200,sc=Math.min((fx1-fx0)/sw,(fy1-fy0)/sh),ox=(fx0+fx1)/2-cx*sc,oy=(fy0+fy1)/2-cy*sc,X=x=>ox+x*sc,Y=y=>oy+y*sc;
+ g.save();g.clearRect(0,0,W,H);
+ /* paper border and the picture */
+ g.fillStyle='#FFFDF7';g.fillRect(0,0,W,H);
+ g.beginPath();g.roundRect(M,M,W-2*M,H-2*M,18);g.clip();
+ const sea=g.createLinearGradient(0,M,0,H-M);sea.addColorStop(0,'#8FDCEB');sea.addColorStop(1,'#2E7FCB');g.fillStyle=sea;g.fillRect(0,0,W,H);
+ g.save();g.setTransform(sc,0,0,sc,ox,oy);g.shadowColor='rgba(10,40,80,.35)';g.shadowBlur=18;g.shadowOffsetY=6;
+ g.fillStyle='#F4E8CC';g.fill(B.land,'nonzero');g.shadowColor='transparent';
+ const lake=g.createLinearGradient(0,y0,0,y1);g.fillStyle='#7CCBE6';g.fill(B.lakes,'nonzero');
+ g.lineWidth=1.6/sc;g.strokeStyle='rgba(120,90,60,.35)';g.setLineDash([6/sc,5/sc]);g.stroke(B.borders);g.setLineDash([]);
+ g.lineWidth=1.2/sc;g.strokeStyle='rgba(60,140,200,.45)';g.stroke(B.rivB);g.restore();
+ /* graticule: a hint of latitude and longitude, also where there is only sea (atolls) */
+ {const span=sw*360,step=span>60?15:span>20?5:span>6?2:span>2?1:.5,lo0=(-ox/sc)*360-180,lo1=((W-ox)/sc)*360-180;g.strokeStyle='rgba(255,255,255,.22)';g.lineWidth=1.2;g.beginPath();
+  for(let lo=Math.ceil(lo0/step)*step;lo<=lo1;lo+=step){const x=X(MX(lo));g.moveTo(x,0);g.lineTo(x,H)}
+  for(let la=-80;la<=80;la+=step){const y=Y(MY(la));if(y>0&&y<H){g.moveTo(0,y);g.lineTo(W,y)}}g.stroke()}
+ const vig=g.createRadialGradient(W/2,H/2,H*.35,W/2,H/2,H*.95);vig.addColorStop(0,'rgba(0,0,0,0)');vig.addColorStop(1,'rgba(10,20,60,.28)');g.fillStyle=vig;g.fillRect(0,0,W,H);
+ /* the ways */
+ const poly=(a,col,w,dash)=>{g.beginPath();a.forEach(([x,y],k)=>k?g.lineTo(X(x),Y(y)):g.moveTo(X(x),Y(y)));g.lineJoin='round';g.lineCap='round';
+  g.setLineDash([]);g.strokeStyle='rgba(255,255,255,.95)';g.lineWidth=w+6;g.stroke();g.setLineDash(dash||[]);g.strokeStyle=col;g.lineWidth=w;g.stroke();g.setLineDash([])};
+ /* no way known for a leg (only some GPS points): a faint dashed line keeps the order of the stations readable */
+ const covered=st.length&&tracks.length&&st.every(x=>{const [px,py]=P(x.la,x.lo);return tracks.some(a=>a.some(([qx,qy])=>Math.hypot(X(qx)-X(px),Y(qy)-Y(py))<40))});
+ if(!fl.length&&!lines.length&&st.length&&!covered){const a=[home,...st.map(x=>P(x.la,x.lo))];g.beginPath();a.forEach(([x,y],k)=>k?g.lineTo(X(x),Y(y)):g.moveTo(X(x),Y(y)));g.setLineDash([3,11]);g.lineCap='round';g.strokeStyle='rgba(23,18,46,.45)';g.lineWidth=4;g.stroke();g.setLineDash([])}
+ tracks.forEach(a=>poly(a,dCol(t.w),5));lines.forEach(l=>poly(l.a,MCOL[l.m]||'#0A7CFF',6,l.m=='ferry'?[2,12]:null));
+ for(const f of fl){const ax=X(f.a[0]),ay=Y(f.a[1]),bx=X(f.b[0]),by=Y(f.b[1]),d=Math.hypot(bx-ax,by-ay),bend=f.sea?.12:.24,mx=(ax+bx)/2-(by-ay)*bend,my=(ay+by)/2+(bx-ax)*bend;
+  const col=f.sea?'#00B8C9':MCOL.fly;g.beginPath();g.moveTo(ax,ay);g.quadraticCurveTo(mx,my,bx,by);g.lineCap='round';g.strokeStyle='rgba(255,255,255,.95)';g.lineWidth=10;g.stroke();
+  g.setLineDash([2,13]);g.strokeStyle=col;g.lineWidth=5;g.stroke();g.setLineDash([]);
+  if(d>60){const px=.25*ax+.5*mx+.25*bx,py=.25*ay+.5*my+.25*by,an=Math.atan2(by-ay,bx-ax);g.save();g.translate(px,py);g.rotate(an);g.font='34px system-ui,"Apple Color Emoji","Segoe UI Emoji"';g.textAlign='center';g.textBaseline='middle';
+   g.shadowColor='rgba(0,0,0,.3)';g.shadowBlur=6;g.fillText(f.sea?'🛩️':'✈️',0,0);g.restore()}}
+ /* places */
+ const label=(x,y,txt,size)=>{g.font=`800 ${size}px Inter,system-ui,sans-serif`;g.textAlign='center';g.lineJoin='round';g.lineWidth=7;g.strokeStyle='rgba(255,255,255,.95)';g.strokeText(txt,x,y);g.fillStyle='#17122E';g.fillText(txt,x,y)};
+ const hx=X(home[0]),hy=Y(home[1]);if(hx>M&&hx<W-M&&hy>M&&hy<H-M){g.beginPath();g.arc(hx,hy,9,0,7);g.fillStyle='#17122E';g.fill();g.lineWidth=4;g.strokeStyle='#fff';g.stroke();label(hx,hy-18,'Zuhause',22)}
+ st.forEach((x,k)=>{const [px,py]=P(x.la,x.lo),sx=X(px),sy=Y(py);g.beginPath();g.arc(sx,sy,12,0,7);g.fillStyle='#fff';g.fill();g.lineWidth=6;g.strokeStyle=dCol(t.w);g.stroke();
+  if(st.length<=8)label(sx,sy-22,String(x.n).slice(0,22),st.length>4?22:26)});
+ g.restore();
+ /* "Grüsse aus" lettering */
+ const name=String(t.name).toUpperCase();let fs=128;g.font=`900 ${fs}px Inter,system-ui,sans-serif`;while(g.measureText(name).width>W*.62&&fs>44){fs-=4;g.font=`900 ${fs}px Inter,system-ui,sans-serif`}
+ const bx=M+40,by=H-M-46;g.save();g.textAlign='left';g.textBaseline='alphabetic';
+ g.font=`700 46px ${PC_HAND}`;g.lineWidth=8;g.strokeStyle='rgba(23,18,46,.85)';g.strokeText('Grüsse aus',bx+6,by-fs*.92);g.fillStyle='#FFF7E0';g.fillText('Grüsse aus',bx+6,by-fs*.92);
+ g.font=`900 ${fs}px Inter,system-ui,sans-serif`;g.shadowColor='rgba(23,18,46,.55)';g.shadowOffsetX=6;g.shadowOffsetY=7;g.shadowBlur=0;g.fillStyle='#17122E';g.fillText(name,bx,by);
+ g.shadowColor='transparent';const gr=g.createLinearGradient(bx,by-fs,bx+W*.6,by);gr.addColorStop(0,'#FF2DAA');gr.addColorStop(.5,'#8B3DFF');gr.addColorStop(1,'#2D7BFF');
+ g.fillStyle=gr;g.fillText(name,bx-3,by-3);g.lineWidth=3;g.strokeStyle='#FFF7E0';g.strokeText(name,bx-3,by-3);g.restore();
+ /* stamp with perforated edge */
+ const sw2=176,sh2=212,sx0=W-M-sw2-30,sy0=M+30,c=pcCountry(t),h=dHash(c||t.name),pal=['#FF3D9A','#0A7CFF','#12A84F','#8B3DFF','#FF8A00','#00BFB3','#D23DB0'],col=pal[h%pal.length];
+ const sc2=document.createElement('canvas');sc2.width=sw2;sc2.height=sh2;const q=sc2.getContext('2d');q.fillStyle='#FFFDF7';q.fillRect(0,0,sw2,sh2);
+ const sgr=q.createLinearGradient(0,0,sw2,sh2);sgr.addColorStop(0,col);sgr.addColorStop(1,'#17122E');q.fillStyle=sgr;q.fillRect(14,14,sw2-28,sh2-28);
+ q.fillStyle='rgba(255,255,255,.14)';for(let k=0;k<6;k++){q.beginPath();q.arc(sw2*.7,sh2*.32,18+k*16,0,7);q.lineWidth=3;q.strokeStyle='rgba(255,255,255,.16)';q.stroke()}
+ q.fillStyle='#fff';q.textAlign='center';q.font='900 58px Inter,system-ui,sans-serif';q.fillText(pcA3(c||t.name),sw2/2,104);q.font='700 15px Inter,system-ui,sans-serif';q.fillText(String(c||t.name).slice(0,16),sw2/2,128);
+ q.font='34px system-ui,"Apple Color Emoji","Segoe UI Emoji"';q.fillText(ICO[dMain(t)]||'🧳',sw2/2,172);q.font='800 16px Inter,system-ui,sans-serif';q.fillText(String(t.y),sw2-36,sh2-26);
+ q.globalCompositeOperation='destination-out';for(let x=0;x<=sw2;x+=16){q.beginPath();q.arc(x,0,6,0,7);q.arc(x,sh2,6,0,7);q.fill()}for(let y=0;y<=sh2;y+=16){q.beginPath();q.arc(0,y,6,0,7);q.arc(sw2,y,6,0,7);q.fill()}
+ g.save();g.translate(sx0+sw2/2,sy0+sh2/2);g.rotate(.05);g.shadowColor='rgba(0,0,0,.35)';g.shadowBlur=14;g.shadowOffsetY=6;g.drawImage(sc2,-sw2/2,-sh2/2);g.restore();
+ /* postmark */
+ const pmx=sx0+4,pmy=sy0+sh2-6,R=70,ink='rgba(23,18,46,.78)';g.save();g.translate(pmx,pmy);g.rotate(-.22);g.strokeStyle=ink;g.fillStyle=ink;g.lineWidth=4;
+ g.beginPath();g.arc(0,0,R,0,7);g.stroke();g.lineWidth=2;g.beginPath();g.arc(0,0,R-12,0,7);g.stroke();
+ const when=(tWhen(t)||dfmtShort(t.a)).replace('~ ','').toUpperCase();g.textAlign='center';g.textBaseline='middle';g.font='900 19px Inter,system-ui,sans-serif';g.fillText(when.slice(0,14),0,4);
+ g.font='800 12px Inter,system-ui,sans-serif';const top='WORLDMAP · '+String(t.name).toUpperCase().slice(0,14);[...top].forEach((ch,k,arr)=>{const a=-Math.PI/2+(k-(arr.length-1)/2)*.15;g.save();g.rotate(a+Math.PI/2);g.fillText(ch,0,-(R-24));g.restore()});
+ g.lineWidth=3.5;for(let k=0;k<4;k++){g.beginPath();for(let x=-R-70;x<=-R-6;x+=4){const y=-30+k*20+Math.sin(x/10)*6;x==-R-70?g.moveTo(x,y):g.lineTo(x,y)}g.stroke()}
+ g.restore();
+}
+function dfmtShort(s){const MN=['JAN','FEB','MÄR','APR','MAI','JUN','JUL','AUG','SEP','OKT','NOV','DEZ'];return `${+s.slice(8,10)} ${MN[+s.slice(5,7)-1]} ${s.slice(0,4)}`}
+function pcInit(T){const w=document.getElementById('pcw');if(!w)return;const t=pcTrip(T);pcDraw(t);
+ if(!TR&&D.days.some(r=>r[6]==t.id))need('tracks').then(()=>{if(DASH.pc==t.id)pcDraw(t)}).catch(()=>{});
+ const go=id=>{DASH.pc=id;PCS.flip=false;pcRender(T)},idx=()=>T.findIndex(x=>x.id==DASH.pc);
+ const card=document.getElementById('pcard');let sx=null,sy=0;
+ card.addEventListener('pointerdown',e=>{sx=e.clientX;sy=e.clientY});
+ card.addEventListener('pointerup',e=>{if(sx==null)return;const dx=e.clientX-sx,dy=e.clientY-sy;sx=null;
+  if(Math.abs(dx)>50&&Math.abs(dx)>Math.abs(dy)){const i=idx()+(dx<0?1:-1);if(i>=0&&i<T.length)go(T[i].id);return}
+  if(Math.abs(dx)<8&&Math.abs(dy)<8){PCS.flip=!PCS.flip;card.classList.toggle('flip',PCS.flip)}});
+ card.addEventListener('keydown',e=>{if(e.key=='Enter'||e.key==' '){e.preventDefault();PCS.flip=!PCS.flip;card.classList.toggle('flip',PCS.flip)}
+  if(e.key=='ArrowRight'||e.key=='ArrowLeft'){const i=idx()+(e.key=='ArrowRight'?1:-1);if(i>=0&&i<T.length){go(T[i].id);document.getElementById('pcard')?.focus()}}});
+ w.querySelectorAll('[data-pc]').forEach(b=>b.onclick=()=>{const a=b.dataset.pc,i=idx();
+  if(a=='prev'&&i>0)go(T[i-1].id);if(a=='next'&&i<T.length-1)go(T[i+1].id);
+  if(a=='rnd'&&T.length>1){let j=i;while(j==i)j=Math.floor(Math.random()*T.length);go(T[j].id)}
+  if(a=='flip'){PCS.flip=!PCS.flip;card.classList.toggle('flip',PCS.flip)}
+  if(a=='png'){const cv=document.getElementById('pccv');cv.toBlob(bl=>{if(!bl)return;const u=URL.createObjectURL(bl),l=document.createElement('a');l.href=u;l.download='postkarte-'+String(t.name).toLowerCase().replace(/[^a-z0-9äöü]+/g,'-').slice(0,40)+'.png';document.body.appendChild(l);l.click();l.remove();setTimeout(()=>URL.revokeObjectURL(u),2000)},'image/png')}});
+ const sel=document.getElementById('dpc-sel');if(sel)sel.onchange=()=>go(+sel.value)}
+function pcRender(T){const w=document.getElementById('pcw');if(!w)return;const n=document.createElement('div');n.innerHTML=tPostcard(T);w.replaceWith(n.firstElementChild);pcInit(T)}
 
 function tCalendar(T){const ys=[...new Set(T.map(t=>t.y))].sort();if(!ys.length)return '<div class="empty">Noch keine Reisen.</div>';
  if(!ys.includes(DASH.year))DASH.year=ys[ys.length-1];const Y=DASH.year,day={};
@@ -950,19 +1051,19 @@ function tBlank(){if(!RG.list)return '<div class="empty">Regionen werden geladen
 function buildDash(){const box=document.getElementById('dashb');if(!box||!D)return;const O=dOpts();let T=dTrips();const allY=[...new Set(T.map(t=>t.y))].sort();
  if(O.year){if(!allY.includes(DASH.year))DASH.year=allY[allY.length-1];T=T.filter(t=>t.y==DASH.year)}
  const order=dOrder(),on=new Set(order);document.getElementById('dash').classList.toggle('kiosk',!!O.kiosk);
- document.getElementById('dash-presets').innerHTML=DPRESETS.concat([['own','Eigene','Deine eigene Auswahl über „Kacheln“.']]).map(([k,n,d])=>`<button class="${dPreset()==k?'on':''}" data-p="${k}" title="${esc(d)}">${n}</button>`).join('');
+ document.getElementById('dash-presets').innerHTML=DPRESETS.concat([DOWN]).map(([k,n,d,,,ico,col])=>`<button class="dpre${dPreset()==k?' on':''}" role="radio" aria-checked="${dPreset()==k}" data-p="${k}" style="--c:${col}"><span class="dpi" aria-hidden="true">${ico}</span><b>${n}</b><small>${esc(d)}</small></button>`).join('');
  document.querySelectorAll('#dash-presets button').forEach(b=>b.onclick=()=>{DASH.preset=b.dataset.p;try{localStorage.setItem('wm-dash-preset',DASH.preset)}catch(e){}buildDash()});
- const pd=DPRESETS.find(x=>x[0]==dPreset());document.getElementById('dash-pdesc').innerHTML=(pd?esc(pd[2]):'Deine eigene Auswahl über „Kacheln“.')+(O.year?` <span class="dyears">${allY.map(y=>`<button class="${y==DASH.year?'on':''}" data-y="${y}">${y}</button>`).join('')}</span>`:'');
+ const pdEl=document.getElementById('dash-pdesc');pdEl.hidden=!O.year;pdEl.innerHTML=O.year?`<span class="dlab">Jahr</span><span class="dyears">${allY.map(y=>`<button class="${y==DASH.year?'on':''}" data-y="${y}">${y}</button>`).join('')}</span>`:'';
  const fn={kpi:tKpi,earth:tEarth,records:tRecords,passport:tPassport,postcard:tPostcard,calendar:tCalendar,lanes:tLanes,wheel:tWheel,favs:tFavs,co2:tCo2,blank:tBlank};
  const wide={kpi:1,calendar:1,lanes:1};
  box.innerHTML=order.map(k=>DTILES.find(t=>t[0]==k)).map(([k,ti,info])=>{let body='';try{body=fn[k](T)}catch(e){body='<div class="empty">Diese Kachel konnte nicht gezeichnet werden.</div>';console.error(e)}
-  return `<section class="dtile${wide[k]?' wide':''}" id="dt-${k}"><div class="dth"><h3>${ti}</h3><button class="info" aria-expanded="false" aria-controls="dti-${k}" aria-label="Was zeigt diese Kachel?">i</button></div><p class="dinfo" id="dti-${k}" hidden>${info}</p>${body}</section>`}).join('')||'<div class="empty">Alle Kacheln sind ausgeblendet. Mit „Kacheln“ oben wieder einblenden.</div>';
+  return `<section class="dtile${wide[k]?' wide':''}" id="dt-${k}"><div class="dth"><h3>${ti}</h3><button class="info" aria-expanded="false" aria-controls="dti-${k}" aria-label="Was zeigt diese Kachel?">i</button></div><p class="dinfo" id="dti-${k}" hidden>${info}</p>${body}</section>`}).join('')||'<div class="empty">Alle Kacheln sind ausgeblendet. Mit „Anpassen“ oben wieder einblenden.</div>';
  box.querySelectorAll('.dth .info').forEach(b=>b.onclick=()=>{const p=document.getElementById(b.getAttribute('aria-controls'));p.hidden=!p.hidden;b.setAttribute('aria-expanded',String(!p.hidden))});
- const sel=document.getElementById('dpc-sel');if(sel)sel.onchange=()=>{DASH.pc=+sel.value;buildDash()};
+ pcInit(T);
  document.querySelectorAll('#dash .dyears button').forEach(b=>b.onclick=()=>{DASH.year=+b.dataset.y;buildDash()});
- box.querySelectorAll('[data-trip]').forEach(el=>el.addEventListener('click',()=>{DASH.pc=+el.dataset.trip;if(!dTilesOn().has('postcard'))return;buildDash();const pc=document.getElementById('dt-postcard');if(pc)pc.scrollIntoView({behavior:'smooth',block:'nearest'})}));
+ box.querySelectorAll('[data-trip]').forEach(el=>el.addEventListener('click',()=>{DASH.pc=+el.dataset.trip;PCS.flip=false;const pc=document.getElementById('dt-postcard');if(!pc)return;pcRender(T);pc.scrollIntoView({behavior:'smooth',block:'nearest'})}));
  document.getElementById('dash-sub').textContent=(SEL?SEL+' · ':'')+(O.year?DASH.year+' · ':'')+T.length+' '+(T.length==1?'Reise':'Reisen');
- clearInterval(DASH.kt);if(O.kiosk&&T.length>1&&!matchMedia('(prefers-reduced-motion: reduce)').matches)DASH.kt=setInterval(()=>{if(TAB!='dash'||document.hidden)return;const i=T.findIndex(t=>t.id==DASH.pc);DASH.pc=T[(i+1)%T.length].id;const el=document.getElementById('dt-postcard');if(!el)return;const n=document.createElement('div');n.innerHTML=tPostcard(T);el.querySelector('.dpc').replaceWith(n.querySelector('.dpc'));const sl=el.querySelector('#dpc-sel');if(sl)sl.value=DASH.pc},15000);
+ clearInterval(DASH.kt);if(O.kiosk&&T.length>1&&!matchMedia('(prefers-reduced-motion: reduce)').matches)DASH.kt=setInterval(()=>{if(TAB!='dash'||document.hidden)return;const i=T.findIndex(t=>t.id==DASH.pc);DASH.pc=T[(i+1)%T.length].id;PCS.flip=false;pcRender(T)},15000);
  if(!RG.list)need('reg').then(()=>{if(TAB=='dash')buildDash()}).catch(()=>{});
 }
 function dashTiles(){const m=document.getElementById('dash-menu');if(!m.hidden){m.hidden=true;return}if(dPreset()!='own')DASH.tiles=new Set(dOrder());const on=dTilesOn();

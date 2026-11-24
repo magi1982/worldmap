@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.15.0 – 2026-11-24
+
+### Added
+- **New trip postcard**: the real map of the trip (coastlines, borders, rivers, a graticule) with the route as it
+  was – flight and seaplane arcs, roads, ferries, GPS tracks –, "Grüsse aus" lettering, a perforated stamp with the
+  country code and a postmark with the date. Tap (or Enter) turns it over: greetings, dates (also "Juli 2009"),
+  nights, km per transport, who was there, the stations and an address field. Swipe, ‹ › or the arrow keys browse,
+  🎲 shows a random trip, ⬇ saves the front as a PNG (made in the browser). The wall-tablet view turns it every 15 s.
+
+### Changed
+- The **Dashboard is the first tab**; Worldmap still opens on the map (Reisen).
+- Dashboard views are picture cards with an icon, a colour and one line (no longer look like the tab bar); people
+  and groups are round avatars in their colours; "Kacheln" is now "✏️ Anpassen". The postcard comes right after the
+  key figures and is twice as wide.
+
 ## 0.14.0 – 2026-11-24
 
 ### Added
