@@ -22,6 +22,18 @@ function toast(msg, ms = 2600) { const t = $('toast'); t.textContent = msg; t.hi
 function paint(root = document) { root.querySelectorAll('[data-c]').forEach((el) => el.style.setProperty('--c', el.dataset.c)); }
 function notifyParent(type) { try { if (EMBED && window.parent !== window) window.parent.postMessage({type: 'worldmap-' + type}, location.origin); } catch (e) { /* ignore */ } }
 const fmtD = (d) => { if (!d) return ''; const [y, m, dd] = d.split('-'); return `${dd}.${m}.${y}`; };
+const MONTHS = ['', 'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+/* "13.–25.07.2009", "Juli 2009" or "2009" – a trip can be known only by month or year */
+function fmtWhen(t) {
+  const a = t.start_date || '', b = t.end_date || a; if (!a) return '';
+  const [ya, ma, da] = a.split('-'), [yb, mb, db] = b.split('-');
+  if (t.date_prec === 'year') return ya;
+  if (t.date_prec === 'month') return ya === yb ? (ma === mb ? `${MONTHS[+ma]} ${ya}` : `${MONTHS[+ma]}–${MONTHS[+mb]} ${ya}`) : `${MONTHS[+ma]} ${ya}–${MONTHS[+mb]} ${yb}`;
+  if (a === b) return fmtD(a);
+  if (ya === yb && ma === mb) return `${da}.–${db}.${mb}.${yb}`;
+  if (ya === yb) return `${da}.${ma}.–${db}.${mb}.${yb}`;
+  return `${fmtD(a)}–${fmtD(b)}`;
+}
 
 function whoList() { return st.cfg ? [...st.cfg.persons, ...st.cfg.who_options.filter((o) => !st.cfg.persons.includes(o))] : []; }
 function colorOf(who) {
@@ -39,17 +51,16 @@ function showTab(name) {
   document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('on', t.id === 'tab-' + name));
   if (name === 'people') loadPeople();
   if (name === 'style') loadStyle();
-  if (name === 'connectors') loadConnectors();
   if (name === 'notify') loadNotify();
   if (name === 'rules') loadRules();
-  if (name === 'import') loadImports();
+  if (name === 'import') { renderSources(); renderAI(); loadImports(); loadConnectors(); }
   if (!EMBED) history.replaceState(null, '', '#' + name);
 }
 $('tabs').addEventListener('click', (e) => { const b = e.target.closest('button[data-tab]'); if (b) showTab(b.dataset.tab); });
 
 /* ================================================================ GRID (Excel style) */
 const COLS = [
-  {k: 'start_date', n: 'Von', t: 'date', w: 110}, {k: 'end_date', n: 'Bis', t: 'date', w: 110},
+  {k: 'start_date', n: 'Wann', t: 'when', w: 160},
   {k: 'destination', n: 'Name', w: 200}, {k: 'legs', n: 'Stationen', t: 'legs', w: 340},
   {k: 'who', n: 'Wer', t: 'who', w: 130},
   {k: 'nights', n: 'Nächte', t: 'num', w: 70}, {k: 'max_km', n: 'km', t: 'num', w: 80},
@@ -66,7 +77,7 @@ function gridHead() {
   sortPicker();
   $('selAll').onchange = (e) => { st.sel = e.target.checked ? new Set(visibleRows().map((t) => t.id)) : new Set(); gridBody(); };
 }
-function cellText(t, c) { const v = t[c.k]; if (c.t === 'date') return fmtD(v); if (c.t === 'legs') return legsOf(t).map((x) => `${x.name} ${x.ap || ''} ${x.country || ''} ${x.transport || ''}`).join(' ') + ' ' + (t.country || '') + ' ' + (t.transport || ''); if (c.k === 'max_km' && v != null) return String(Math.round(v)); return v ?? ''; }
+function cellText(t, c) { const v = t[c.k]; if (c.t === 'when') return fmtWhen(t); if (c.t === 'date') return fmtD(v); if (c.t === 'legs') return legsOf(t).map((x) => `${x.name} ${x.ap || ''} ${x.country || ''} ${x.transport || ''}`).join(' ') + ' ' + (t.country || '') + ' ' + (t.transport || ''); if (c.k === 'max_km' && v != null) return String(Math.round(v)); return v ?? ''; }
 /* a trip without real details: no place, only a whole country, or no coordinates – worth completing */
 function countryList() { return [...new Set(st.trips.flatMap((t) => String(t.country || '').split(/\s*·\s*/)).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'de')); }
 /* sort picker above the list: the same as clicking a column head */
@@ -124,6 +135,7 @@ $('grid').addEventListener('focusout', (e) => {
   const td = e.target.closest('td[data-k]'); if (!td) return;
   const tr = td.parentElement, t = st.trips.find((x) => x.id === +tr.dataset.id), k = td.dataset.k, c = COLS.find((x) => x.k === k);
   if (td.textContent === String(cellText(t, c))) return;
+  if (c.t === 'when') { const txt = td.textContent.trim(); if (!txt) { td.textContent = cellText(t, c); return; } return saveCell(tr, 'when', txt, td).then(() => { td.textContent = cellText(t, c); }); }
   let v; try { v = parseCell(k, td.textContent); } catch (err) { toast(err.message); td.textContent = cellText(t, c); return; }
   saveCell(tr, k, v, td);
 });
@@ -317,15 +329,15 @@ async function preview(file) {
     const warn = (r.warnings || []).map((w) => `<p class="small warn">${esc(w)}</p>`).join('');
     if (r.kind === 'package') {
       const range = r.points ? `${new Date(r.first * 1000).toLocaleDateString('de-CH')} – ${new Date(r.last * 1000).toLocaleDateString('de-CH')}` : '';
-      set(`<h3>${esc(file.name)} <span class="status ok">Worldmap-Paket</span></h3><p><b>${r.trips.toLocaleString('de-CH')}</b> Reisen mit „Wer war dabei“ · <b>${r.points.toLocaleString('de-CH')}</b> GPS-Positionen${range ? ' · ' + esc(range) : ''}</p>
+      set(`<h3>${esc(file.name)} <span class="status ok">Worldmap-Paket</span></h3><p><b>${r.trips.toLocaleString('de-CH')}</b> Reisen mit „Wer war dabei“ · <b>${r.points.toLocaleString('de-CH')}</b> GPS-Positionen${range ? ' · ' + esc(range) : ''}${r.skipped ? ` · ${r.skipped.toLocaleString('de-CH')} Positionen ausserhalb gültiger Koordinaten übersprungen` : ''}</p>${(r.warnings || []).filter((w) => !w.startsWith('noch nicht unter')).map((w) => `<p class="small warn">${esc(w)}</p>`).join('')}
       <p class="small">Personen: ${r.persons.map(esc).join(', ') || '–'} · Gruppen: ${r.groups.map(esc).join(', ') || '–'}</p>${r.missing.length ? `<p class="small warn">Lege zuerst unter <a href="#people">Personen &amp; Gruppen</a> an: <b>${r.missing.map(esc).join(', ')}</b> – sonst fehlen Farben und Zuordnung.</p>` : ''}${(r.warnings || []).filter((w) => !w.startsWith('not set up')).map((w) => `<p class="small warn">${esc(w)}</p>`).join('')}
       <div class="opts"><button class="primary go">Importieren</button></div>`);
     } else if (r.kind === 'trips') {
-      set(`<h3>${esc(file.name)} <span class="status ok">Reiseliste</span></h3><p><b>${r.trips}</b> Reisen · ${fmtD(r.first)} – ${fmtD(r.last)} · <b>${r.located}</b> auf der Karte gefunden</p>${cols ? `<p class="small">Spalten: ${cols}</p>` : ''}${warn}
+      set(`<h3>${esc(file.name)} <span class="status ok">Reiseliste</span></h3><p><b>${r.trips}</b> Reisen · ${fmtD(r.first)} – ${fmtD(r.last)} · <b>${r.located}</b> auf der Karte gefunden${r.vague ? ` · ${r.vague} nur mit Monat oder Jahr` : ''}${r.skipped ? ` · ${r.skipped} Zeilen ohne Datum oder Ziel übersprungen` : ''}</p>${cols ? `<p class="small">Spalten: ${cols}</p>` : ''}${warn}
       <div class="opts"><button class="primary go">Importieren</button></div>`);
     } else {
       const range = `${new Date(r.first * 1000).toLocaleDateString('de-CH')} – ${new Date(r.last * 1000).toLocaleDateString('de-CH')}`;
-      set(`<h3>${esc(file.name)} <span class="status ok">${esc(r.format)}</span></h3><p><b>${r.points.toLocaleString('de-CH')}</b> Positionen · ${esc(range)}${r.skipped ? ` · ${r.skipped} übersprungen` : ''}</p>${cols ? `<p class="small">Spalten: ${cols}</p>` : ''}${warn}
+      set(`<h3>${esc(file.name)} <span class="status ok">${esc(r.format)}</span></h3><p><b>${r.points.toLocaleString('de-CH')}</b> Positionen · ${esc(range)}${r.skipped ? ` · ${r.skipped.toLocaleString('de-CH')} ohne gültige Zeit oder Koordinaten übersprungen` : ''}</p>${cols ? `<p class="small">Spalten: ${cols}</p>` : ''}${warn}
       <label class="field">Wessen Daten?<select class="who"><option value="">gemischt (Fotos: nach Kamera)</option>${(st.cfg?.persons || []).map((p) => `<option>${esc(p)}</option>`).join('')}</select></label>
       <div class="opts"><button class="primary go">Importieren</button></div>`);
     }
@@ -341,7 +353,7 @@ async function preview(file) {
         refresh(); loadImports();
       } catch (e) { card.querySelector('.opts').innerHTML = `<span class="status warn">${esc(e.message)}</span>`; }
     };
-  } catch (e) { set(`<h3>${esc(file.name)}</h3><p><span class="status warn">${esc(e.message)}</span></p><p class="small">Erwartet wird ein Worldmap-Paket, eine Reiseliste (Spalten Von, Bis, Ziel …) oder GPS-Daten (Datum/Zeit + Breite/Länge).</p>`); }
+  } catch (e) { set(`<h3>${esc(file.name)}</h3><p><span class="status warn">${esc(e.message)}</span></p><p class="small">Erwartet wird ein Worldmap-Paket, eine Reiseliste (Spalten Wann oder Von/Bis, Ziel …) oder GPS-Daten (Datum/Zeit + Breite/Länge).</p>`); }
 }
 async function loadImports() {
   try {
@@ -349,6 +361,101 @@ async function loadImports() {
     $('pastImports').innerHTML = c.imports.length ? c.imports.map((i) => `<div class="card small-card" data-id="${i.id}"><button class="x" aria-label="Eintrag entfernen">✕</button><b>${esc(i.filename)}</b><p class="small">${esc(i.format)} · ${i.points.toLocaleString('de-CH')} · ${new Date(i.created_at * 1000).toLocaleString('de-CH')}</p></div>`).join('') : '<p class="small">Noch keine Importe.</p>';
     $('pastImports').querySelectorAll('.x').forEach((x) => (x.onclick = async () => { const card = x.closest('[data-id]'); try { await api('api/imports/' + card.dataset.id, {method: 'DELETE'}); card.remove(); } catch (e) { toast(e.message); } }));
   } catch (e) { /* ignore */ }
+}
+
+/* ================================================================ DATA SOURCES overview */
+const EXIF_CMD = 'exiftool -csv -n -r -GPSLatitude -GPSLongitude -DateTimeOriginal "ORDNER" > fotos.csv';
+const CLAUDE_ASK = 'Lies in meinem Fotoordner (Windows: „iCloud Photos“ bzw. „iCloud-Fotos“, Mac: Fotos-Mediathek) Aufnahmedatum und GPS-Position aller Fotos aus und speichere sie als fotos.csv mit den Spalten DateTimeOriginal, GPSLatitude, GPSLongitude (Dezimalgrad, Süden und Westen negativ). Fotos ohne GPS weglassen.';
+async function copyText(text) {
+  try { await navigator.clipboard.writeText(text); toast('Kopiert'); } catch (e) {
+    const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select();
+    try { document.execCommand('copy'); toast('Kopiert'); } catch (err) { toast('Kopieren ging nicht – bitte markieren und kopieren'); } ta.remove();
+  }
+}
+function renderSources() {
+  const box = $('sources'); if (box.dataset.done) return; box.dataset.done = '1';
+  const card = (icon, title, teaser, info, buttons) => `<div class="card src"><h3>${icon} ${title}</h3><p class="small keep">${teaser}</p>${info}<div class="opts">${buttons}</div></div>`;
+  box.innerHTML = [
+    card('✍️', 'Von Hand', 'Reisen selbst eintragen – mit Datum, nur Monat oder nur Jahr.',
+      `<p class="small">Der Assistent fragt nach Stationen, Zeit, Dauer und wer dabei war. In der Reiseliste lässt sich danach jedes Feld direkt ändern. Ins Feld <b>Wann</b> passt „13.–25.07.2009“, „Juli 2009“ oder einfach „2009“, wenn es lange her ist.</p>`,
+      `<button class="primary" data-act="wizard">Reise erfassen</button><button class="btn" data-goto="trips">Reiseliste</button>`),
+    card('📦', 'Worldmap-Paket', 'Das Standardformat dieser Karte: Reisen, Personen und GPS-Punkte in einer Datei.',
+      `<p class="small">Zum Sichern, zum Umziehen auf ein neues Home Assistant oder um Daten aus anderen Quellen einzulesen. Alles andere lässt sich mit einer KI in dieses Format umwandeln (unten).</p>`,
+      `<a class="btn" href="api/export.worldmap.json.gz" download>Sichern</a><a class="btn" href="beispiel.worldmap.json" download="beispiel.worldmap.json">Beispiel</a>`),
+    card('🟢', 'Google Zeitachse', 'Die genaueste Quelle für die Vergangenheit – ab und zu exportieren.',
+      `<p class="small">Google speichert die Zeitachse nur auf dem Handy und bietet keine Schnittstelle, darum geht es nur per Export:</p><ol class="small"><li>Android: Einstellungen › Standort › Zeitachse › Exportieren</li><li>iPhone: Google Maps › Profil › Deine Zeitachse › ⋯ › Exportieren</li><li>Die Datei unten ablegen – schon Vorhandenes wird nicht doppelt gespeichert.</li></ol>`,
+      `<button class="btn" data-act="file">Datei wählen</button>`),
+    card('🏠', 'Home-Assistant-App', 'Live-Standort ab jetzt – unterwegs nur mit Fernzugang.',
+      `<p class="small">Die Companion-App schickt GPS nur, wenn das Handy Home Assistant erreicht. Zu Hause im WLAN klappt das immer. Unterwegs braucht es einen Fernzugang: <b>Home Assistant Cloud</b> (das Abo von Nabu Casa) oder einen eigenen Zugang per VPN (z. B. Tailscale, WireGuard) oder eigener Domain. Ohne Fernzugang gehen die Positionen von unterwegs verloren – die App speichert sie nicht zwischen. Dann besser OwnTracks.</p>`,
+      `<button class="btn" data-goto="people">Personen zuordnen</button>`),
+    card('📡', 'OwnTracks', 'Sammelt unterwegs, sendet zu Hause – ohne Cloud und ohne Abo.',
+      `<p class="small">Die kostenlose App für iPhone und Android speichert jede Position auf dem Handy und schickt sie, sobald das Handy wieder im Heimnetz ist. Nichts geht über fremde Server, kein Port muss im Router offen sein. Einrichten: Port 8098 im Add-on freigeben, unten einen Benutzer anlegen, in der App Modus HTTP mit der angezeigten Adresse wählen.</p>`,
+      `<button class="btn" data-act="ot">Einrichten</button>`),
+    card('🍎', 'iPhone &amp; Apple', 'Apple gibt keinen Standortverlauf heraus – es bleiben Live-Daten und Fotos.',
+      `<ol class="small"><li><b>Ab jetzt:</b> OwnTracks oder die Home-Assistant-App auf dem iPhone.</li><li><b>Vergangenheit:</b> Ort und Zeit der Fotos – mit exiftool oder Claude als CSV, dann hier ablegen.</li><li>Mac: in Fotos „Unverändertes Original exportieren“ behält Ort und Datum. Windows: den Ordner „iCloud-Fotos“ ganz herunterladen.</li><li>iCloud3 (HACS) liefert die Position der Apple-Geräte als Entität – braucht die Apple-ID.</li></ol>`, ''),
+    card('🖼️', 'Fotos mit exiftool', 'Aufnahmeort und -zeit aller Fotos einer Galerie als CSV.',
+      `<p class="small">exiftool ist gratis (exiftool.org) und läuft auf Windows, Mac und Linux. Im Befehl „ORDNER“ durch den Fotoordner ersetzen, z. B. das NAS, den Ordner „iCloud-Fotos“ oder einen Mac-Export. Die entstandene <b>fotos.csv</b> unten ablegen. Nur Ort und Zeit werden gelesen, die Fotos selbst nie.</p><pre class="cmd">${esc(EXIF_CMD)}</pre>`,
+      `<button class="btn" data-copy="exif">Befehl kopieren</button>`),
+    card('🤖', 'Claude fragen', 'Claude listet GPS und Datum deiner Fotos auf – ohne Befehle.',
+      `<p class="small">In der Claude-Desktop-App den Fotoordner freigeben (unter Windows den Ordner „iCloud-Fotos“, am Mac die Fotos-Mediathek) und das hier fragen. Die fertige fotos.csv unten ablegen.</p><pre class="cmd">${esc(CLAUDE_ASK)}</pre>`,
+      `<button class="btn" data-copy="claude">Frage kopieren</button>`),
+    card('📄', 'Andere Dateien', 'GPX, KML, CSV und Excel – das Format wird erkannt.',
+      `<p class="small"><b>Reiselisten</b> brauchen die Spalten Von/Bis oder Wann sowie Ziel; Land, Wer, Nächte, Verkehrsmittel, Notiz und Stationen sind freiwillig. <b>GPS-Listen</b> brauchen Zeit, Breite und Länge – Spaltennamen auf Deutsch oder Englisch, Komma oder Punkt egal. Vor dem Speichern zeigt die Vorschau, was erkannt wurde.</p>`,
+      `<button class="btn" data-act="file">Datei wählen</button>`),
+    card('✨', 'Mit KI umwandeln', 'Hast du Daten in einem anderen Format? Eine KI macht ein Worldmap-Paket daraus.',
+      '', `<button class="btn" data-act="ai">Anleitung</button>`),
+  ].join('');
+  box.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-act],[data-copy],[data-goto]'); if (!b) return;
+    if (b.dataset.goto) return showTab(b.dataset.goto);
+    if (b.dataset.copy) return copyText(b.dataset.copy === 'exif' ? EXIF_CMD : CLAUDE_ASK);
+    const a = b.dataset.act;
+    if (a === 'wizard') wizard();
+    if (a === 'file') $('file').click();
+    if (a === 'ot') $('cOT')?.scrollIntoView({behavior: 'smooth', block: 'start'});
+    if (a === 'ai') $('aiCard')?.scrollIntoView({behavior: 'smooth', block: 'start'});
+  });
+  infoize(box);
+}
+const AI_PROMPT = `Wandle meine angehängten Reise- oder Standortdaten in eine Worldmap-Datei um.
+Antworte nur mit gültigem JSON ohne Erklärung, damit ich es als „meine-daten.worldmap.json“ speichern kann.
+
+Aufbau:
+{
+  "worldmap": 1,
+  "persons": ["Name1", "Name2"],
+  "groups": [{"name": "Familie", "members": ["Name1", "Name2"]}],
+  "trips": [ … ],
+  "points": [ … ]
+}
+
+Reisen ("trips"), ein Objekt pro Reise:
+- "destination": Name der Reise oder des Hauptziels (Pflicht)
+- Zeit (Pflicht): "start_date" und "end_date" als JJJJ-MM-TT – oder "when", wenn nur Monat oder Jahr bekannt ist ("Juli 2009", "2009"), dann mit "nights"
+- freiwillig: "country" (Land auf Deutsch), "who" (eine Person oder Gruppe von oben), "transport" (Flug, Auto, Zug, Schiff, Bus, Wohnmobil, Velo, zu Fuss, Wasserflugzeug – mehrere mit " · "), "nights", "note", "lat"/"lon" des Hauptziels
+- freiwillig "legs": Stationen in Reihenfolge, je {"name", "country", "lat", "lon", "transport" (womit man dorthin kam), "ap" (IATA-Code, wenn die Station ein Flughafen ist)}
+
+GPS-Punkte ("points"), ein Objekt pro Position:
+{"time": "2024-07-13T10:00:00Z", "lat": 46.948, "lon": 7.447, "person": "Name1"}
+- Zeit mit Zeitzone (Z = UTC), Koordinaten in Dezimalgrad (WGS84), Süden und Westen negativ
+
+Regeln: nichts erfinden – fehlende Angaben weglassen; Koordinaten von Reisezielen darfst du ergänzen, GPS-Punkte nie.
+
+Beispiel:
+{"worldmap": 1, "persons": ["Alex"], "groups": [],
+ "trips": [{"start_date": "2024-05-10", "end_date": "2024-05-14", "destination": "Lissabon", "country": "Portugal", "who": "Alex", "transport": "Flug",
+            "legs": [{"name": "Lissabon", "country": "Portugal", "lat": 38.72, "lon": -9.14, "transport": "Flug", "ap": "LIS"}]},
+           {"when": "Juli 2009", "nights": 10, "destination": "Toskana", "country": "Italien", "who": "Alex", "transport": "Auto"}],
+ "points": [{"time": "2024-05-10T09:15:00Z", "lat": 38.7742, "lon": -9.1342, "person": "Alex"}]}`;
+function renderAI() {
+  const box = $('aiBox'); if (box.dataset.done) return; box.dataset.done = '1';
+  box.innerHTML = `<div class="card wide" id="aiCard"><h3>🤖 Mit KI umwandeln</h3>
+    <p class="small keep">Anleitung kopieren, zusammen mit deiner Datei einer KI geben (z. B. Claude), die Antwort als <b>.worldmap.json</b> speichern und oben ablegen.</p>
+    <p class="small">Geeignet für alles, was Worldmap nicht direkt liest: Tabellen mit eigenen Spalten, Notizen, Reiseberichte, Exporte anderer Apps. Gib der KI nur, was du ihr geben willst – deine Datei geht an diesen Dienst. Vor dem Speichern zeigt Worldmap eine Vorschau.</p>
+    <textarea class="aiprompt" readonly rows="10" aria-label="Anleitung für die KI">${esc(AI_PROMPT)}</textarea>
+    <div class="opts"><button class="primary" id="aiCopy">Kopieren</button><a class="btn" href="beispiel.worldmap.json" download="beispiel.worldmap.json">Beispiel</a></div></div>`;
+  $('aiCopy').onclick = () => copyText(AI_PROMPT);
+  infoize(box);
 }
 
 /* ================================================================ SETTINGS helpers */
@@ -420,17 +527,23 @@ async function loadPeople() {
   $('saveWk').onclick = () => save({work_lat: num('wlat'), work_lon: num('wlon'), work_radius_m: +$('wrad').value || 300, show_work: $('wshow').checked}, loadPeople);
   syncButtons(box);
 }
+/* remembered per browser which explanations were opened (only a convenience – may be empty or unavailable) */
+function seenInfo(key, set) {
+  try { if (set) localStorage.setItem(key, '1'); return localStorage.getItem(key) === '1'; } catch (e) { return !!set; }
+}
 /* descriptions go behind a small (i) button so every card stays tidy */
 let ibN = 0;
 function infoize(root) {
   root.querySelectorAll('.card').forEach((card) => {
     const h = card.querySelector('h3'); if (!h || h.querySelector('.info')) return;
-    const bits = [...card.children].filter((el) => el.matches('p.small,ol.small,ul.small,details.help') && !el.classList.contains('keep'));
+    const bits = [...card.children].filter((el) => el.matches('p.small,ol.small,ul.small,details.help,pre.cmd') && !el.classList.contains('keep'));
     if (!bits.length) return;
     const box = document.createElement('div'); box.className = 'infobox'; box.hidden = true; box.id = 'ib-' + (++ibN);
     bits.forEach((b) => { if (b.tagName === 'DETAILS') { const sm = b.querySelector('summary'); const t = document.createElement('p'); const bb = document.createElement('b'); bb.textContent = sm.textContent; t.appendChild(bb); sm.remove(); box.appendChild(t); while (b.firstChild) box.appendChild(b.firstChild); b.remove(); } else box.appendChild(b); });
     const btn = document.createElement('button'); btn.className = 'info'; btn.type = 'button'; btn.textContent = 'i'; btn.setAttribute('aria-label', 'Erklärung'); btn.setAttribute('aria-expanded', 'false'); btn.setAttribute('aria-controls', box.id);
-    btn.onclick = () => { box.hidden = !box.hidden; btn.setAttribute('aria-expanded', String(!box.hidden)); };
+    const key = 'wm-info:' + h.textContent.trim().slice(0, 40);
+    if (!seenInfo(key)) btn.classList.add('new');  // gently pulses until it was opened once
+    btn.onclick = () => { box.hidden = !box.hidden; btn.setAttribute('aria-expanded', String(!box.hidden)); btn.classList.remove('new'); seenInfo(key, true); };
     h.appendChild(btn); h.after(box);
   });
 }
@@ -502,13 +615,6 @@ async function loadConnectors() {
       <li>Hier einen Benutzer mit Passwort anlegen und der Person zuordnen.</li>
       <li>OwnTracks-App: Einstellungen › Verbindung › Modus <b>HTTP</b>, URL <code>http://IP-von-Home-Assistant:8098/pub</code>, Benutzer und Passwort eintragen.</li>
       <li>Fertig – unterwegs sammelt die App, zu Hause wird übertragen.</li></ol></details></div>
-  <div class="card"><h3>🟢 Google Maps Zeitachse <span class="status">${(src.google || 0).toLocaleString('de-CH')} Positionen</span></h3>
-    <p class="small">Die genaueste Quelle für die Vergangenheit. Google speichert sie nur auf dem Handy und bietet keine Schnittstelle – ab und zu exportieren und hier importieren:</p>
-    <ol class="small"><li>Android: Einstellungen › Standort › Zeitachse › Exportieren</li><li>iPhone: Google Maps › Profil › Deine Zeitachse › ⋯ › Exportieren</li><li>Datei unter „Import“ ablegen – schon Vorhandenes wird nicht doppelt gespeichert.</li></ol>
-    <div class="opts"><button class="btn" data-goto="import">Zum Import</button></div></div>
-  <div class="card"><h3>🍎 Apple</h3>
-    <p class="small">Apple gibt den Standortverlauf („Wichtige Orte“) nicht heraus. Was geht:</p>
-    <ol class="small"><li><b>OwnTracks</b> oder die <b>Home-Assistant-App</b> auf dem iPhone für alles ab jetzt.</li><li><b>iCloud3</b> (HACS) liefert die Position aller Apple-Geräte als Entität – braucht die Apple-ID.</li><li><b>Fotos</b>: Aufnahmeort und -zeit der Fotos als CSV exportieren (z. B. mit exiftool) und importieren – ergibt die Reisen der Vergangenheit.</li></ol></div>
   <div class="card" id="cRoute"><h3>🛤️ Bahn- &amp; Strassennetz <span class="status ${c.routing !== 'off' ? 'ok' : ''}">${c.routing !== 'off' ? 'aktiv' : 'aus'}</span></h3>
     <p class="small">Lücken zwischen GPS-Punkten werden auf echte Bahnlinien und Strassen gelegt – direkt im Add-on, ohne Routing-Dienst. Das Netz kommt aus OpenStreetMap-Kartenkacheln, die einmal per Kachelnummer geladen und dauerhaft gespeichert werden (keine Positionen werden gesendet). Danach läuft es offline.</p>
     <p class="small keep">${c.tiles.toLocaleString('de-CH')} Kacheln gespeichert · ${(c.segments.rail || 0).toLocaleString('de-CH')} Bahn- und ${(c.segments.road || 0).toLocaleString('de-CH')} Strassenabschnitte · ${(c.segments.none || 0).toLocaleString('de-CH')} offen gelassen</p>
@@ -551,7 +657,7 @@ async function loadNotify() {
   if (c.notify_service && !svcs.includes(c.notify_service)) opts.push([c.notify_service, c.notify_service + ' (nicht gefunden)']);
   box.innerHTML = `<div class="card wide"><h3>🔔 Wohin sollen die Fragen kommen?</h3>
     <div class="choice" id="nsvc">${opts.map(([v, n]) => `<button data-v="${esc(v)}" class="${v === (c.notify_service || '') ? 'on' : ''}">${esc(n)}</button>`).join('')}</div>
-    ${svcs.length ? '' : '<p class="small">Keine Handys gefunden – die Home-Assistant-App installieren und anmelden, dann erscheint sie hier.</p>'}
+    ${svcs.length ? '' : '<p class="small keep">Keine Handys gefunden – die Home-Assistant-App installieren und anmelden, dann erscheint sie hier.</p>'}
     <h3 class="sub">Wie oft?</h3>
     <div class="choice" id="nmode">${modes.map(([v, n, d]) => `<button data-v="${v}" class="${v === c.notify_mode ? 'on' : ''}" title="${esc(d)}"><b>${n}</b><br><span class="small">${esc(d)}</span></button>`).join('')}</div>
     <p class="small">Die Nachricht nennt die Reise mit Datum, Ziel und Vorschlag; ein Tipp öffnet die Fragen in Worldmap.</p>
@@ -560,6 +666,7 @@ async function loadNotify() {
   const val = (id) => $(id).querySelector('button.on')?.dataset.v ?? '';
   $('saveN').onclick = () => save({notify_service: val('nsvc'), notify_mode: val('nmode') || 'weekly'}, loadNotify);
   $('testN').onclick = async () => { try { await post('api/connectors', {notify_service: val('nsvc'), notify_mode: val('nmode') || 'weekly'}); await post('api/notify_test'); toast('Test gesendet'); } catch (e) { toast(e.message, 5000); } };
+  infoize(box);
 }
 
 /* ================================================================ RULES */
@@ -580,7 +687,7 @@ async function loadRules() {
     <label class="rng"><span>mit Übernachtung ab</span><input type="range" id="minkm" min="5" max="300" step="5" value="${Math.min(300, c.min_trip_km)}"><b id="minkmV">${Math.round(c.min_trip_km)} km</b></label>
     <label class="rng"><span>Tagesausflug ab</span><input type="range" id="minday" min="10" max="400" step="10" value="${Math.min(400, c.min_day_trip_km || 100)}"><b id="mindayV">${Math.round(c.min_day_trip_km || 100)} km</b></label>
     <label class="switch" style="margin-top:10px"><input type="checkbox" id="routOn" ${c.routine_days ? 'checked' : ''}><span></span>Oft besuchte Orte nie als Reise zählen</label>
-    <label class="rng" id="routRow" style="margin-top:6px"><span>ab</span><input type="range" id="routd" min="5" max="120" step="5" value="${c.routine_days || 20}"><b id="routV" class="wide-b">${c.routine_days || 20} Tagen</b></label></div>
+    <label class="rng" id="routRow" style="margin-top:6px"><span>an mindestens</span><input type="range" id="routd" min="5" max="120" step="5" value="${c.routine_days || 20}"><b id="routV" class="wide-b">${c.routine_days || 20} Tagen</b></label></div>
   <div class="card" id="cAsk"><h3>💬 Wann soll ich nachfragen?</h3>
     <p class="small">Worldmap rät bei jeder Reise, wer dabei war, und weiss, wie sicher es ist. Je nach Wahl kommt eine Frage nur bei unsicheren Reisen oder bei allen.</p>
     ${'<div class="seg2" id="askb" role="radiogroup">' + [['mittel', 'nur wenn unsicher'], ['hoch', 'normal (empfohlen)'], ['bestätigt', 'bei jeder Reise']].map(([v, l]) => `<button type="button" role="radio" data-v="${v}" class="${v === c.ask_below ? 'on' : ''}" aria-checked="${v === c.ask_below}">${l}</button>`).join('') + '</div>'}</div>
@@ -635,7 +742,7 @@ function wizard() {
       case 'long': return `<div class="choice">${[[0, 'Tagesausflug'], [2, 'Wochenende'], [7, '1 Woche'], [14, '2 Wochen'], [21, '3 Wochen']].map(([n, l]) => `<button data-n="${n}" class="${w.nights === n ? 'on' : ''}">${l}</button>`).join('')}</div><label class="field">Nächte<input id="wn" type="number" min="0" max="365" value="${w.nights}"></label>${w.start ? '<p class="small">Aus den Daten berechnet.</p>' : ''}`;
       case 'who': return `<div class="choice">${whoList().map((o) => `<button data-who="${esc(o)}" class="${o === w.who ? 'on' : ''}">${esc(o)}</button>`).join('')}</div><input id="wwho" placeholder="oder eigene Angabe" value="${esc(whoList().includes(w.who) ? '' : w.who)}" maxlength="60">`;
       case 'area': { const reg = w.place?.radius_km; return `<div class="choice">${[[3, 'Ein Ort'], [15, 'Umgebung'], [reg || 50, reg ? `ganz ${esc(w.place.name)}` : 'Region'], [150, 'Rundreise']].map(([r, l]) => `<button data-r="${r}" class="${w.area === r ? 'on' : ''}">${l} · ${r} km</button>`).join('')}</div><p class="small">Ohne GPS-Daten zeigt die Karte eine gestrichelte Fläche – lieber zu klein als zu gross.</p>`; }
-      default: { const [s, e, n, ap] = dates(); return `<p><b>${esc(w.name || stopsToTrip(w.stops).destination)}</b></p><p>${w.stops.map((x) => `${TICON[x.transport] || ''} ${stopLabel(x)}`).join(' → ') || '?'}</p><p>${fmtD(s)} – ${fmtD(e)} · ${n} Nächte${ap ? ' · <span class="status">Datum geschätzt</span>' : ''}</p><p>${esc(w.who || 'wer offen')} · Fläche ${w.area ?? 0} km</p><label class="field">Notiz<textarea id="wnote" rows="2" maxlength="1000">${esc(w.note)}</textarea></label>`; }
+      default: { const [s, e, n, ap] = dates(); return `<p><b>${esc(w.name || stopsToTrip(w.stops).destination)}</b></p><p>${w.stops.map((x) => `${TICON[x.transport] || ''} ${stopLabel(x)}`).join(' → ') || '?'}</p><p>${w.start ? fmtWhen({start_date: s, end_date: e}) : (w.month ? MONTHS[+w.month] + ' ' : '') + w.year} · ${n} Nächte${ap ? ' · <span class="status">nur ' + (w.month ? 'Monat' : 'Jahr') + ' bekannt</span>' : ''}</p><p>${esc(w.who || 'wer offen')} · Fläche ${w.area ?? 0} km</p><label class="field">Notiz<textarea id="wnote" rows="2" maxlength="1000">${esc(w.note)}</textarea></label>`; }
     }
   };
   const render = () => {
@@ -661,7 +768,8 @@ function wizard() {
       try {
         const r = stopsToTrip(w.stops);
         const far = home && w.stops.some((x) => x.lat != null) ? Math.max(...w.stops.filter((x) => x.lat != null).map((x) => haversine(home[0], home[1], x.lat, x.lon))) : null;
-        await post('api/trips', {start_date: s, end_date: e, nights: n, destination: w.name || r.destination, who: w.who, confidence: w.who ? 'bestätigt' : 'tief', radius_km: w.area, approx: ap, note: w.note, source: 'manual', reason: 'von Hand erfasst', max_km: far ?? km, legs: r.legs, ap_from: w.ap_from || ''});
+        const when = w.start ? {start_date: s, end_date: e, date_prec: 'day'} : {when: w.month ? `${w.month}.${w.year}` : String(w.year)};
+        await post('api/trips', {...when, nights: n, destination: w.name || r.destination, who: w.who, confidence: w.who ? 'bestätigt' : 'tief', radius_km: w.area, approx: ap, note: w.note, source: 'manual', reason: 'von Hand erfasst', max_km: far ?? km, legs: r.legs, ap_from: w.ap_from || ''});
         saved = true; d.close(); toast('Reise gespeichert'); notifyParent('changed'); refresh();
       } catch (err) { toast(err.message, 4000); }
     };
@@ -689,6 +797,7 @@ function route() {
   const h = decodeURIComponent(location.hash.slice(1));
   const m = h.match(/^edit-(\d+)$/);
   if (m) { showTab('trips'); st.filter = {}; const t = st.trips.find((x) => x.id === +m[1]); if (t) { st.filter.destination = t.destination; gridHead(); gridBody(); } return; }
+  if (h === 'connectors') { showTab('import'); setTimeout(() => $('connHead').scrollIntoView({block: 'start'}), 300); return; }  // old links
   if (h && $('tab-' + h)) showTab(h); else showTab('trips');
 }
 (async function boot() {

@@ -17,8 +17,7 @@
     <button data-tab="people" role="tab">👥 Personen &amp; Gruppen</button>
     <button data-tab="style" role="tab">🎨 Kartenstil</button>
     <button data-tab="trips" class="on" role="tab">📋 Reiseliste</button>
-    <button data-tab="import" role="tab">📥 Import</button>
-    <button data-tab="connectors" role="tab">📡 Verbindungen</button>
+    <button data-tab="import" role="tab">📦 Daten &amp; Import</button>
     <button data-tab="notify" role="tab">🔔 Benachrichtigungen</button>
     <button data-tab="rules" role="tab">❓ Fragen &amp; Regeln</button>
   </nav>
@@ -37,7 +36,7 @@
       <button id="gridClear" class="btn">Filter löschen</button>
       <a class="btn" href="api/export.csv">CSV / Excel</a>
     </div>
-    <p class="small hint">Zelle anklicken und tippen – gespeichert wird beim Verlassen der Zelle. Mit <kbd>Strg</kbd>+<kbd>V</kbd> fügst du Zeilen direkt aus Excel ein (Spalten Von, Bis, Ziel, …). Doppelte Reisen werden erkannt.</p>
+    <p class="small hint">Zelle anklicken und tippen – gespeichert wird beim Verlassen der Zelle. <b>Wann</b> versteht „13.–25.07.2009“, „Juli 2009“ oder „2009“. Mit <kbd>Strg</kbd>+<kbd>V</kbd> fügst du Zeilen direkt aus Excel ein (Spalten Wann oder Von/Bis, Ziel, …). Doppelte Reisen werden erkannt.</p>
     <div class="tablewrap grid"><table id="grid"><thead></thead><tbody></tbody></table></div>
   </section>
 
@@ -46,21 +45,26 @@
   </section>
 
   <section id="tab-import" class="tab">
+    <h2 class="sub">So kommen Daten in Worldmap</h2>
+    <div id="sources" class="cards srcs"></div>
     <div id="drop" class="drop" tabindex="0">
       <b>Dateien hierher ziehen</b> oder <label class="link">auswählen<input id="file" type="file" multiple hidden></label>
-      <p class="small">Worldmap-Paket, Reiselisten (CSV/Excel mit Von, Bis, Ziel …), Google-Zeitachse (JSON), iCloud-/exiftool-CSV, GPX, KML – das Format wird automatisch erkannt. Doppelte Daten werden nicht doppelt gespeichert.</p>
+      <p class="small">Worldmap-Paket, Google-Zeitachse, Reiselisten (CSV/Excel), Foto-Listen (exiftool), GPX, KML – das Format wird erkannt, Doppeltes nicht doppelt gespeichert.</p>
     </div>
     <div id="imports" class="cards"></div>
-    <div class="card wide backup"><h3>💾 Alles in einer Datei</h3>
-      <p class="small keep">Ein <b>Worldmap-Paket</b> enthält alle Reisen mit „Wer war dabei“ und alle GPS-Positionen mit der Person dazu. Zum Sichern, für ein neues Home Assistant oder um es hier wieder einzulesen – einfach oben ablegen.</p>
-      <div class="opts"><a class="btn" href="api/export.worldmap.json.gz" download>Worldmap-Paket herunterladen</a><a class="btn" href="api/export.csv">Nur Reiseliste (CSV / Excel)</a></div></div>
+    <div id="aiBox" class="cards"></div>
+    <div class="card wide backup"><h3>💾 Sichern</h3>
+      <p class="small keep">Alles in einer Datei: Reisen mit „Wer war dabei“ und alle GPS-Positionen.</p>
+      <p class="small">Das <b>Worldmap-Paket</b> ist das Standardformat dieser Karte – zum Sichern, für ein neues Home Assistant oder um es hier wieder abzulegen. Die Reiseliste als CSV öffnet sich in Excel.</p>
+      <div class="opts"><a class="btn" href="api/export.worldmap.json.gz" download>Paket sichern</a><a class="btn" href="api/export.csv">Reiseliste (CSV)</a></div></div>
+    <h2 class="sub" id="connHead">Verbindungen</h2>
+    <div id="conn" class="cards"></div>
     <h3 class="sub">Bisherige Importe</h3>
     <div id="pastImports" class="cards"></div>
   </section>
 
   <section id="tab-style" class="tab"><div id="style"></div></section>
   <section id="tab-people" class="tab"><div id="people" class="cards"></div></section>
-  <section id="tab-connectors" class="tab"><div id="conn" class="cards"></div></section>
   <section id="tab-notify" class="tab"><div id="notify" class="cards"></div></section>
   <section id="tab-rules" class="tab"><div id="rules" class="cards"></div></section>
 </main>

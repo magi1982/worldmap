@@ -305,3 +305,17 @@ body.embed-new{background:transparent}
 .stops .mv{border:1px solid var(--line);background:transparent;color:inherit;border-radius:6px;width:28px;height:26px;font-size:11px;cursor:pointer;line-height:1}
 .stops .mv:disabled{opacity:.3;cursor:default}
 .stops li .rm{margin-left:4px}
+/* Daten & Import: overview of all ways data comes in */
+h2.sub{margin:22px 0 10px;font-size:18px}
+h2.sub:first-child{margin-top:4px}
+.srcs{grid-template-columns:repeat(auto-fill,minmax(260px,1fr));margin-bottom:16px}
+.card.src{display:flex;flex-direction:column}
+.card.src h3{display:flex;align-items:center;gap:6px;font-size:15px;margin:0 0 6px}
+.card.src .opts{margin-top:auto;padding-top:8px}
+pre.cmd{white-space:pre-wrap;word-break:break-word;font:12.5px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:#F4F2FB;border-radius:10px;padding:8px 10px;margin:8px 0 0}
+textarea.aiprompt{width:100%;box-sizing:border-box;font:12.5px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;border:1.5px solid var(--line);border-radius:12px;padding:10px;resize:vertical;margin-top:8px}
+[data-theme=dark] pre.cmd,[data-theme=dark] textarea.aiprompt{background:#1D1E36;color:inherit}
+/* an (i) never opened pulses softly so you notice there is help */
+.info.new{animation:ipulse 2.2s ease-in-out infinite}
+@keyframes ipulse{0%,100%{box-shadow:0 0 0 0 rgba(139,61,255,.45)}50%{box-shadow:0 0 0 7px rgba(139,61,255,0)}}
+@media (prefers-reduced-motion:reduce){.info.new{animation:none;border-color:var(--neon3)}}

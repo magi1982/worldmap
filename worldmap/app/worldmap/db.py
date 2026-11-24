@@ -104,12 +104,13 @@ MIGRATIONS = (
     ("trips", "ap_from", "TEXT"),   # IATA code set by hand: airport the flights start from (home side)
     ("trips", "ap_to", "TEXT"),     # … and the airport at the destination
     ("trips", "legs", "TEXT"),      # JSON: stops of a trip in order [{name, country, lat, lon, transport}]
+    ("trips", "date_prec", "TEXT NOT NULL DEFAULT 'day'"),  # day | month | year: how exactly the date is known
 )
 
 TRIP_FIELDS = (
     "start_date", "end_date", "destination", "country", "who", "confidence", "nights",
     "max_km", "lat", "lon", "transport", "reason", "note", "source", "locked", "radius_km", "approx", "status",
-    "ap_from", "ap_to", "legs",
+    "ap_from", "ap_to", "legs", "date_prec",
 )
 CONFIDENCE = ("tief", "mittel", "hoch", "bestätigt")
 # writing one of these keeps the stations and the trip in step
@@ -131,6 +132,22 @@ class Database:
         self._migrate_airport_stations()
         self.migrate_stations()
         self.migrate_stations_v3()
+        self.migrate_date_prec()
+
+    def migrate_date_prec(self) -> int:
+        """0.14.0: trips from the "Reise von Hand" wizard that only knew the year or the month say so.
+
+        The wizard stored a year as 15 July and a month as starting on the 1st, marked ``approx``.
+        """
+        with self._lock:
+            if self._conn.execute("SELECT 1 FROM meta WHERE key='date_prec'").fetchone():
+                return 0
+            with self.tx() as c:
+                hand = "approx = 1 AND source = 'manual' AND date_prec = 'day'"
+                n = c.execute(f"UPDATE trips SET date_prec = 'year' WHERE {hand} AND substr(start_date, 6) = '07-15'").rowcount  # nosec B608 - constant
+                n += c.execute(f"UPDATE trips SET date_prec = 'month' WHERE {hand} AND substr(start_date, 9) = '01'").rowcount  # nosec B608 - constant
+                c.execute("INSERT OR REPLACE INTO meta(key, value) VALUES('date_prec', '1')")
+            return n
 
     def _migrate_airport_stations(self) -> None:
         """0.11.0: the airport at the destination (``ap_to``) becomes an airport stop in ``legs``.

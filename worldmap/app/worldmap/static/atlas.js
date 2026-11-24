@@ -311,7 +311,7 @@ function sideR(){
  $('r-top').querySelectorAll('.trow').forEach(r=>r.onclick=()=>{const q=top[+r.dataset.i];const G=q.g&&D.groups.find(g=>g[0]==q.g);const la=G?G[2]:q.ts[0].p[0],lo=G?G[3]:q.ts[0].p[1];flyTo(MX(lo),MY(la),G?Math.max(V.S,90000):220000);showTrips(q.name,q.ts)});
 }
 function showTrips(name,ts){ts=[...ts].sort((a,b)=>b.a.localeCompare(a.a));const n=ts.reduce((s,t)=>s+t.n,0),km=ts.reduce((s,t)=>s+t.km,0);
- openDetail(`<h3>${esc(name)}</h3><div class="dsub">${ts.length} ${ts.length==1?'Reise':'Reisen'} · ${esc(n)} Nächte · ${fmt(km)} km · ${esc(ts[0]?ts[0].c:'')}</div>`+ts.map(t=>`<div class="trip"><div class="s" style="background:${WCOL[t.w]}"></div><div><div class="t1">${dfmt(t.a)}${t.n?' – '+dfmt(t.b):''}</div><div class="t2"><span class="pill" style="background:${tint(WCOL[t.w],.18)}">${esc(t.w)}</span>${t.m.map(m=>`<span class="pill">${MNAME[m]}</span>`).join('')}${t.n?t.n+(t.n==1?' Nacht':' Nächte'):'Tagesausflug'} · ${fmt(t.km)} km${t.name!=name?' · '+esc(t.name):''}${t.approx?' · geschätzt':''} · <a href="#" class="edit" data-id="${t.dbid}">bearbeiten</a></div></div></div>`).join(''));$('detail').querySelectorAll('a.edit').forEach(a=>a.onclick=e=>{e.preventDefault();editTrip(+a.dataset.id)})}
+ openDetail(`<h3>${esc(name)}</h3><div class="dsub">${ts.length} ${ts.length==1?'Reise':'Reisen'} · ${esc(n)} Nächte · ${fmt(km)} km · ${esc(ts[0]?ts[0].c:'')}</div>`+ts.map(t=>`<div class="trip"><div class="s" style="background:${WCOL[t.w]}"></div><div><div class="t1">${tWhen(t)||dfmt(t.a)+(t.n?' – '+dfmt(t.b):'')}</div><div class="t2"><span class="pill" style="background:${tint(WCOL[t.w],.18)}">${esc(t.w)}</span>${t.m.map(m=>`<span class="pill">${MNAME[m]}</span>`).join('')}${t.n?t.n+(t.n==1?' Nacht':' Nächte'):'Tagesausflug'} · ${fmt(t.km)} km${t.name!=name?' · '+esc(t.name):''}${t.approx?' · geschätzt':''} · <a href="#" class="edit" data-id="${t.dbid}">bearbeiten</a></div></div></div>`).join(''));$('detail').querySelectorAll('a.edit').forEach(a=>a.onclick=e=>{e.preventDefault();editTrip(+a.dataset.id)})}
 function chipsR(){
  $('r-mode').innerHTML=MODES.map(m=>`<button class="chip ${R.m.has(m)?'on':''}" style="--c:${MCOL[m]}" data-m="${m}"><i></i>${MNAME[m]}</button>`).join('');
  $('r-mode').querySelectorAll('.chip').forEach(b=>b.onclick=()=>toggle(R.m,b.dataset.m,MODES,updR))}
@@ -580,7 +580,7 @@ function overlayF(C,o,T){const W=V.W,H=V.H,ph=(T-o.t0)/o.d,fade=Math.min(1,(T-o.
   ctx.font=`900 ${o.k=='year'?Math.min(120,W/5):Math.min(64,W/10)}px Inter,system-ui,sans-serif`;const tw=ctx.measureText(big).width;ctx.font='700 17px Inter,system-ui,sans-serif';const sw=ctx.measureText(sub).width;const bw=Math.max(tw,sw)+64,bh=(o.k=='year'?Math.min(120,W/5):Math.min(64,W/10))+70;
   ctx.fillStyle=bg;rrect((W-bw)/2,H/2-bh/2-10,bw,bh,24);ctx.fill();ctx.fillStyle=fg;ctx.textAlign='center';ctx.font=`900 ${o.k=='year'?Math.min(120,W/5):Math.min(64,W/10)}px Inter,system-ui,sans-serif`;ctx.fillText(big,W/2,H/2+(o.k=='year'?Math.min(120,W/5):Math.min(64,W/10))*.3-14);ctx.font='700 17px Inter,system-ui,sans-serif';ctx.fillStyle=mu;ctx.fillText(sub,W/2,H/2+bh/2-26);ctx.globalAlpha=1}
  if(o.k=='trip'&&C.cards!==false){const t=o.t,G=t.g&&D.groups.find(g=>g[0]==t.g),name=(t.name||(G&&G[1])||'Reise');const a=Math.max(0,Math.min(1,(T-o.t0-o.fly*.5)/.4,(o.t0+o.d-T)/.3));ctx.globalAlpha=a;
-  const l1=t.w,l3=dfmt(t.a)+(t.n?' – '+dfmt(t.b):'')+' · '+t.m.map(m=>ICO[m]||'').join(' ')+(t.km?' · '+fmt(t.km)+' km':'');ctx.font='850 26px Inter,system-ui,sans-serif';const w1=ctx.measureText(name).width;ctx.font='600 14px Inter,system-ui,sans-serif';const w3=ctx.measureText(l3).width;
+  const l1=t.w,l3=(tWhen(t)||dfmt(t.a)+(t.n?' – '+dfmt(t.b):''))+' · '+t.m.map(m=>ICO[m]||'').join(' ')+(t.km?' · '+fmt(t.km)+' km':'');ctx.font='850 26px Inter,system-ui,sans-serif';const w1=ctx.measureText(name).width;ctx.font='600 14px Inter,system-ui,sans-serif';const w3=ctx.measureText(l3).width;
   const bw=Math.min(W-28,Math.max(w1,w3)+40),bx=(W-bw)/2,by=H-(W<600?124:136);ctx.fillStyle=bg;rrect(bx,by,bw,104,18);ctx.fill();
   ctx.fillStyle=WCOL[t.w]||'#8B3DFF';ctx.beginPath();ctx.arc(bx+24,by+27,6,0,7);ctx.fill();ctx.font='800 13px Inter,system-ui,sans-serif';ctx.fillStyle=mu;ctx.textAlign='left';ctx.fillText(l1.toUpperCase(),bx+38,by+32);
   ctx.font='850 26px Inter,system-ui,sans-serif';ctx.fillStyle=fg;ctx.fillText(name,bx+18,by+64,bw-36);ctx.font='600 14px Inter,system-ui,sans-serif';ctx.fillStyle=mu;ctx.fillText(l3,bx+18,by+88,bw-36);ctx.globalAlpha=1}
@@ -594,7 +594,7 @@ function sideF(){if(!F.sc)return;const mm=s=>Math.floor(s/60)+':'+String(Math.ro
  const ys=F.sc.filter(o=>o.k=='year');$('f-years').innerHTML=ys.map(o=>`<button class="chip on" style="--c:${ycol(o.y)}" data-t="${o.t0}"><i></i>${o.y}</button>`).join('')||'<div class="empty">Keine Reisen in dieser Auswahl.</div>';
  $('f-years').querySelectorAll('button').forEach(b=>b.onclick=()=>{F.t=+b.dataset.t+.01;infoF();DRAW()});infoF()}
 function infoF(){if(!F.sc)return;const o=F.sc[sceneAt(F.t)];$('f-slider').value=Math.round(F.t/Math.max(.001,F.dur)*1000);
- $('f-now').textContent=o.k=='trip'?o.t.name:o.k=='year'?String(o.y):o.k=='intro'?'Anfang':'Ende';$('f-what').textContent=o.k=='trip'?`${o.t.w} · ${dfmt(o.t.a)}`:o.k=='year'?'Kapitel':F.play?'läuft':'bereit'}
+ $('f-now').textContent=o.k=='trip'?o.t.name:o.k=='year'?String(o.y):o.k=='intro'?'Anfang':'Ende';$('f-what').textContent=o.k=='trip'?`${o.t.w} · ${tWhen(o.t)||dfmt(o.t.a)}`:o.k=='year'?'Kapitel':F.play?'läuft':'bereit'}
 function setPlayF(p){F.play=p;$('f-pico').setAttribute('d',p?PLAY:PAUSE);$('f-play').setAttribute('aria-label',p?'Pause':'Abspielen');if(p){F.last=0;requestAnimationFrame(tickF)}else{full();infoF()}}
 function tickF(ts){if(!F.play||TAB!='zeit')return;const dt=Math.min(.1,(ts-(F.last||ts))/1000);F.last=ts;F.t=Math.min(F.dur,F.t+dt);DRAW();infoF();if(F.t>=F.dur){setPlayF(false);if(F.rec)F.rec.stop()}else requestAnimationFrame(tickF)}
 $('f-play').onclick=()=>{if(!F.sc)buildF();if(!F.play&&F.t>=F.dur)F.t=0;setPlayF(!F.play)};
@@ -837,7 +837,11 @@ function dTrips(){return D.trips.filter(t=>tripSel(t)).sort((a,b)=>a.a<b.a?-1:1)
 function dMain(t){let best=null,v=-1;for(const m in t.k||{})if(t.k[m]>v){v=t.k[m];best=m}return best||(t.m&&t.m[0])||'road'}
 function dCountries(t){return String(t.c||'').split(/\s*[,·]\s*/).filter(Boolean)}
 function dFar(t){return t.nopos?0:dHav(HOME[0],HOME[1],t.p[0],t.p[1])}
-function dRange(t){return `${t.a.slice(8,10)}.${t.a.slice(5,7)}.${t.a.slice(0,4)}${t.b!=t.a?' – '+t.b.slice(8,10)+'.'+t.b.slice(5,7)+'.'+t.b.slice(0,4):''}`}
+const MONTHS_DE=['','Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+/* a trip known only by month or year ("Juli 2009", "2009") – the stored days are a stand-in, never shown as exact */
+function tWhen(t){if(t.dp=='year')return '~ '+t.a.slice(0,4);if(t.dp!='month')return null;const ya=t.a.slice(0,4),yb=t.b.slice(0,4),ma=MONTHS_DE[+t.a.slice(5,7)],mb=MONTHS_DE[+t.b.slice(5,7)];
+ return '~ '+(ya==yb?(ma==mb?ma:ma+'–'+mb)+' '+ya:ma+' '+ya+'–'+mb+' '+yb)}
+function dRange(t){const v=tWhen(t);if(v)return v;return `${t.a.slice(8,10)}.${t.a.slice(5,7)}.${t.a.slice(0,4)}${t.b!=t.a?' – '+t.b.slice(8,10)+'.'+t.b.slice(5,7)+'.'+t.b.slice(0,4):''}`}
 
 /* ---------------------------------------------------------------- tiles */
 function tKpi(T){const cs=new Set(T.flatMap(dCountries)),n=T.reduce((s,t)=>s+(t.n||0),0),km=T.reduce((s,t)=>s+(t.km||0),0);

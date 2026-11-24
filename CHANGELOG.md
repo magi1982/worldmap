@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.14.0 – 2026-11-24
+
+### Added
+- **Vague dates**: a trip can have exact days, only a month or only a year. The trip list has one *When* column that
+  understands "13.–25.07.2009", "13.07.–25.07.2009", "Juli 2009", "Juli–August 2009", "07.2009" or "2009" (also
+  "ca. 2009"). Maps, film, statistics and sorting use a stand-in stay in the middle of the month or year, shown with
+  "~". The trip wizard stores what you knew; trip lists (a *When* column or vague Von/Bis), Worldmap packages
+  (`"when"`) and the CSV export carry it. Old wizard trips that knew only the year or month are marked on update.
+- **Data & import** tab: Import and Connections are one page that starts with "So kommen Daten in Worldmap" – by
+  hand, Worldmap package (the standard format of this map), Google Timeline, Home Assistant app (on the road only
+  with Home Assistant Cloud / Nabu Casa or your own remote access), OwnTracks, iPhone, photo galleries with exiftool
+  (ready command), asking Claude to list photo GPS data (ready question), other files.
+- **Convert with AI**: a ready prompt describing the Worldmap format with a copy button and a sample file
+  (`beispiel.worldmap.json`).
+- Info buttons pulse gently until they were opened once (off with "reduce motion").
+
+### Improved
+- Worldmap packages also read trips with `"when"` and stations (`"legs"`), points as objects
+  (`{"time", "lat", "lon", "person"}`), times in milliseconds or ISO text, and add unknown persons.
+- Import messages and previews are in German and say what was skipped and why (rows without date or destination,
+  positions without valid time or coordinates, trips with only a month or year).
+- Clearer wording on the questions and notifications pages; old `#connectors` links open the new tab.
+
 ## 0.13.0 – 2026-11-24
 
 ### Added

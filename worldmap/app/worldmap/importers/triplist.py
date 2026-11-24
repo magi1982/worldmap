@@ -8,9 +8,9 @@ from __future__ import annotations
 
 import json
 import re
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 
-from .. import airports, places
+from .. import airports, places, vague
 from ..db import CONFIDENCE
 from ..timeparse import parse_ts
 from .tabular import _find
@@ -27,6 +27,7 @@ NOTE = ("notiz", "note", "bemerkung", "kommentar", "comment")
 SOURCE = ("quelle", "source")
 KM = ("maxentfernungkm", "entfernungkm", "entfernung", "km", "distancekm", "distance")
 STATIONS = ("stationen", "stations", "route", "etappen")
+WHEN = ("wann", "when", "datum", "date", "zeitraum", "jahr", "year", "reisedatum")
 LAT = ("lat", "latitude", "breite", "breitengrad")
 LON = ("lon", "lng", "longitude", "laenge", "lange", "laengengrad", "langengrad")
 
@@ -37,7 +38,7 @@ COUNTRY_CC.update({"grossbritannien": "GB", "vereinigtes königreich": "GB", "uk
 
 def looks_like_trip_list(header: list) -> bool:
     h = ["" if x is None else str(x) for x in header]
-    if _find(h, START, exact=True) is None or _find(h, DEST) is None:
+    if (_find(h, START, exact=True) is None and _find(h, WHEN, exact=True) is None) or _find(h, DEST) is None:
         return False
     # a list with coordinates is still a trip list when it has an end date column (point exports have none)
     return _find(h, LAT, exact=True) is None or _find(h, END, exact=True) is not None
@@ -54,6 +55,44 @@ def _date(v) -> str | None:
     if ts is None:
         return None
     return datetime.fromtimestamp(ts, UTC).date().isoformat()
+
+
+def _vague_text(v) -> str:
+    if isinstance(v, float) and v.is_integer():
+        v = int(v)
+    return "" if v is None else str(v).strip()
+
+
+def _try(text: str, nights) -> dict | None:
+    try:
+        return vague.parse(text, nights) if text else None
+    except ValueError:
+        return None
+
+
+def _when(start, end, when, nights: int | None = None) -> dict | None:
+    """Dates of one row: exact days, or only a month / a year ("Juli 2009", "2009") as people remember them.
+
+    A "Wann" column that only knows a month or a year wins (our own CSV export writes it next to the stand-in days);
+    otherwise Von/Bis, otherwise the "Wann" column as a day.
+    """
+    w = _try(_vague_text(when), nights)
+    if w and w["date_prec"] != "day":
+        return w
+    a = None if isinstance(start, (datetime, date)) else _vague_text(start)
+    b = None if isinstance(end, (datetime, date)) else _vague_text(end)
+    got = _try(f"{a} – {b}", nights) if a and b else _try(a or "", nights) if a and end in (None, "") else None
+    if got:
+        return got
+    a2, b2 = _date(start), _date(end)
+    if a2:
+        if not b2:
+            b2 = (date.fromisoformat(a2) + timedelta(days=nights or 0)).isoformat()
+        if b2 < a2:
+            a2, b2 = b2, a2
+        return {"start_date": a2, "end_date": b2, "date_prec": "day",
+                "nights": (date.fromisoformat(b2) - date.fromisoformat(a2)).days}
+    return w
 
 
 def _fold(s: str) -> str:
@@ -167,10 +206,11 @@ def parse_rows(rows: list) -> tuple[dict, list[dict], int]:
     if hi is None:
         return {}, [], 0
     header = ["" if x is None else str(x) for x in rows[hi]]
-    col = {k: _find(header, names, exact=k in ("start", "end", "lat", "lon"))
+    col = {k: _find(header, names, exact=k in ("start", "end", "lat", "lon", "when"))
            for k, names in (("start", START), ("end", END), ("dest", DEST), ("country", COUNTRY), ("who", WHO),
                             ("conf", CONF), ("nights", NIGHTS), ("transport", TRANSPORT), ("note", NOTE),
-                            ("source", SOURCE), ("km", KM), ("lat", LAT), ("lon", LON), ("stations", STATIONS))}
+                            ("source", SOURCE), ("km", KM), ("lat", LAT), ("lon", LON), ("stations", STATIONS),
+                            ("when", WHEN))}
     names = {k: header[v] for k, v in col.items() if v is not None}
 
     def cell(row, k):
@@ -179,21 +219,23 @@ def parse_rows(rows: list) -> tuple[dict, list[dict], int]:
 
     trips, skipped = [], 0
     for row in rows[hi + 1:]:
-        a, b = _date(cell(row, "start")), _date(cell(row, "end"))
+        try:
+            nights = max(0, min(3650, int(float(str(cell(row, "nights")).replace(",", ".")))))
+        except (TypeError, ValueError):
+            nights = None
+        when = _when(cell(row, "start"), cell(row, "end"), cell(row, "when"), nights)
         dest = str(cell(row, "dest") or "").strip()[:120]
-        if not a or not dest:
+        if not when or not dest:
             skipped += 1 if any(c not in (None, "") for c in row) else 0
             continue
-        b = b or a
-        if b < a:
-            a, b = b, a
-        t = {"start_date": a, "end_date": b, "destination": dest,
+        t = {"start_date": when["start_date"], "end_date": when["end_date"], "date_prec": when["date_prec"],
+             "destination": dest,
              "country": str(cell(row, "country") or "").strip()[:60],
              "who": str(cell(row, "who") or "").strip()[:60],
              "transport": str(cell(row, "transport") or "").strip()[:80],
              "note": str(cell(row, "note") or "").strip()[:1000],
              "source": (str(cell(row, "source") or "").strip() or "Import")[:80],
-             "nights": (date.fromisoformat(b) - date.fromisoformat(a)).days}
+             "nights": when["nights"]}
         conf = str(cell(row, "conf") or "").strip().lower()
         t["confidence"] = conf if conf in CONFIDENCE else ("bestätigt" if t["who"] else "tief")
         km = cell(row, "km")

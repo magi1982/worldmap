@@ -238,7 +238,7 @@ def test_worldmap_package_roundtrip(server, tmp_path, monkeypatch):
     st, raw, _ = call(url + "/api/import?dry_run=1", "POST", body, "application/octet-stream", {"X-Filename": "x.worldmap.json.gz"})
     r = js(raw)
     assert st == 200 and r["kind"] == "package" and r["trips"] == 2 and r["points"] == 3 and r["skipped"] == 1
-    assert "Grossfamilie" in r["missing"] and any("could not be read" in w for w in r["warnings"])
+    assert "Grossfamilie" in r["missing"] and any("unlesbar" in w for w in r["warnings"])
     st, raw, _ = call(url + "/api/import", "POST", body, "application/octet-stream", {"X-Filename": "x.worldmap.json.gz"})
     r = js(raw)
     assert st == 200 and r["new_points"] == 3 and r["trips_created"] == 1 and r["duplicates_in_file"] == 1

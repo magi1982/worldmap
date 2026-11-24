@@ -42,7 +42,7 @@ def _clean(points, person: str, result: ImportResult) -> None:
             result.skipped += 1
             continue
         if len(result.points) >= MAX_POINTS:
-            result.warnings.append(f"stopped after {MAX_POINTS} points")
+            result.warnings.append(f"nach {MAX_POINTS:,} Positionen abgebrochen – Datei aufteilen".replace(",", "'"))
             return
         hint = (str(hint)[:200] if hint else None)
         result.points.append((int(ts), float(lat), float(lon), person, src, acc, hint))
@@ -57,7 +57,7 @@ def _gunzip(data: bytes) -> bytes:
     while chunk := d.read(1 << 20):
         out += chunk
         if len(out) > MAX_UNZIPPED:  # zip bomb guard
-            raise UserImportError("file too large after unpacking")
+            raise UserImportError("Datei ist entpackt zu gross (max. 1 GB)")
     return bytes(out)
 
 
@@ -66,7 +66,7 @@ def detect_and_parse(data: bytes, filename: str = "", person: str = "", tz: str 
         try:
             data = _gunzip(data)
         except (OSError, EOFError) as exc:
-            raise UserImportError(f"invalid gzip file: {exc}") from exc
+            raise UserImportError(f"kaputte .gz-Datei: {exc}") from exc
         filename = (filename or "").removesuffix(".gz")
     name = (filename or "").lower()
     head = data[:4096].lstrip()
@@ -92,7 +92,7 @@ def detect_and_parse(data: bytes, filename: str = "", person: str = "", tz: str 
         try:
             obj = json.loads(data.decode("utf-8-sig"))
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-            raise UserImportError(f"invalid JSON: {exc}") from exc
+            raise UserImportError(f"kein gültiges JSON (Zeile {getattr(exc, 'lineno', '?')}): {getattr(exc, 'msg', exc)}") from exc
         if package.is_package(obj):
             pts, trips, persons, groups, problems = package.parse(obj)
             res = ImportResult(format="worldmap", trips=trips, persons=persons, groups=groups, warnings=problems)
@@ -102,11 +102,11 @@ def detect_and_parse(data: bytes, filename: str = "", person: str = "", tz: str 
                 else:
                     res.skipped += 1
             if not res.points and not res.trips:
-                raise UserImportError("the Worldmap package is empty")
+                raise UserImportError("das Worldmap-Paket ist leer (keine Reisen, keine Positionen)")
             return res
         kind, pts = google.parse(obj, tz)
         if kind is None:
-            raise UserImportError("JSON format not recognised (expected a Google Timeline export)")
+            raise UserImportError("JSON nicht erkannt – erwartet wird ein Worldmap-Paket (\"worldmap\": 1) oder ein Google-Zeitachsen-Export")
         res = ImportResult(format=kind)
         _clean(pts, person, res)
         _require(res)
@@ -128,18 +128,18 @@ def _trips(rows, fmt):
     if not names:
         return None
     if not trips:
-        raise UserImportError("trip list recognised, but no row has a start date and a destination")
+        raise UserImportError("Reiseliste erkannt, aber keine Zeile hat ein Datum (Wann oder Von) und ein Ziel")
     res = ImportResult(format=fmt, columns=names, skipped=skipped, trips=trips)
     missing = sum(1 for t in trips if t.get("lat") is None)
     if missing:
-        res.warnings.append(f"{missing} destinations not found on the map – edit them in the list")
+        res.warnings.append(f"{missing} Ziele nicht auf der Karte gefunden – in der Reiseliste ergänzen")
     return res
 
 
 def _require(res: ImportResult) -> None:
     if not res.points:
         raise UserImportError(
-            f"no usable coordinates found (format: {res.format}, skipped rows: {res.skipped})"
+            f"keine brauchbaren Positionen gefunden (Format: {res.format}, {res.skipped} Zeilen ohne gültige Zeit oder Koordinaten)"
         )
 
 

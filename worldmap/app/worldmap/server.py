@@ -22,7 +22,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
-from . import airports, asking, geosearch, places, routeservice
+from . import airports, asking, geosearch, places, routeservice, vague
 from .atlas import Atlas
 from .db import CONFIDENCE
 from .engine import Engine
@@ -38,6 +38,7 @@ STATIC_FILES = {
     "/": ("atlas.html", "text/html; charset=utf-8"),
     "/index.html": ("atlas.html", "text/html; charset=utf-8"),
     "/app.html": ("app.html", "text/html; charset=utf-8"),
+    "/beispiel.worldmap.json": ("beispiel.worldmap.json", "application/json; charset=utf-8"),
     "/app.js": ("app.js", "text/javascript; charset=utf-8"),
     "/style.css": ("style.css", "text/css; charset=utf-8"),
     "/base.json": ("base.json", "application/json"),
@@ -146,9 +147,12 @@ def validate_legs(raw) -> str:
     return json.dumps(out, ensure_ascii=False)
 
 
-def validate_trip(data: dict, partial: bool) -> dict:
+def validate_trip(data: dict, partial: bool, cur: dict | None = None) -> dict:
     if not isinstance(data, dict):
         raise ValueError("body must be a JSON object")
+    if data.get("when") not in (None, ""):  # "Juli 2009", "13.–25.07.2009", "2009" … typed into the list
+        nights = data.get("nights", (cur or {}).get("nights"))
+        data = {**{k: v for k, v in data.items() if k != "when"}, **vague.parse(str(data["when"]), nights)}
     out: dict = {}
     for k in ("start_date", "end_date"):
         if k in data:
@@ -177,6 +181,11 @@ def validate_trip(data: dict, partial: bool) -> dict:
         out["confidence"] = data["confidence"]
     if "approx" in data:
         out["approx"] = 1 if data["approx"] else 0
+    if "date_prec" in data:
+        prec = data["date_prec"] or "day"
+        if prec not in vague.PRECISIONS:
+            raise ValueError("invalid date_prec")
+        out["date_prec"] = prec
     for k in ("max_km", "lat", "lon", "radius_km"):
         if k in data:
             out[k] = None if data[k] in (None, "") else float(data[k])
@@ -590,13 +599,14 @@ def make_handler(app: App):
                 w = csv.writer(buf, delimiter=";")
                 cols = ["start_date", "end_date", "destination", "country", "who", "confidence", "nights",
                         "max_km", "transport", "reason", "note", "source"]
-                w.writerow(cols + ["stations"])
+                w.writerow(cols + ["stations", "when"])
                 for t in eng.db.trips():
                     try:
                         legs = json.loads(t["legs"]) if t["legs"] else []
                     except ValueError:
                         legs = []
-                    w.writerow([csv_safe(t[c]) for c in cols] + [csv_safe(triplist.stations_text(legs))])
+                    w.writerow([csv_safe(t[c]) for c in cols] + [csv_safe(triplist.stations_text(legs)),
+                                csv_safe(vague.label(t["start_date"], t["end_date"], t["date_prec"]))])
                 return self._send(HTTPStatus.OK, ("﻿" + buf.getvalue()).encode(), "text/csv; charset=utf-8",
                                   {"Content-Disposition": 'attachment; filename="worldmap-trips.csv"'})
             return self._send(HTTPStatus.NOT_FOUND, {"error": "not found"})
@@ -708,8 +718,8 @@ def make_handler(app: App):
             if not eng.db.trip(tid):
                 return self._send(HTTPStatus.NOT_FOUND, {"error": "not found"})
             try:
-                data = validate_trip(self._json(), partial=True)
                 cur = eng.db.trip(tid)
+                data = validate_trip(self._json(), partial=True, cur=cur)
                 if data.get("end_date", cur["end_date"]) < data.get("start_date", cur["start_date"]):
                     raise ValueError("end_date is before start_date")
             except OverflowError:
@@ -743,6 +753,7 @@ def make_handler(app: App):
         def _import_trips(self, res, filename, dry):
             found = sum(1 for t in res.trips if t.get("lat") is not None)
             summary = {"format": res.format, "kind": "trips", "trips": len(res.trips), "located": found,
+                       "vague": sum(1 for t in res.trips if t.get("date_prec") in ("month", "year")),
                        "skipped": res.skipped, "columns": res.columns, "warnings": res.warnings,
                        "first": min(t["start_date"] for t in res.trips), "last": max(t["end_date"] for t in res.trips),
                        "sample": [t["destination"] for t in res.trips[:5]]}
@@ -764,7 +775,7 @@ def make_handler(app: App):
                     bad += 1
             res.trips = ok_trips
             if bad:
-                res.warnings.append(f"{bad} trips could not be read and were left out")
+                res.warnings.append(f"{bad} Reisen unlesbar (Datum oder Ziel fehlt) – weggelassen")
             known = set(eng.s.labels) | {g["name"] for g in eng.s.groups}
             needed = sorted({p[3] for p in res.points if p[3]} | {t.get("who") for t in res.trips if t.get("who")})
             missing = [n for n in needed if n not in known]
@@ -774,7 +785,7 @@ def make_handler(app: App):
                        "first": min([p[0] for p in res.points] or [0]), "last": max([p[0] for p in res.points] or [0]),
                        "sample": [t["destination"] for t in res.trips[:5]]}
             if missing:
-                summary["warnings"] = [*res.warnings, "not set up yet under People & groups: " + ", ".join(missing)]
+                summary["warnings"] = [*res.warnings, "noch nicht unter Personen & Gruppen angelegt: " + ", ".join(missing)]
             if dry:
                 return self._send(HTTPStatus.OK, summary)
             summary["new_points"] = eng.import_points(res.points) if res.points else 0

@@ -650,6 +650,7 @@ class Atlas:
                 "km": sum(k.values()), "dw": wd(t["start_date"]), "dwb": wd(t["end_date"]), "fl": fl, "k": k,
                 "p": [round(lat, 4), round(lon, 4)], "conf": t["confidence"], "approx": approx, "nopos": nopos,
                 "r": t["radius_km"], "fixed": 1 if fixed else 0,
+                **({"dp": t["date_prec"]} if t.get("date_prec") in ("month", "year") else {}),
                 **({"gr": gr} if gr else {}),
                 **({"lg": lg} if lg else {}),
                 **({"st": [[x["lat"], x["lon"], x["name"]] + ([x["ap"]] if x.get("ap") else []) for x in legs]}

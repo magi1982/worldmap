@@ -64,27 +64,27 @@ Ideen werden zuerst hier gesammelt. Code entsteht erst nach einem ausdrückliche
 
 ## Next update – waiting for "mach es" / Nächstes Update – wartet auf „mach es“
 
-### Vague dates, "Daten & Import" tab, AI helper (waiting for "mach es")
-- [ ] Trips can have a day, only a month or only a year ("summer 2009, don't know exactly"). New trip field
+### Vague dates, "Daten & Import" tab, AI helper (done in 0.14.0)
+- [x] Trips can have a day, only a month or only a year ("summer 2009, don't know exactly"). New trip field
       `date_prec` = day | month | year; the trip list shows "13.–25.07.2009", "Juli 2009" or "2009". The date cell
-      accepts "13.07.2009", "07.2009", "Juli 2009" or "2009" (also as a range "2008–2009"); the wizard already asks
+      accepts "13.07.2009", "07.2009", "Juli 2009" or "2009" (a range of years like "2008–2009" is NOT built – one year only); the wizard already asks
       year / month and now stores the precision too. Map, film, dashboard and sorting use a representative date
       (mid-month / mid-July), shown with "~". Migration: hand trips marked "approx" from the wizard get month/year
       precision when their dates are the wizard placeholders; everything else stays "day". Worldmap package, CSV
       export and the trip-list import carry the field.
-- [ ] "Import" and "Verbindungen" become one tab **"📦 Daten & Import"** (rarely used, so it explains itself):
+- [x] "Import" and "Verbindungen" become one tab **"📦 Daten & Import"** (rarely used, so it explains itself):
       1. "So kommen Daten in Worldmap" – short overview cards: Worldmap-Paket (the standard format of this map,
          backup / move / import), Google Zeitachse (phone export), live from Home Assistant / OwnTracks, files
          (GPX, KML, CSV/Excel trip lists, photo CSV), Apple users (no timeline export: OwnTracks, photos), and
          "everything else: let an AI convert it" (below).
       2. Drop zone + past imports (as now). 3. Connections (as now).
-- [ ] Small box **"Andere Daten? Mit einer KI umwandeln"**: a ready prompt with the Worldmap JSON format (trips +
+- [x] Small box **"Andere Daten? Mit einer KI umwandeln"**: a ready prompt with the Worldmap JSON format (trips +
       points, field list, a short invented example) and a copy button – paste it into any AI together with your
       own file, get back a `*.worldmap.json` to drop in here. Also a download "Beispiel.worldmap.json" (sample data).
       Hint: only share what you are fine giving to that AI service.
-- [ ] Wording & design: buttons get short, telling names; every longer explanation moves behind an "i" info button
+- [x] Wording & design: buttons get short, telling names; every longer explanation moves behind an "i" info button
       that gently pulses (stops after it was opened once, respects "reduce motion") so you see there is help.
-- [ ] Overview "So kommen Daten in Worldmap" also lists:
+- [x] Overview "So kommen Daten in Worldmap" also lists:
       - **Von Hand**: "Reise von Hand" wizard and editing in the trip list (with vague dates).
       - **Home Assistant Companion app**: sends GPS only while Home Assistant is reachable – on the road that needs
         remote access, i.e. Home Assistant Cloud (Nabu Casa) or your own VPN / domain; it does not keep positions
@@ -95,12 +95,12 @@ Ideen werden zuerst hier gesammelt. Code entsteht erst nach einem ausdrückliche
         -DateTimeOriginal <folder> > fotos.csv`, Windows/Mac/Linux) and drop the CSV here.
       - **Ask Claude**: e.g. "list GPS and date of all photos in my iCloud Photos folder on Windows (or the Photos
         library on the Mac) as CSV" – with folder access in the Claude desktop app – then drop the CSV here.
-- [ ] Review of ALL settings pages (people, map style, trips, data & import, connections, notifications, questions &
+- [x] Review of ALL settings pages (people, map style, trips, data & import, connections, notifications, questions &
       rules): one consistent layout, plain German, short labels, info buttons, no duplicate or dead options.
-- [ ] Import quality check: run every importer against the sample files and against malformed / mixed files
+- [x] Import quality check: run every importer against the sample files and against malformed / mixed files
       (wrong date formats, comma vs. dot, swapped lat/lon, empty rows, duplicates, time zones, HEIC exiftool
       output, huge files); clear summary after each import ("1234 Punkte, 12 Reisen, 3 Zeilen übersprungen: …").
-- [ ] Tests (date parsing of all forms, sorting, migration, package round trip, importer edge cases), README EN/DE,
+- [x] Tests (date parsing of all forms, sorting, migration, package round trip, importer edge cases), README EN/DE,
       changelog.
 
 ### Photos as a location source – for every user (waiting for "mach es")

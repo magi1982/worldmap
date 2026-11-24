@@ -1,0 +1,21 @@
+{
+  "worldmap": 1,
+  "persons": ["Alex", "Sam"],
+  "groups": [{"name": "Paar", "members": ["Alex", "Sam"]}],
+  "trips": [
+    {"start_date": "2024-05-10", "end_date": "2024-05-14", "destination": "Lissabon", "country": "Portugal",
+     "who": "Paar", "transport": "Flug", "note": "Beispiel mit genauen Daten und Stationen",
+     "legs": [{"name": "Lissabon", "country": "Portugal", "lat": 38.72, "lon": -9.14, "transport": "Flug", "ap": "LIS"},
+              {"name": "Sintra", "country": "Portugal", "lat": 38.80, "lon": -9.39, "transport": "Zug"}]},
+    {"when": "Juli 2009", "nights": 10, "destination": "Toskana", "country": "Italien", "who": "Alex",
+     "transport": "Auto", "lat": 43.35, "lon": 11.0, "note": "Beispiel: nur Monat bekannt"},
+    {"when": "2003", "nights": 7, "destination": "Kreta", "country": "Griechenland", "who": "Sam",
+     "transport": "Flug", "lat": 35.24, "lon": 24.8, "note": "Beispiel: nur Jahr bekannt"}
+  ],
+  "points": [
+    {"time": "2024-05-10T09:15:00Z", "lat": 38.7742, "lon": -9.1342, "person": "Alex"},
+    {"time": "2024-05-10T11:40:00Z", "lat": 38.7110, "lon": -9.1390, "person": "Alex"},
+    {"time": "2024-05-12T10:05:00Z", "lat": 38.7976, "lon": -9.3906, "person": "Sam"},
+    [1715594400, 38.7139, -9.1334, 0, "beispiel", null]
+  ]
+}
