@@ -64,6 +64,13 @@ Ideen werden zuerst hier gesammelt. Code entsteht erst nach einem ausdrückliche
 
 ## Next update – waiting for "mach es" / Nächstes Update – wartet auf „mach es“
 
+### Security gate: open alerts turn the checks red (waiting for "mach es")
+- [ ] New job "Security alerts" in codeql.yml after the analysis (also weekly): lists the open **code scanning**
+      and **Dependabot** alerts of the repo with the workflow token (`security-events: read`) and fails when one is
+      open – each alert as an error line (rule, severity, file:line). Like this an open finding is a red check that
+      is seen after every push, without reading the Security tab.
+- [ ] Same for family-planer.
+
 ### Dashboard first, clearer choices, a real postcard (done in 0.15.0)
 - [x] Tab order: **Dashboard first** in the bar (1 Dashboard, 2 Reisen, …), but Worldmap still **opens on the map**
       (Reisen) – a remembered last tab is not used; number keys follow the new order.
