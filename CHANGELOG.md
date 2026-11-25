@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.16.3 – 2026-11-25
+
+### Fixed
+- **Moving flights follow the look**: with the animation on, the flying vehicles were still the classic planes.
+  Now 💎 crystals send comets with a glowing, tapering tail, a bright core, crystal dust and a crystal at the head;
+  ⭐ stars a golden plane with sparkles; 🏅 medals a paper plane – each with its shadow on the ground. The static
+  comet is only drawn when the animation is off, so nothing appears twice.
+
 ## 0.16.2 – 2026-11-25
 
 ### Fixed
