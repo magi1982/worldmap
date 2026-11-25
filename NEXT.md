@@ -287,3 +287,15 @@ Ideen werden zuerst hier gesammelt. Code entsteht erst nach einem ausdrückliche
 - Miniwelt v3 (Vorschau): v1-Stil ohne Weichzeichner; Küsten/Seen/Flüsse/Grenzen/Orte aus base.json als Vektoren; Relief aus Gebirgszügen + Gratmuster mit Schattierung und Schneegrenze nach Breite; Baumkronen, Felder mit Hecken beim Reinzoomen; eigene GPS-Spuren pink, besuchte Regionen umrandet, Reiseziele mit Nadel und Namen; Ebenen schaltbar; Zoom bis ca. 1 cm ≈ 2 km
 - Miniwelt v4 (Minigame-Vektor) abgebrochen; stattdessen 10 Stilvorschläge auf Basis v1 (Game-Look, realistisch, minimal) – Antworten offen
 - Kartenstil-Suche 25.11.: 4 Game-Karten, gemalte Welt (von oben), Alpen 5 Varianten (2 Runden), 5 Regionen; aktuell Anno-Stil (Relief + 3D-Bäume/Tannen/Akazien, Sicheldünen, Outback-Tafelberge, Wasser randlos) – Antwort offen. Offen: Flüsse ausserhalb Europas fehlen in base.json
+
+## Neuer Kartenstil „Earth“ – Architektur für Leistung (Vorschlag 25.11.)
+Problem Vorschau: Gelände wird bei jedem Zoom im Browser komplett neu gerechnet (Relief pro Pixel, Tausende Sprites, ganze Weltküste als Pfad) → 1–3 s CPU pro Bild, 20 % CPU, bis 1,5 GB RAM. Nicht reparierbar durch Feintuning.
+Vorschlag: rechnen nur einmal, im Browser nur noch Bilder anzeigen.
+- Kacheln vorberechnen (Web-Mercator, 256 px, WebP): z0–z6 Welt (~5’500 Kacheln), Detail z7–z9 nur rund um eigene Reisen bei Bedarf
+- Erzeugung einmal beim Build (GitHub Action) bzw. einmalig im Add-on im Hintergrund; danach nur Dateien ausliefern (Cache, ETag)
+- Gelände aus echten, freien Daten statt nachgebildet: Höhenmodell (z. B. ETOPO/GEBCO, gemeinfrei) + Landbedeckung (Natural Earth) → Alpen, Himalaya, Seen und Flüsse stimmen wirklich
+- Browser: einfacher Kachel-Viewer (<img> + CSS-Transform, GPU), nur sichtbare Kacheln, max. ~60 im Speicher; Reisen (Spuren, Bögen, Farben) als eigene leichte Ebene, pro Zoom vereinfacht
+- Ziele: Zoomen/Ziehen 60 fps, < 2 % CPU im Ruhezustand, < 150 MB RAM, erstes Bild < 0,5 s; funktioniert gleich auf Laptop, Handy, Wandtablet
+- Gleiche Kacheln für Postkarte, Poster und Dashboard-Kacheln
+- Speicher: z0–z6 ca. 60–120 MB; Option „Detailstufe“ (bis z5 ≈ 25 MB) als Einstellung
+- Offen: Daten-Download beim Build ok? Kacheln im Add-on-Image mitliefern oder beim ersten Start erzeugen?
