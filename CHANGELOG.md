@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.16.4 – 2026-11-25
+
+### Fixed
+- 🎨 drawer: changing a setting under "Mehr für die Karte …" folded that part shut and jumped back to the top,
+  because the drawer is redrawn after every change. It now stays open at the same scroll position.
+
 ## 0.16.3 – 2026-11-25
 
 ### Fixed

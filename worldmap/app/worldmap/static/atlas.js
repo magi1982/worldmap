@@ -808,7 +808,10 @@ function openStyle(){if(!STYLE||typeof WM_SPEC=='undefined')return;if(SDR.saved=
  const mapSec=WM_SPEC.find(x=>x.id=='map'),quick={...mapSec,id:'quick',icon:'✨',title:'Aussehen',fields:mapSec.fields.filter(f=>['map.basemap','map.theme','map.look'].includes(f[0]))};
  const mine=WM_SPEC.filter(x=>x.tabs[0]==TAB&&x.id!='map');
  const names={reisen:'Reisen',spuren:'Spuren',orte:'Orte & Tage',regionen:'Regionen',zeit:'Reisefilm'};$('sd-t').textContent='🎨 Design';
- $('sd-b').innerHTML=wmSection(quick,STYLE)+(mine.length?`<details><summary class="sd-more">Mehr für die Karte „${names[TAB]||'Karte'}“</summary>${mine.map(x=>wmSection(x,STYLE)).join('')}</details>`:'');
+ /* redrawn after every change: keep the folded part open and the scroll position where they were */
+ const sb=$('sd-b'),wasOpen=!!(sb.querySelector('details')||{}).open,keepTab=sb.dataset.tab===TAB,sc=sb.scrollTop;sb.dataset.tab=TAB;
+ sb.innerHTML=wmSection(quick,STYLE)+(mine.length?`<details><summary class="sd-more">Mehr für die Karte „${names[TAB]||'Karte'}“</summary>${mine.map(x=>wmSection(x,STYLE)).join('')}</details>`:'');
+ if(keepTab){const dt=sb.querySelector('details');if(dt&&wasOpen)dt.open=true;sb.scrollTop=sc}
  d.hidden=false;$('wrap').classList.add('sd-open');sdState()}
 const sdClose=()=>{$('sdrawer').hidden=true;$('wrap').classList.remove('sd-open')};
 $('zstyle').onclick=()=>{$('sdrawer').hidden?openStyle():sdClose()};
