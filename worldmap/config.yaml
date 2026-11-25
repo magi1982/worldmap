@@ -1,5 +1,5 @@
 name: Worldmap
-version: "0.16.5"
+version: "0.17.0"
 slug: worldmap
 description: Your trips on a map – from Home Assistant, OwnTracks and Google exports, with smart questions. Works offline.
 url: https://github.com/magi1982/worldmap
@@ -10,6 +10,7 @@ init: false
 ingress: true
 panel_icon: mdi:earth
 panel_title: Worldmap
+panel_admin: false  # every Home Assistant user sees Worldmap in the sidebar and may use all of it
 homeassistant_api: true
 hassio_api: true
 ports:

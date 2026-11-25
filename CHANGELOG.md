@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.17.0 – 2026-11-25
+
+### Changed
+- **Worldmap for every Home Assistant user** (`panel_admin: false`): the sidebar entry – also in the Companion app –
+  is no longer limited to administrators. Users do not become admins and get no other rights in Home Assistant,
+  but inside Worldmap they can do everything: see all trips and places of all tracked persons, edit and delete
+  trips, import and export data, change the app's settings (persons, notifications, OwnTracks, Google key) and send
+  a test notification. Managing the add-on itself (configuration, logs, start/stop, updates) stays admin only.
+
 ## 0.16.5 – 2026-11-25
 
 ### Fixed

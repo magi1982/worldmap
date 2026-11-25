@@ -216,3 +216,11 @@ def test_version_matches_the_addon():
     from worldmap import __version__
     cfg = (Path(__file__).resolve().parents[1] / "worldmap" / "config.yaml").read_text(encoding="utf-8")
     assert re.search(r'^version: "([^"]+)"', cfg, re.M).group(1) == __version__
+
+
+def test_every_user_sees_worldmap():
+    from pathlib import Path
+
+    import yaml
+    cfg = yaml.safe_load((Path(__file__).resolve().parents[1] / "worldmap" / "config.yaml").read_text(encoding="utf-8"))
+    assert cfg["panel_admin"] is False and cfg["ingress"] is True
