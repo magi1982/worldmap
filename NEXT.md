@@ -303,3 +303,13 @@ Vorschlag: rechnen nur einmal, im Browser nur noch Bilder anzeigen.
 - Trace 25.11. (Laptop): JavaScript nur ~3 s von 177 s; die GPU war bis zu 32 s am Stück blockiert. Ursachen: (1) Spuren als Pfad in Weltkoordinaten mit riesigem Zoom-Faktor gezeichnet, (2) gestrichelte Flugbögen, die beim Reinzoomen Millionen Pixel lang werden. Fix v2: alles in Bildschirm-Pixeln, nur sichtbarer Teil, eine einzige Canvas statt vieler Bild-Ebenen, grobe Spuren beim Rauszoomen. Gilt auch für die bestehende Karte – dort prüfen.
 - Schwache HA-Hardware: Server liefert nur fertige Dateien (Kacheln, vereinfachte Spuren pro Zoom) mit Cache; nichts wird auf dem HA-Gerät gerechnet; Kacheln entstehen beim Build auf GitHub.
 - Prototyp v3 (25.11.): Kacheln als Ebenen pro Zoomstufe, nur eine Transformation pro Bild; Reise-Ebene komplett in einem Worker (Seite zeichnet nichts); Spuren nur sichtbare Segmente, Unterpixel-Stücke weg (55'000 Mini-Teilpfade waren eine Raster-Falle). Gemessen (Hauptthread): Start 2,5×, Zoomen ~3,5×, Verschieben ~10× weniger Arbeit, keine Blockaden > 50 ms, 3 MB statt 64 MB Speicher. Restzeit = Browser-Zusammensetzen der Bilder.
+
+## Map designs: base map × line style, 3 saved designs (idea, waiting for "mach es")
+- Base map: Earth (tiles with trees, mountains), Light, Dark – every base works with every line style.
+- Line styles: Classic (today's lines), Star journey (golden 3D stars, sparkling flight trails), Crystal quest (floating crystals, comet flights), Medals (bronze/silver/gold coin with readable visit count, ribbon from 6 visits).
+- Nothing covers the map: no fog, no darkening, no area fills.
+- Markers never pile up (a close smaller place merges into the bigger one); names never sit on another marker.
+- "My designs": 3 slots (name + base + line style + colours + layers), quick-select bar on the map, one slot marked ★ as the default at start, slots can be overwritten and renamed any time.
+- Settings: stored with the other map settings on the server (not only in the browser), so every device sees the same 3 designs.
+- In the prototype Light/Dark are only filtered Earth tiles; the app keeps its real light/dark map designs.
+- Flights: trail fades in towards the aircraft, aircraft casts a shadow (offset by height), max 14 at once.
