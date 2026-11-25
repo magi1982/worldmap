@@ -285,3 +285,4 @@ Ideen werden zuerst hier gesammelt. Code entsteht erst nach einem ausdrückliche
 - Miniwelt v2 (Vorschau): Sechseck-Spielbrett, Felder teilen sich beim Zoomen (≈150 km bis ≈1 km), Gebirge von Hand nach echter Lage (>120 Züge), besuchte Felder mit goldenem Rand, Siedlung und Zähl-Chip, Zuhause als Stadt, Minimap, Vollbild, Karte folgt dem Finger
 - Miniwelt v2 (Spielbrett): Nein – „übel daneben“, kein Catan; Stil wie v1, aber cool und scharf
 - Miniwelt v3 (Vorschau): v1-Stil ohne Weichzeichner; Küsten/Seen/Flüsse/Grenzen/Orte aus base.json als Vektoren; Relief aus Gebirgszügen + Gratmuster mit Schattierung und Schneegrenze nach Breite; Baumkronen, Felder mit Hecken beim Reinzoomen; eigene GPS-Spuren pink, besuchte Regionen umrandet, Reiseziele mit Nadel und Namen; Ebenen schaltbar; Zoom bis ca. 1 cm ≈ 2 km
+- Miniwelt v4 (Minigame-Vektor) abgebrochen; stattdessen 10 Stilvorschläge auf Basis v1 (Game-Look, realistisch, minimal) – Antworten offen
