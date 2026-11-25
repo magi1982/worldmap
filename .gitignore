@@ -17,3 +17,9 @@ Records.json
 Timeline.json
 location-history*.json
 .privacy-terms
+
+# Earth tile build output
+tools/earthtiles/out/
+tools/earthtiles/render.html
+tools/earthtiles/full.json
+tools/earthtiles/welt.json

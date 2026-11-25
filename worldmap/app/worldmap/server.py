@@ -60,6 +60,9 @@ SECURITY_HEADERS = {
     "Cache-Control": "no-store",
 }
 _STATIC_CACHE: dict = {}
+EARTH_DIR = STATIC / "tiles" / "earth"
+EARTH_MAXZ = 12
+EARTH_TILE = re.compile(r"/tiles/earth/(\d{1,2})/(\d{1,5})/(\d{1,5})\.webp")
 
 
 class QuietServer(ThreadingHTTPServer):
@@ -466,6 +469,26 @@ def make_handler(app: App):
             if self.command != "HEAD":
                 self.wfile.write(raw)
 
+        def _earth_tile(self, z: int, x: int, y: int):
+            """A picture tile of the Earth map. Only numbers reach the file system, never a path from the browser."""
+            if not (0 <= z <= EARTH_MAXZ and 0 <= x < 2 ** z and 0 <= y < 2 ** z):
+                return self._send(HTTPStatus.NOT_FOUND, {"error": "not found"})
+            f = EARTH_DIR / str(z) / str(x) / f"{y}.webp"
+            try:
+                raw = f.read_bytes()
+            except OSError:
+                return self._send(HTTPStatus.NOT_FOUND, {"error": "not found"})
+            self.send_response(HTTPStatus.OK)
+            self.send_header("Content-Type", "image/webp")
+            self.send_header("Content-Length", str(len(raw)))
+            for k, v in SECURITY_HEADERS.items():
+                if k != "Cache-Control":
+                    self.send_header(k, v)
+            self.send_header("Cache-Control", "public, max-age=31536000, immutable")  # tiles only change with a new version (?v=…)
+            self.end_headers()
+            if self.command != "HEAD":
+                self.wfile.write(raw)
+
         def _static(self, path: str, versioned: bool = False):
             name, ctype = STATIC_FILES[path]
             if name not in _STATIC_CACHE:
@@ -531,6 +554,9 @@ def make_handler(app: App):
             path, q = self._route()
             if path in STATIC_FILES:
                 return self._static(path, versioned=q.get("v") == [asset_version()])
+            m = EARTH_TILE.fullmatch(path)
+            if m:
+                return self._earth_tile(*(int(v) for v in m.groups()))
             if path == "/api/trips":
                 return self._send(HTTPStatus.OK, eng.db.trips(include_ignored=q.get("all", ["0"])[0] == "1"))
             if path == "/api/questions":
@@ -638,6 +664,13 @@ def make_handler(app: App):
                 if path == "/api/style":
                     body = self._json()
                     return self._send(HTTPStatus.OK, app.style.save(body.get("style"), str(body.get("note", ""))))
+                m = re.fullmatch(r"/api/style/presets/([1-3])", path)
+                if m:  # Preset 1–3: save, rename, default at start, load
+                    body = self._json()
+                    act = str(body.get("action", ""))
+                    if act not in ("save", "rename", "default", "load"):
+                        return self._send(HTTPStatus.BAD_REQUEST, {"error": "unknown action"})
+                    return self._send(HTTPStatus.OK, app.style.preset(int(m.group(1)) - 1, act, body.get("name"), body.get("style")))
                 m = re.fullmatch(r"/api/style/versions/(\d+)/restore", path)
                 if m:
                     try:

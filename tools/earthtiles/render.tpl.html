@@ -1,0 +1,24 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"></head><body><script>
+const R=Math.PI/180;
+/*SHARED*/
+/*CORE*/
+/*DRAW*/
+let W=0,H=0,v=null,Z=1;
+const LAf=y=>Math.atan(Math.sinh((.5-y)*2*Math.PI))/R;
+function bboxes(list,off){return list.map(r=>{let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;for(let i=off;i<r.length;i+=2){const x=r[i],y=r[i+1];if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y}return [x0,x1,y0,y1]})}
+let SRC={};
+async function load(){const a=await (await fetch('welt.json')).json(),b=await (await fetch('full.json')).json();
+ SRC.lo={land:a.land,lakes:a.lakes,rivers:a.rivers,lb:bboxes(a.land,0),kb:bboxes(a.lakes,0),rb:bboxes(a.rivers,1)};
+ SRC.hi={land:b.land,lakes:b.lakes,rivers:b.rivers.filter(r=>r[0]<=7),lb:bboxes(b.land,0),kb:bboxes(b.lakes,0)};SRC.hi.rb=bboxes(SRC.hi.rivers,1);return 1}
+function pick(src,lo0,lo1,la0,la1){const f=(L,B)=>L.filter((r,i)=>{const b=B[i];return b[1]>=lo0&&b[0]<=lo1&&b[3]>=la0&&b[2]<=la1});return {land:f(src.land,src.lb),lakes:f(src.lakes,src.kb),rivers:f(src.rivers,src.rb)}}
+async function renderBlock(z,bx,by,n,pad){const T=256,N=2**z,s=N*T,size=n*T+2*pad;W=H=size;Z=Math.max(1,N/4);
+ const wx0=bx/N-pad/s,wy0=by/N-pad/s;
+ v={W,H,s,span:360*1098/s,fz:1,kmpx:40075*Math.cos(45*R)/s,P:(lo,la)=>[(WX(lo)-wx0)*s,(WY(la)-wy0)*s],inv:(x,y)=>[(x/s+wx0)*360-180,LAf(y/s+wy0)]};
+ const [lo0,la1]=v.inv(-40,-40),[lo1,la0]=v.inv(size+40,size+40);
+ AL=pick(z>=5?SRC.hi:SRC.lo,lo0-1,lo1+1,la0-1,la1+1);if(z<=1)AL={land:SRC.lo.land,lakes:SRC.lo.lakes,rivers:SRC.lo.rivers};
+ for(const k in RELCACHE)delete RELCACHE[k];
+ const c=document.createElement('canvas');c.width=c.height=size;const g=c.getContext('2d');await drawTile(g);
+ const out={};const t=document.createElement('canvas');t.width=t.height=T;const tg=t.getContext('2d');
+ for(let j=0;j<n;j++)for(let i=0;i<n;i++){const X=bx+i,Y=by+j;if(X>=N||Y>=N)continue;tg.clearRect(0,0,T,T);tg.drawImage(c,pad+i*T,pad+j*T,T,T,0,0,T,T);out[z+'/'+X+'/'+Y]=t.toDataURL('image/webp',.8)}
+ return out}
+</script></body></html>

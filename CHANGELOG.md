@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.16.0 – 2026-11-25
+
+### Added
+- **🌍 Earth base map**: a drawn landscape (forests, mountains with snow, deserts, steppe, ice) as ready-made WebP
+  picture tiles for the whole world down to zoom 5, shipped with the add-on. Home Assistant only serves files
+  (`/tiles/earth/<z>/<x>/<y>.webp`, numbers only, cached for a year); deeper zoom uses the closest level.
+  Build tool in `tools/earthtiles/`.
+- **Looks for places and flights** (`map.look`): ⭐ stars, 💎 crystals (flights as comets) and 🏅 medals with the
+  number of visits; flights get an aircraft with a shadow and a trail that fades in. "Classic" stays the default
+  and draws the map exactly as before.
+- **Preset 1–3**: save the current look into one of three presets, rename them, load them with one tap from the
+  quick bar on the map, and mark one with ★ as the design the map opens with. Stored on the server, so every
+  device sees the same presets (`POST /api/style/presets/<1-3>` with `save`, `rename`, `default`, `load`).
+
+### Security
+- Preset names are cleaned (no control characters or angle brackets, max. 24 characters) and escaped when shown;
+  preset styles go through the same schema validation as every other style.
+- The tile route only accepts numbers and checks them against the zoom level before touching the file system.
+
 ## 0.15.1 – 2026-11-24
 
 ### Security (CodeQL findings)

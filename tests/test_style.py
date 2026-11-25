@@ -61,3 +61,35 @@ def test_every_map_setting_is_validated():
     assert S.validate({"regions": {"border_color": "url(x)"}})["regions"]["border_color"] == ""
     assert s["areas"]["shape"] == "circles" and s["areas"]["outline_color"] == "fill" and s["est"]["dash"] == "dotted"
     assert "evil" not in s and set(s) == set(S.DEFAULT)
+
+
+def test_presets_save_rename_default_load(tmp_path):
+    st = S.StyleStore(str(tmp_path))
+    g = st.get()
+    assert [p["name"] for p in g["presets"]] == ["Preset 1", "Preset 2", "Preset 3"] and g["preset_default"] == -1
+    assert g["presets"][0]["style"] == S.DEFAULT  # preset 1 is today's map, untouched
+    assert g["presets"][1]["style"]["map"]["basemap"] == "earth" and g["presets"][1]["style"]["map"]["look"] == "stars"
+    r = st.preset(2, "save", "  Nacht\x00<b>look  " + "x" * 40, {"map": {"look": "medals", "theme": "dark"}, "evil": 1})
+    p = r["presets"][2]
+    assert p["name"] == ("Nachtblook  " + "x" * 40).strip()[:24] and p["style"]["map"]["look"] == "medals" and "evil" not in p["style"]
+    assert st.preset(0, "rename", "")["presets"][0]["name"] == "Preset 1"  # empty name falls back
+    assert st.preset(1, "default")["preset_default"] == 1
+    assert st.preset(1, "default")["preset_default"] == -1  # second tap: no default
+    st.preset(2, "default")
+    loaded = st.preset(2, "load")
+    assert loaded["style"]["map"]["look"] == "medals" and loaded["versions"][0]["note"].endswith("geladen")
+    assert S.StyleStore(str(tmp_path)).get()["preset_default"] == 2  # survives a restart
+
+
+def test_presets_reject_bad_input(tmp_path):
+    import pytest
+    st = S.StyleStore(str(tmp_path))
+    for bad in (-1, 3, "1", True, None, 1.0):
+        with pytest.raises(LookupError):
+            st.preset(bad, "save", "x", {})
+    with pytest.raises(ValueError):
+        st.preset(0, "delete-everything")
+    (tmp_path / "style.json").write_text(json.dumps({"current": {}, "versions": [], "presets": "nope", "preset_default": 99}))
+    g = st.get()
+    assert len(g["presets"]) == 3 and g["preset_default"] == -1
+    assert S.validate({"map": {"look": "<script>", "basemap": "earth"}})["map"] == {**S.DEFAULT["map"], "basemap": "earth"}

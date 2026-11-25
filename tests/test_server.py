@@ -11,7 +11,8 @@ from worldmap.server import csv_safe, serve, validate_connectors, validate_trip
 
 
 @pytest.fixture
-def server(engine):
+def server(engine, tmp_path, monkeypatch):
+    monkeypatch.setenv("WORLDMAP_DATA", str(tmp_path))  # style and presets go to a temporary folder, never to /data
     httpd = serve(engine, host="127.0.0.1", port=0, allowed_ips={"127.0.0.1"})
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
     yield f"http://127.0.0.1:{httpd.server_address[1]}", engine
@@ -269,3 +270,27 @@ def test_closed_connections_are_not_logged(capsys):
     except BrokenPipeError:
         Srv().handle_error(None, ("127.0.0.1", 1))
     assert "Traceback" not in capsys.readouterr().err
+
+
+def test_earth_tiles_only_numbers_reach_the_disk(server):
+    url, _ = server
+    st, raw, h = call(url + "/tiles/earth/0/0/0.webp")
+    assert st == 200 and raw[:4] == b"RIFF" and raw[8:12] == b"WEBP" and h["Content-Type"] == "image/webp"
+    assert "immutable" in h["Cache-Control"] and h["X-Content-Type-Options"] == "nosniff"
+    assert call(url + "/tiles/earth/5/31/31.webp")[0] == 200  # the whole world exists down to zoom 5
+    for bad in ("/tiles/earth/1/2/0.webp", "/tiles/earth/0/0/0.png", "/tiles/earth/99/0/0.webp", "/tiles/earth/13/0/0.webp",
+                "/tiles/earth/../../server.py", "/tiles/earth/0/0/..%2F..%2Fserver.webp", "/tiles/earth/-1/0/0.webp", "/tiles/earth/9/0/0.webp"):
+        assert call(url + bad)[0] == 404, bad
+
+
+def test_presets_api(server):
+    url, _ = server
+    st, raw, _ = call(url + "/api/style")
+    d = js(raw)
+    assert [p["name"] for p in d["presets"]] == ["Preset 1", "Preset 2", "Preset 3"] and d["preset_default"] == -1
+    st, raw, _ = call(url + "/api/style/presets/2", "POST", {"action": "load"})
+    assert st == 200 and js(raw)["style"]["map"]["basemap"] == "earth"
+    st, raw, _ = call(url + "/api/style/presets/3", "POST", {"action": "save", "name": "<i>Nacht</i>", "style": {"map": {"look": "medals"}}})
+    assert st == 200 and js(raw)["presets"][2]["name"] == "iNacht/i" and js(raw)["presets"][2]["style"]["map"]["look"] == "medals"
+    assert call(url + "/api/style/presets/1", "POST", {"action": "drop"})[0] == 400
+    assert call(url + "/api/style/presets/4", "POST", {"action": "load"})[0] == 404

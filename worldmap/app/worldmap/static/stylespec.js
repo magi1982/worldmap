@@ -83,7 +83,8 @@ const WM_SPEC = [
   ]},
   {id: 'map', tabs: ['reisen', 'spuren', 'orte', 'regionen', 'zeit'], icon: '🗺️', title: 'Grundkarte', fields: [
     ['map.theme', 's', 'Erscheinungsbild', [['auto', 'wie Gerät'], ['light', '☀ hell'], ['dark', '☾ dunkel']]],
-    ['map.basemap', 's', 'Kartenfarben (hell)', [['standard', 'Standard'], ['paper', 'Papier'], ['mono', 'Grau']]],
+    ['map.basemap', 's', 'Grundkarte', [['standard', 'Standard'], ['paper', 'Papier'], ['mono', 'Grau'], ['earth', '🌍 Earth']], '„Earth“ ist eine gezeichnete Landschaft mit Wäldern, Bergen, Wüsten und Eis. Die anderen drei sind schlichte Karten in Hell und Dunkel.'],
+    ['map.look', 's', 'Orte & Flüge', [['classic', 'Klassisch'], ['stars', '⭐ Sterne'], ['crystal', '💎 Kristalle'], ['medals', '🏅 Medaillen']], '„Klassisch“ ist die Karte wie bisher. Sterne, Kristalle und Medaillen zeigen deine Orte wie in einem Spiel – je öfter du dort warst, desto grösser oder wertvoller. Flüge bekommen ein Flugzeug mit Schatten (bei Kristallen einen Kometen). Die Spuren bleiben gleich.'],
     ['map.palette', 's', 'Farben für Personen', [['neon', 'Neon'], ['classic', 'Klassisch'], ['pastel', 'Pastell'], ['earth', 'Erde'], ['contrast', 'Kontrast'], ['mono', 'Ton in Ton']], 'Farben für Personen und Gruppen ohne eigene Farbe (eigene Farben unter „Personen & Gruppen“).'],
     ['map.labels', 's', 'Ortsnamen der Karte', [['many', 'viele'], ['normal', 'normal'], ['few', 'wenige'], ['off', 'keine']]],
     ['map.rivers', 'b', 'Flüsse'],

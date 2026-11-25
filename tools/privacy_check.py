@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-SKIP_SUFFIX = {".png", ".gz", ".jpg", ".ico"}
+SKIP_SUFFIX = {".png", ".gz", ".jpg", ".ico", ".webp"}  # pictures: compressed pixels, random bytes can look like e-mail addresses
 PUBLIC_DATASETS = {"worldmap/app/worldmap/static/base.json", "worldmap/app/worldmap/static/regions.json"}  # Natural Earth / BFS, no personal data
 EMAIL = re.compile(r"[\w.+-]+@[\w-]+\.[\w.]+")
 ALLOWED_EMAIL = re.compile(r"(noreply|example)\.(com|org)|users\.noreply\.github\.com|anthropic\.com")
