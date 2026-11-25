@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.16.1 – 2026-11-25
+
+### Changed
+- The 🎨 button on the map shows only the essentials: your three presets, then base map, light/dark and the look
+  of places & flights; this map's own settings are folded away, everything else is under "Alle Einstellungen".
+- "Kartenstil" settings page starts with **Meine Designs**: three boxes with name, a short summary
+  (base map · look · light/dark), "Übernehmen", "💾 Aktuelles hier speichern" and "☆ Als Start", plus a
+  three-step explanation. The box that matches what is set right now is highlighted.
+- The quick bar on the map hides while the 🎨 drawer is open (the drawer has the presets itself).
+
 ## 0.16.0 – 2026-11-25
 
 ### Added

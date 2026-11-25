@@ -563,6 +563,7 @@ function renderStyle() {
   const tabs = [['reisen', 'Reisen'], ['spuren', 'Spuren'], ['orte', 'Orte & Tage'], ['regionen', 'Regionen'], ['zeit', 'Reisefilm']];
   box.innerHTML = `<div class="style-grid">
    <div class="style-main" id="stForm">
+    ${presetCard()}
     <div class="card">${wmModes(c)}<p class="small">Gilt für alle Karten. Personen- und Gruppenfarben stellst du unter „Personen &amp; Gruppen“ ein.</p></div>
     ${WM_SPEC.map((x) => `<div class="card">${wmSection(x, c)}</div>`).join('')}
    </div>
@@ -578,6 +579,7 @@ function renderStyle() {
       <div class="vlist">${sty.data.versions.map((v, i) => `<div class="vrow"><div><b>${esc(v.note)}</b><span class="small">${new Date(v.ts * 1000).toLocaleString('de-CH', {dateStyle: 'medium', timeStyle: 'short'})}${i === 0 ? ' · aktuell' : ''}</span></div>${i === 0 ? '' : `<button class="btn" data-restore="${v.id}">Zurück</button>`}</div>`).join('') || '<p class="small keep">Noch keine – nach dem ersten Speichern erscheinen sie hier.</p>'}</div></div>
    </div></div>`;
   wmBind($('stForm'), c, (k) => { if (k === 'map.theme') themeLocal(c.map.theme); styleChanged(); });
+  bindPresets();
   $('stTabs').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; sty.tab = b.dataset.tab;
     $('stTabs').querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
     try { $('stLive').contentWindow.location.hash = '#' + sty.tab; } catch (err) { $('stLive').src = './?embed=1#' + sty.tab; } });
@@ -587,6 +589,27 @@ function renderStyle() {
   $('stDef').onclick = () => { sty.cur = JSON.parse(JSON.stringify(sty.data.default)); renderStyle(); };
   box.querySelectorAll('[data-restore]').forEach((b) => (b.onclick = async () => { try { sty.data = await post('api/style/versions/' + b.dataset.restore + '/restore'); themeLocal(sty.data.style.map.theme); toast('Früherer Stil wiederhergestellt'); loadStyle(); } catch (e) { toast(e.message, 5000); } }));
   styleChanged();
+}
+/* Preset 1–3: the three designs you switch between on the map (quick bar at the top of the map) */
+const P_BASE = {standard: 'Standard', paper: 'Papier', mono: 'Grau', earth: '🌍 Earth'}, P_LOOK = {classic: 'Klassisch', stars: '⭐ Sterne', crystal: '💎 Kristalle', medals: '🏅 Medaillen'}, P_THEME = {auto: 'wie Gerät', light: 'hell', dark: 'dunkel'};
+function presetCard() {
+  const ps = sty.data.presets || [], def = sty.data.preset_default ?? -1;
+  return `<div class="card presets-card"><h3>⭐ Meine Designs</h3>
+   <p class="small">So geht’s: <b>1.</b> Stell unten alles ein – rechts siehst du es live. <b>2.</b> Tippe bei einem Preset auf <b>„💾 Aktuelles hier speichern“</b>. <b>3.</b> Auf der Karte wechselst du oben mit einem Tipp zwischen deinen drei Designs. ★ = dieses Design beim Öffnen der Karte.</p>
+   <div class="pgrid">${ps.map((p, i) => { const m = p.style.map, on = JSON.stringify(p.style) === JSON.stringify(sty.cur);
+     return `<div class="pbox${on ? ' on' : ''}"><label class="field">Name<input data-pname="${i + 1}" maxlength="24" value="${esc(p.name)}"></label>
+      <div class="small">${esc(P_BASE[m.basemap] || m.basemap)} · ${esc(P_LOOK[m.look] || m.look)} · ${esc(P_THEME[m.theme] || m.theme)}${on ? ' · <b>gerade eingestellt</b>' : ''}</div>
+      <div class="opts"><button type="button" class="btn" data-pload="${i + 1}">Übernehmen</button><button type="button" class="primary" data-psave="${i + 1}">💾 Aktuelles hier speichern</button>
+      <button type="button" class="btn pdef" data-pdef="${i + 1}" aria-pressed="${def === i}" title="Beim Öffnen der Karte verwenden">${def === i ? '★ Start-Design' : '☆ Als Start'}</button></div></div>`; }).join('')}</div></div>`;
+}
+function bindPresets() {
+  const box = $('stForm'), call = async (n, body, msg) => { try { const r = await post('api/style/presets/' + n, body); sty.data = {...sty.data, ...r}; if (msg) toast(msg(r)); return r; } catch (e) { toast(e.message, 5000); return null; } };
+  box.querySelectorAll('[data-pname]').forEach((i) => (i.onchange = () => call(+i.dataset.pname, {action: 'rename', name: i.value}, (r) => 'Umbenannt in „' + r.presets[i.dataset.pname - 1].name + '“')));
+  box.querySelectorAll('[data-psave]').forEach((b) => (b.onclick = async () => { const n = +b.dataset.psave, nm = box.querySelector(`[data-pname="${n}"]`).value;
+    if (await call(n, {action: 'save', name: nm, style: sty.cur}, (r) => 'In „' + r.presets[n - 1].name + '“ gespeichert')) renderStyle(); }));
+  box.querySelectorAll('[data-pload]').forEach((b) => (b.onclick = async () => { const r = await call(+b.dataset.pload, {action: 'load'}, (x) => '„' + x.presets[b.dataset.pload - 1].name + '“ ist jetzt aktiv');
+    if (r) { themeLocal(r.style.map.theme); loadStyle(); } }));
+  box.querySelectorAll('[data-pdef]').forEach((b) => (b.onclick = async () => { if (await call(+b.dataset.pdef, {action: 'default'}, (r) => r.preset_default >= 0 ? '„' + r.presets[r.preset_default].name + '“ öffnet die Karte' : 'Kein Start-Design mehr')) renderStyle(); }));
 }
 function themeLocal(t) { try { if (t === 'auto') localStorage.removeItem('wm-theme'); else localStorage.setItem('wm-theme', t); } catch (e) { /* ignore */ } applyTheme(); }
 let stRaf = 0;

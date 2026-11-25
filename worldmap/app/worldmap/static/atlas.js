@@ -788,12 +788,15 @@ function restyle(k){
  sdState();presetsUI()}
 function sdState(){const e=$('sd-st');if(!e)return;const ch=SDR.saved!=null&&JSON.stringify(STYLE)!==SDR.saved;e.textContent=ch?'Geändert – noch nicht gespeichert.':'Jede Änderung siehst du sofort auf der Karte.';e.style.color=ch?'#D9480F':''}
 function openStyle(){if(!STYLE||typeof WM_SPEC=='undefined')return;if(SDR.saved==null)SDR.saved=JSON.stringify(STYLE);const d=$('sdrawer');closeDetail();
- const mine=WM_SPEC.filter(x=>x.tabs[0]==TAB||(x.tabs.includes(TAB)&&x.id!='map')),rest=WM_SPEC.filter(x=>!mine.includes(x));
- const names={reisen:'Reisen',spuren:'Spuren',orte:'Orte & Tage',regionen:'Regionen',zeit:'Reisefilm'};$('sd-t').textContent='🎨 Stil · '+(names[TAB]||'Karte');
- $('sd-b').innerHTML=mine.map(x=>wmSection(x,STYLE)).join('')+wmModes(STYLE)+`<details><summary class="sd-more">Weitere Karten & Grundkarte</summary>${rest.map(x=>wmSection(x,STYLE)).join('')}</details>`;
- d.hidden=false;sdState()}
-$('zstyle').onclick=()=>{$('sdrawer').hidden?openStyle():($('sdrawer').hidden=true)};
-$('sd-x').onclick=()=>{$('sdrawer').hidden=true};
+ /* only the essentials here: the look of the map and this map's own settings (folded); everything else lives in "Alle Einstellungen" */
+ const mapSec=WM_SPEC.find(x=>x.id=='map'),quick={...mapSec,id:'quick',icon:'✨',title:'Aussehen',fields:mapSec.fields.filter(f=>['map.basemap','map.theme','map.look'].includes(f[0]))};
+ const mine=WM_SPEC.filter(x=>x.tabs[0]==TAB&&x.id!='map');
+ const names={reisen:'Reisen',spuren:'Spuren',orte:'Orte & Tage',regionen:'Regionen',zeit:'Reisefilm'};$('sd-t').textContent='🎨 Design';
+ $('sd-b').innerHTML=wmSection(quick,STYLE)+(mine.length?`<details><summary class="sd-more">Mehr für die Karte „${names[TAB]||'Karte'}“</summary>${mine.map(x=>wmSection(x,STYLE)).join('')}</details>`:'');
+ d.hidden=false;$('wrap').classList.add('sd-open');sdState()}
+const sdClose=()=>{$('sdrawer').hidden=true;$('wrap').classList.remove('sd-open')};
+$('zstyle').onclick=()=>{$('sdrawer').hidden?openStyle():sdClose()};
+$('sd-x').onclick=sdClose;
 if(typeof wmBind=='function')wmBind($('sd-b'),new Proxy({},{get:(_,k)=>STYLE[k]}),k=>restyle(k));
 $('sd-save').onclick=async()=>{try{const r=await fetch('api/style',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({style:STYLE,note:'auf der Karte ('+($('sd-t').textContent.split('· ')[1]||'')+')'})});if(!r.ok)throw new Error();const j=await r.json();STYLE=j.style;applyStyle(STYLE);SDR.saved=JSON.stringify(STYLE);sdState();$('sd-st').textContent='✓ Gespeichert – neue Version angelegt.'}catch(e){$('sd-st').textContent='Speichern ging nicht – bitte nochmals versuchen.'}};
 $('sd-undo').onclick=()=>{if(SDR.saved==null)return;STYLE=JSON.parse(SDR.saved);restyle('map.theme');openStyle()};

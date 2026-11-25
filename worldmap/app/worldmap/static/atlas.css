@@ -394,3 +394,5 @@ div.drec{cursor:default}.drec .di{font-size:22px}.drec small{display:block;font-
 .sd-pre button[aria-pressed=true]{border-color:#E0A820;color:#B07800}
 .sd-pre .hint{font-size:12px;opacity:.75;margin:4px 0 0}
 @media(max-width:640px){.presets{top:auto;bottom:64px;max-width:calc(100% - 24px)}}
+
+.sd-open .presets{display:none} /* the drawer shows the presets itself */
