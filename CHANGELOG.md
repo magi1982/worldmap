@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.16.2 – 2026-11-25
+
+### Fixed
+- **🎨 drawer on the map**: buttons, switches and sliders did nothing since 0.15.1. The safer style setter (no
+  prototype pollution) could not see the drawer's live-style proxy; the proxy now answers that check. A test
+  guards it.
+- Saving into a preset no longer resets unsaved changes on the map – only "Laden" changes what you see.
+- Phones: the 🎨 drawer is a bottom sheet over the whole page (78 % of the screen) instead of a small box inside the
+  map that cut off its own buttons; the preset list scrolls on its own.
+
 ## 0.16.1 – 2026-11-25
 
 ### Changed

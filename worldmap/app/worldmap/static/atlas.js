@@ -797,7 +797,8 @@ function openStyle(){if(!STYLE||typeof WM_SPEC=='undefined')return;if(SDR.saved=
 const sdClose=()=>{$('sdrawer').hidden=true;$('wrap').classList.remove('sd-open')};
 $('zstyle').onclick=()=>{$('sdrawer').hidden?openStyle():sdClose()};
 $('sd-x').onclick=sdClose;
-if(typeof wmBind=='function')wmBind($('sd-b'),new Proxy({},{get:(_,k)=>STYLE[k]}),k=>restyle(k));
+/* the drawer edits the live STYLE; the proxy also answers 'own property?' – the safe setter (no prototype pollution) asks that before it writes */
+if(typeof wmBind=='function')wmBind($('sd-b'),new Proxy({},{get:(_,k)=>STYLE[k],has:(_,k)=>k in STYLE,getOwnPropertyDescriptor:(_,k)=>Object.getOwnPropertyDescriptor(STYLE,k)}),k=>restyle(k));
 $('sd-save').onclick=async()=>{try{const r=await fetch('api/style',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({style:STYLE,note:'auf der Karte ('+($('sd-t').textContent.split('· ')[1]||'')+')'})});if(!r.ok)throw new Error();const j=await r.json();STYLE=j.style;applyStyle(STYLE);SDR.saved=JSON.stringify(STYLE);sdState();$('sd-st').textContent='✓ Gespeichert – neue Version angelegt.'}catch(e){$('sd-st').textContent='Speichern ging nicht – bitte nochmals versuchen.'}};
 $('sd-undo').onclick=()=>{if(SDR.saved==null)return;STYLE=JSON.parse(SDR.saved);restyle('map.theme');openStyle()};
 
@@ -807,7 +808,7 @@ const sameStyle=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
 function presetsUI(){const q=$('presets');if(q)q.innerHTML=PRE.list.map((p,i)=>`<button type="button" data-pload="${i+1}" aria-pressed="${!!STYLE&&sameStyle(STYLE,p.style)}" title="${esc(p.name)} laden">${PRE.def==i?'★ ':''}${esc(p.name)}</button>`).join('');
  const d=$('sd-pre');if(d)d.innerHTML='<h4>Meine Designs</h4>'+PRE.list.map((p,i)=>`<div class="pr"><input value="${esc(p.name)}" maxlength="24" data-pname="${i+1}" aria-label="Name von Preset ${i+1}"><button type="button" data-pload="${i+1}">Laden</button><button type="button" data-psave="${i+1}" title="Das aktuelle Aussehen hier speichern">💾 Hier speichern</button><button type="button" data-pdef="${i+1}" aria-pressed="${PRE.def==i}" aria-label="Beim Start verwenden: ${esc(p.name)}">${PRE.def==i?'★':'☆'}</button></div>`).join('')+'<p class="hint">Laden = sofort auf der Karte. 💾 speichert das, was du gerade siehst. ★ = dieses Design beim Öffnen.</p>'}
 async function presetCall(n,body){try{const r=await fetch('api/style/presets/'+n,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});if(!r.ok)throw new Error();const j=await r.json();PRE.list=j.presets||[];PRE.def=j.preset_default??-1;
-  if(j.style&&!sameStyle(j.style,STYLE)){STYLE=j.style;SDR.saved=JSON.stringify(STYLE);restyle('map.theme');if(!$('sdrawer').hidden)openStyle()}presetsUI();return j}catch(e){const st=$('sd-st');if(st)st.textContent='Das ging nicht – bitte nochmals versuchen.';return null}}
+  if(body.action=='load'&&j.style&&!sameStyle(j.style,STYLE)){/* only loading changes the map; saving keeps what you see */STYLE=j.style;SDR.saved=JSON.stringify(STYLE);restyle('map.theme');if(!$('sdrawer').hidden)openStyle()}presetsUI();return j}catch(e){const st=$('sd-st');if(st)st.textContent='Das ging nicht – bitte nochmals versuchen.';return null}}
 document.addEventListener('click',e=>{const b=e.target.closest('[data-pload],[data-psave],[data-pdef]');if(!b)return;
  if(b.dataset.pload)presetCall(+b.dataset.pload,{action:'load'});
  else if(b.dataset.psave){const n=+b.dataset.psave,inp=document.querySelector(`[data-pname="${n}"]`);presetCall(n,{action:'save',name:inp?inp.value:null,style:STYLE}).then(j=>{if(j){SDR.saved=JSON.stringify(STYLE);const st=$('sd-st');if(st)st.textContent='✓ In „'+(j.presets[n-1]||{}).name+'“ gespeichert.'}})}

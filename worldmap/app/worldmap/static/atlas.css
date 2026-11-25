@@ -233,13 +233,13 @@ input[type=range]{width:100%;accent-color:var(--acc);min-height:30px}
 .sdrawer[hidden]{display:none}
 .sd-h{display:flex;align-items:center;gap:8px;padding:14px 14px 8px}.sd-h b{flex:1;font-size:17px;font-weight:850}
 .sd-h button{border:0;background:var(--soft);width:32px;height:32px;border-radius:50%;cursor:pointer;color:inherit}
-.sd-b{flex:1;overflow:auto;padding:0 16px;overscroll-behavior:contain}
+.sd-b{flex:1 1 auto;min-height:90px;overflow:auto;padding:0 16px;overscroll-behavior:contain}
 .sd-f{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 14px 14px;border-top:1px solid var(--line)}
 .sd-f button,.sd-f a{border:1px solid var(--line);background:transparent;color:inherit;border-radius:10px;padding:8px 12px;font:700 13px Inter,system-ui,sans-serif;cursor:pointer;text-decoration:none}
 .sd-f .pri{background:var(--acc);border-color:transparent;color:#fff}
 .sd-f .st{flex:1 1 100%;font-size:12px;color:var(--mute)}
 .sd-more{margin:10px 0 4px;font-size:12.5px;font-weight:700;color:var(--mute);cursor:pointer}
-@media (max-width:700px){.sdrawer{left:8px;right:8px;width:auto;top:auto;max-height:62%}}
+@media (max-width:700px){.sdrawer{position:fixed;left:8px;right:8px;bottom:8px;top:auto;width:auto;max-height:78vh;z-index:1000}.sd-pre{max-height:34vh}}
 .fbtn{border:1px solid var(--line);background:transparent;color:inherit;border-radius:10px;padding:8px 12px;font:700 13px Inter,system-ui,sans-serif;cursor:pointer;text-decoration:none}
 .fbtn:hover{background:var(--soft)}
 /* embedded as live preview in the settings */
@@ -386,7 +386,7 @@ div.drec{cursor:default}.drec .di{font-size:22px}.drec small{display:block;font-
 .presets button[aria-pressed=true]{border-color:var(--p,#FF2DAA);background:rgba(255,45,170,.10)}
 .presets button:focus-visible,.sd-pre button:focus-visible,.sd-pre input:focus-visible{outline:3px solid #0A7CFF;outline-offset:2px}
 .embed .presets{display:none}
-.sd-pre{padding:10px 14px;border-bottom:1px solid var(--line)}
+.sd-pre{padding:10px 14px;border-bottom:1px solid var(--line);flex:0 1 auto;min-height:0;max-height:42%;overflow:auto;overscroll-behavior:contain}
 .sd-pre h4{margin:0 0 6px;font-size:13px}
 .sd-pre .pr{display:flex;gap:6px;align-items:center;margin:6px 0;flex-wrap:wrap}
 .sd-pre input{flex:1 1 120px;min-width:0;min-height:36px;border-radius:9px;border:1px solid var(--line);padding:0 8px;font:600 13px Inter,system-ui,sans-serif;background:transparent;color:inherit}
@@ -396,3 +396,5 @@ div.drec{cursor:default}.drec .di{font-size:22px}.drec small{display:block;font-
 @media(max-width:640px){.presets{top:auto;bottom:64px;max-width:calc(100% - 24px)}}
 
 .sd-open .presets{display:none} /* the drawer shows the presets itself */
+
+@media (max-width:700px){.sdrawer{width:auto}} /* after the desktop width rule above */
