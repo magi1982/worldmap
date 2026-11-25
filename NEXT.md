@@ -299,3 +299,4 @@ Vorschlag: rechnen nur einmal, im Browser nur noch Bilder anzeigen.
 - Gleiche Kacheln für Postkarte, Poster und Dashboard-Kacheln
 - Speicher: z0–z6 ca. 60–120 MB; Option „Detailstufe“ (bis z5 ≈ 25 MB) als Einstellung
 - Offen: Daten-Download beim Build ok? Kacheln im Add-on-Image mitliefern oder beim ersten Start erzeugen?
+- Prototyp Kachel-Karte gebaut (25.11.): 2’676 WebP-Kacheln (Welt z0–5, Europa z6–8, Alpen z9, 25 MB), erzeugt per Headless-Chrome mit dem Earth-Stil; Viewer mit <img>-Kacheln + GPU-Transform, Reisen als eigene Ebene. Gemessen mit 4× gedrosselter CPU: längste Blockade 80 ms, 25 MB JS-Speicher, Bildaufbau < 4 ms. Gelände noch nachgebildet (keine echten Höhendaten).
