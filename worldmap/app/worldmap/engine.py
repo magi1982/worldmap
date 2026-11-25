@@ -366,6 +366,11 @@ class Engine:
             from .netmatch import Matcher, OpenFreeMapTiles
 
             self.matcher = Matcher(OpenFreeMapTiles(self.tile_dir))
+        wait = self.matcher.paused() if hasattr(self.matcher, "paused") else 0
+        if wait > 0:  # the map server said no: do not even read the points again until the pause is over
+            self.route_progress = {**self.route_progress, "running": False, "paused_s": int(wait)}
+            return 0
+        self.matcher.stats.clear()  # numbers per run, not an ever-growing total
         prog: dict = {}
         self.route_progress = {**self.route_progress, "running": True}
         n = 0
@@ -377,7 +382,10 @@ class Engine:
                                    "segments": prog.get("done_total", 0) + n, "ts": int(time.time()),
                                    "paused_s": max(0, int(getattr(src, "pause_until", 0) - time.monotonic())) if src else 0,
                                    "error": getattr(src, "last_error", "") if src else ""}
-        log.info("routing: %d new segments %s", n, dict(self.matcher.stats))
+        st = dict(self.matcher.stats)
+        if n or st != getattr(self, "_route_log", None):  # only when something changed
+            log.info("routing: %d new segments %s", n, st)
+        self._route_log = st
         if n:
             self.touch()
         return n

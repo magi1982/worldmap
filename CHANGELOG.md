@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.16.5 – 2026-11-25
+
+### Fixed
+- **Map server refuses ("403 Forbidden")**: the add-on retried every 2 minutes and each time read all GPS points
+  and ran through every open gap (tens of thousands) only to fail again – wasted CPU on small Home Assistant
+  hardware and log lines with an ever-growing counter. Now:
+  - a refusal pauses tile downloads for 1 h, then 6 h, then 24 h (429 "too many requests" keeps the short pause);
+  - while paused nothing is scanned at all, and a running pass stops at the first refused tile;
+  - at most one tile every 1.5 s, sent with a clear user agent (`Worldmap-HomeAssistant-Addon/<version>` and the
+    repository address) so the server operator can see who asks;
+  - the log shows numbers per pass, only when they change, and says when the next try is;
+  - the map's progress note says "Kartenserver lehnt gerade ab – neuer Versuch in … Std.".
+- Start right after a Home Assistant restart: when Home Assistant answers "502" and the home zone is not readable
+  yet, the add-on tries again every 30 s (up to 5 times) instead of skipping the first rebuild.
+- Start script uses `bashio::app.version` (the old call is deprecated), with a fallback for older base images.
+- The Python package version now follows the add-on version (it was stuck at 0.6.1); a test keeps them in sync.
+
 ## 0.16.4 – 2026-11-25
 
 ### Fixed

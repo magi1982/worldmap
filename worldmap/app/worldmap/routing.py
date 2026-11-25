@@ -76,6 +76,8 @@ def fill_gaps(db, matcher=None, limit: int = 200_000, budget_s: float | None = N
     for mode, a, b, d in gaps:
         if new >= limit or (t_end and time.monotonic() > t_end):
             break
+        if matcher is not None and mode != "flight" and matcher.paused():
+            break  # the map server asked us to wait: stop now instead of failing every remaining gap
         pa, pb = (a["lat"], a["lon"]), (b["lat"], b["lon"])
         geom = None
         if mode == "flight":

@@ -38,6 +38,8 @@ SNAP_M = {"rail": 2500, "road": 300}
 SLACK_M = {"rail": 4000, "road": 1500}
 STITCH_M = 20
 TILEJSON = "https://tiles.openfreemap.org/planet"
+USER_AGENT = "Worldmap-HomeAssistant-Addon/{v} (+https://github.com/magi1982/worldmap)"
+BLOCK_PAUSES = (3600, 6 * 3600, 24 * 3600)  # "403 forbidden": wait longer every time, never hammer a server that said no
 
 
 # ---------------------------------------------------------------- tiles
@@ -191,7 +193,7 @@ class TileSource:
 class OpenFreeMapTiles(TileSource):
     """Downloads zoom-12 vector tiles once and keeps the decoded lines on disk."""
 
-    def __init__(self, cache_dir: str, tilejson: str = TILEJSON, timeout: float = 20.0, min_interval: float = 0.2,
+    def __init__(self, cache_dir: str, tilejson: str = TILEJSON, timeout: float = 20.0, min_interval: float = 1.5,
                  allow_http: bool = False, z: int = Z):
         self.z = z  # 12 for map matching; 7 for long estimated car routes (motorways and main roads only)
         self.dir = Path(cache_dir)
@@ -208,6 +210,16 @@ class OpenFreeMapTiles(TileSource):
         self.pause_until = 0.0  # back off when the tile server says "too many requests" or is down
         self.last_error = ""
         self._warned = 0.0
+        self.blocked = 0  # how many "403 forbidden" in a row
+        try:
+            from . import __version__ as ver
+        except ImportError:  # pragma: no cover
+            ver = "?"
+        self.user_agent = USER_AGENT.format(v=ver)
+
+    def paused(self) -> float:
+        """Seconds until downloads may start again (0 = free to go)."""
+        return max(0.0, self.pause_until - time.monotonic())
 
     def _template(self) -> str:
         if self._url and time.time() - self._url_t < 86400:
@@ -236,18 +248,23 @@ class OpenFreeMapTiles(TileSource):
             self._last = time.monotonic()
         try:
             url = self._template().replace("{z}", str(self.z)).replace("{x}", str(x)).replace("{y}", str(y))
-            req = urllib.request.Request(url, headers={"User-Agent": "worldmap-home-assistant-addon"})
+            req = urllib.request.Request(url, headers={"User-Agent": self.user_agent})
             with urllib.request.urlopen(req, timeout=self.timeout) as r:  # nosec B310 - https URL from TileJSON
                 data = r.read(20_000_000)
         except urllib.error.HTTPError as exc:
             if exc.code == 404:  # empty sea tile
                 data = b""
+            elif exc.code == 403:  # the server refuses us: long, growing pauses
+                self._failed(exc, BLOCK_PAUSES[min(self.blocked, len(BLOCK_PAUSES) - 1)])
+                self.blocked += 1
+                return None
             else:
                 self._failed(exc, 300 if exc.code == 429 else 120)
                 return None
         except (OSError, ValueError) as exc:
             self._failed(exc, 120)
             return None
+        self.blocked = 0
         lines = decode_mvt(data, self.z, x, y) if data else []
         compact = [[c, [[round(a, 6), round(b, 6)] for a, b in pts]] for c, pts in lines]
         f.write_bytes(gzip.compress(json.dumps(compact, separators=(",", ":")).encode(), 6))
@@ -258,9 +275,10 @@ class OpenFreeMapTiles(TileSource):
         """Pause downloads for a while instead of hammering the server; tell the log once in a while why."""
         self.last_error = str(exc)[:200]
         self.pause_until = time.monotonic() + pause_s
-        if time.monotonic() - self._warned > 600:
+        if time.monotonic() - self._warned > 600 or pause_s >= 3600:
             self._warned = time.monotonic()
-            log.warning("map tiles: download paused for %d s (%s)", pause_s, self.last_error)
+            when = time.strftime("%H:%M", time.localtime(time.time() + pause_s))
+            log.warning("map tiles: the map server refused (%s) – next try at %s (pause %d min)", self.last_error, when, pause_s // 60)
 
 
 class StaticLines(TileSource):
@@ -459,6 +477,11 @@ class Graph:
 # ---------------------------------------------------------------- matcher
 class Matcher:
     """Find network paths for gaps. Keeps a few region graphs in memory."""
+
+    def paused(self) -> float:
+        """Seconds the tile source wants us to wait (0 when it is ready)."""
+        f = getattr(self.source, "paused", None)
+        return f() if callable(f) else 0.0
 
     def __init__(self, source: TileSource, max_graphs: int = 6):
         self.source = source

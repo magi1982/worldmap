@@ -167,3 +167,52 @@ def test_tile_server_backoff(tmp_path, monkeypatch):
     monkeypatch.setattr(netmatch.urllib.request, "urlopen", boom)
     assert src.lines(1, 2) is None and src.pause_until > 0 and "429" in src.last_error
     assert src.lines(1, 3) is None and len(calls) == 1  # paused: no second request
+
+
+def test_forbidden_means_long_growing_pauses_and_a_real_user_agent(tmp_path, monkeypatch):
+    import time
+    import urllib.error
+
+    from worldmap import __version__, netmatch
+    src = netmatch.OpenFreeMapTiles(str(tmp_path), min_interval=0)
+    src._url, src._url_t = "https://tiles.example/{z}/{x}/{y}.pbf", 9e18
+    seen = []
+
+    def no(req, timeout=0):
+        seen.append(req.get_header("User-agent"))
+        raise urllib.error.HTTPError(req.full_url, 403, "Forbidden", {}, None)
+    monkeypatch.setattr(netmatch.urllib.request, "urlopen", no)
+    pauses = []
+    for _ in range(4):
+        src.pause_until = 0
+        assert src.lines(1, 2) is None
+        pauses.append(round(src.pause_until - time.monotonic()))
+    assert pauses[0] >= 3590 and pauses[1] >= 6 * 3600 - 10 and pauses[2] >= 24 * 3600 - 10 and pauses[3] == pauses[2]
+    assert __version__ in seen[0] and "github.com/magi1982/worldmap" in seen[0]
+    assert N.Matcher(src).paused() > 3000
+
+
+def test_fill_gaps_stops_while_the_map_server_pauses(db):
+    class Paused(N.TileSource):
+        calls = 0
+
+        def lines(self, x, y):
+            Paused.calls += 1
+            return None
+
+        def paused(self):
+            return 600.0
+    pts = []
+    for i in range(50):  # 49 rail gaps of ~15 km
+        pts.append((i * 1800, 47.0 + i * 0.13, 8.0, "Alex", "t", None, "in train"))
+    db.add_points(pts)
+    assert routing.fill_gaps(db, N.Matcher(Paused())) == 0 and Paused.calls == 0  # nothing asked, nothing looped
+
+
+def test_version_matches_the_addon():
+    import re
+    from pathlib import Path
+
+    from worldmap import __version__
+    cfg = (Path(__file__).resolve().parents[1] / "worldmap" / "config.yaml").read_text(encoding="utf-8")
+    assert re.search(r'^version: "([^"]+)"', cfg, re.M).group(1) == __version__

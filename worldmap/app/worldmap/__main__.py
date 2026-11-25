@@ -56,14 +56,22 @@ def route_worker(engine: Engine, stop: threading.Event) -> None:
 
 def scheduler(engine: Engine, stop: threading.Event) -> None:
     s = engine.s
-    try:
-        if engine.ha.available and s.persons:
-            log.info("history backfill: %d new points", engine.backfill_history())
-        log.info("rebuild: %s", engine.rebuild())
-        warm(engine)
-        engine.routes_wanted.set()  # lay new gaps onto the rail/road network in the background
-    except Exception:  # noqa: BLE001 - keep the add-on alive
-        log.exception("startup sync failed")
+    for attempt in range(6):  # Home Assistant may not be ready yet right after a restart (502): try again
+        try:
+            if engine.ha.available and s.persons:
+                log.info("history backfill: %d new points", engine.backfill_history())
+            res = engine.rebuild()
+            if res.get("error") and engine.ha.available and attempt < 5:
+                log.info("Home Assistant not ready yet (%s) – trying again in 30 s", res["error"])
+                if stop.wait(30):
+                    return
+                continue
+            log.info("rebuild: %s", res)
+            warm(engine)
+            engine.routes_wanted.set()  # lay new gaps onto the rail/road network in the background
+        except Exception:  # noqa: BLE001 - keep the add-on alive
+            log.exception("startup sync failed")
+        break
     last_rebuild = time.time()
     while not stop.wait(max(60, engine.s.poll_interval_min * 60)):
         s = engine.s  # settings may change through the UI
